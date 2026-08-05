@@ -1,0 +1,25 @@
+{
+  "name": "booktoskill-hpe-oca-scraper",
+  "version": "1.0.0",
+  "description": "HPE OCA Solution & Product Catalog Intelligence Pipeline",
+  "main": "scripts/scrape_oca_solution.js",
+  "scripts": {
+    "scrape": "node scripts/scrape_oca_solution.js",
+    "scrape:storage": "node scripts/scrape_oca_storage_solution.js",
+    "raw": "node scripts/scrape_oca.js",
+    "expand": "node scripts/expand_and_rescrape.js",
+    "build": "node scripts/build_catalog.js",
+    "generate": "node scripts/generate_xlsx.js",
+    "verify": "node scripts/verify_excel_tally.js",
+    "audit": "node scripts/test_pipeline_evals.js",
+    "diff": "node scripts/lib/diff_catalog.js",
+    "download:qs": "node scripts/download_quickspecs_pdf.js",
+    "demo:qs": "node scripts/demo_qs_vs_menu_cdp.js",
+    "demo:live": "node scripts/live_visual_demo_cdp.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "xlsx": "^0.18.5",
+    "xlsx-js-style": "^1.2.0"
+  }
+}

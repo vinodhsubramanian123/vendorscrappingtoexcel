@@ -1,0 +1,28 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Scrape outputs — large binaries and generated files
+# Keep the directory structure but not the actual data files
+outputs/**/*.json
+outputs/**/*.xlsx
+outputs/**/*.tsv
+outputs/**/*.pdf
+outputs/**/*.html
+# Always keep the registry and directory structure
+!outputs/SCRAPED_CATALOGS.md
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Scratch / temp
+*.crdownload
