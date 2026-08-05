@@ -256,7 +256,7 @@ Assigns functional roles based on description keywords:
 | 16 | Start Date | Availability start | `02/24/2025` |
 | 17 | Discontinued Date | End of availability | `06/30/2029` |
 
-### Diff Fields (5 — PLANNED)
+### Diff Fields (5 — Active Production)
 
 | # | Field | Description | Example |
 |---|-------|-------------|---------|
@@ -264,7 +264,23 @@ Assigns functional roles based on description keywords:
 | 19 | Previous List Price (USD) | Price from last scrape | `300.00` |
 | 20 | Price Change (USD) | Absolute delta | `+16.00` |
 | 21 | Price Change (%) | Percentage delta | `+5.33%` |
-| 22 | Price History Trail | Cumulative trail | `2026-08-05: $300 → 2026-09-01: $316 (+5.33%)` |
+| 22 | Price History Trail | Cumulative trail | `2026-08-01: $300.00 → 2026-08-05: $316.00 (▲)` |
+
+---
+
+## Re-Scrape & Historical Delta Tracking Workflow
+
+When asked to re-run or update an existing catalog solution:
+1. Run `npm run scrape` (or `npm run scrape:storage` for storage wizards).
+2. `build_catalog.js` invokes `processCatalogDiff()` from `scripts/lib/diff_catalog.js`.
+3. It loads the previous snapshot from `history/catalog_{YYYY-MM-DD}.json` and `history/price_history.json`.
+4. Computes SKU diffs:
+   - **`ADDED`**: New SKUs get Green fill (`#E6F4EA`) + bold font.
+   - **`REMOVED`**: Discontinued SKUs are preserved as Tombstones (`[DISCONTINUED]`) with Red fill (`#FDE7E7`) + strikethrough.
+   - **`PRICE_CHANGED`**: Price changes get Amber fill (`#FFF3E0`) + delta fields.
+5. Saves new date-stamped snapshot under `history/` and writes styled Excel workbook with dedicated `Catalog Diff & History` sheet.
+6. Run `npm run registry:sync` to synchronize `outputs/SCRAPED_CATALOGS.md`.
+7. Run `npm run audit:all` to verify 100% portfolio compliance.
 
 ---
 
@@ -273,15 +289,19 @@ Assigns functional roles based on description keywords:
 | Script | CLI Signature | Purpose |
 |--------|---------------|---------|
 | `scripts/lib/cdp.js` | N/A (module) | Shared CDP utilities (`sendCommand`, `getOCATarget`, `connectWS`, `sleep`) |
+| `scripts/lib/diff_catalog.js` | N/A (module) | Historical catalog diff & price history engine (tombstone injection) |
+| `scripts/lib/registry.js` | N/A (module) | Shared registry table updater (`updateScrapedRegistry`) |
+| `scripts/lib/sync_registry.js` | `npm run registry:sync` | Auto-scans `outputs/` and syncs `SCRAPED_CATALOGS.md` |
 | `scripts/scrape_oca.js` | `node scripts/scrape_oca.js <raw_json_out>` | Initial CDP raw data extractor |
 | `scripts/expand_and_rescrape.js` | `node scripts/expand_and_rescrape.js <raw_json_out>` | Expand all DOM sections then re-scrape |
-| `scripts/scrape_oca_solution.js` | `node scripts/scrape_oca_solution.js` | Generic E2E solution scraper (auto-detects chassis) |
-| `scripts/scrape_oca_storage_solution.js` | `node scripts/scrape_oca_storage_solution.js` | Storage wizard scraper (Alletra/Nimble/MSA) |
-| `scripts/build_catalog.js` | `node scripts/build_catalog.js <raw.json> <catalog.json>` | Parse raw JSON → classified catalog JSON + TSVs |
-| `scripts/generate_xlsx.js` | `node scripts/generate_xlsx.js <output.xlsx>` | TSVs → multi-sheet Excel workbook |
+| `scripts/scrape_oca_solution.js` | `npm run scrape` | Generic E2E solution scraper (extracts DOM section landmarks) |
+| `scripts/scrape_oca_storage_solution.js` | `npm run scrape:storage` | Storage wizard scraper (Alletra/Nimble/MSA) |
+| `scripts/build_catalog.js` | `node scripts/build_catalog.js <raw.json> <catalog.json>` | Parse raw JSON → classified catalog JSON + TSVs + diffs |
+| `scripts/generate_xlsx.js` | `node scripts/generate_xlsx.js <output.xlsx>` | TSVs → multi-sheet Excel workbook (`xlsx-js-style` colors + freeze panes + autofilters) |
 | `scripts/download_quickspecs_pdf.js` | `node scripts/download_quickspecs_pdf.js <docId> <dest_pdf_path>` | Download + MD5-cache QuickSpecs PDF |
-| `scripts/verify_excel_tally.js` | `node scripts/verify_excel_tally.js <output.xlsx>` | Post-flight 6-check audit |
-| `scripts/test_pipeline_evals.js` | `node scripts/test_pipeline_evals.js <output.xlsx>` | Pre/in/post-flight eval suite |
+| `scripts/verify_excel_tally.js` | `node scripts/verify_excel_tally.js <output.xlsx>` | Post-flight 7-check audit (includes diff verification) |
+| `scripts/test_pipeline_evals.js` | `node scripts/test_pipeline_evals.js <output.xlsx> [--post-flight-only]` | Pre/in/post-flight eval suite (supports standalone post-flight mode) |
+| `scripts/verify_all.js` | `npm run audit:all` | One-shot portfolio audit suite across all outputs |
 | `scripts/demo_qs_vs_menu_cdp.js` | `node scripts/demo_qs_vs_menu_cdp.js` | QuickSpecs vs Menu link visual demo |
 | `scripts/live_visual_demo_cdp.js` | `node scripts/live_visual_demo_cdp.js` | Live browser banner demo |
 
@@ -291,6 +311,6 @@ Assigns functional roles based on description keywords:
 1. User opens OCA and navigates to the target solution/chassis (authenticated session already open)
 2. Determine protocol: **Server** → `npm run scrape` | **Storage Wizard** → `npm run scrape:storage`
 3. Script auto-detects family/gen/model from DOM breadcrumbs
-4. Run `node scripts/verify_excel_tally.js <output.xlsx>` — all checks must pass
-5. Add a row to `outputs/SCRAPED_CATALOGS.md`
+4. Run `npm run registry:sync` to index the new catalog in master registry
+5. Run `npm run audit:all` — verify 100% portfolio certification
 6. **No code changes required** — all scripts are fully generic across all HPE product families
