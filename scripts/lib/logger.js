@@ -1,9 +1,10 @@
 'use strict';
 /**
- * scripts/lib/logger.js — Structured Cross-Platform Logger
+ * scripts/lib/logger.js — Structured Dynamic Local Timezone Logger
  *
- * Provides ISO-timestamped, severity-aware logging with optional JSON-lines
- * output mode and ASCII emoji fallbacks on Windows legacy terminals.
+ * Automatically detects and formats log timestamps in the host machine's
+ * current local timezone (e.g. IST in India, GST in Dubai, PST in US)
+ * without hardcoded offsets or location assumptions.
  */
 
 const isWindows = process.platform === 'win32';
@@ -21,12 +22,56 @@ const SYMBOLS = isWindows ? {
   step: '📌', launch: '🚀', success: '🎉', debug: '🔍'
 };
 
+/**
+ * Get the system's timezone name / short abbreviation (e.g., IST, GST, PST, UTC).
+ */
+function getSystemTimezone() {
+  try {
+    const tzMatch = new Date().toTimeString().match(/\((.+)\)$/);
+    if (tzMatch && tzMatch[1]) return tzMatch[1];
+  } catch {}
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {}
+  return 'UTC';
+}
+
+/**
+ * Format a Date object into local YYYY-MM-DD HH:mm:ss TZ string dynamically.
+ * Automatically adapts whether executed in India (IST), Dubai (GST), US, Europe, etc.
+ * @param {Date} [date=new Date()]
+ * @returns {string}
+ */
+function getLocalTimestamp(date = new Date()) {
+  const d = date instanceof Date ? date : new Date(date);
+  const year  = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day   = String(d.getDate()).padStart(2, '0');
+  const hours = String(d.getHours()).padStart(2, '0');
+  const mins  = String(d.getMinutes()).padStart(2, '0');
+  const secs  = String(d.getSeconds()).padStart(2, '0');
+  const tz    = getSystemTimezone();
+
+  return `${year}-${month}-${day} ${hours}:${mins}:${secs} ${tz}`;
+}
+
 function formatMessage(context, level, msg, meta = null) {
-  const timestamp = new Date().toISOString();
+  const date = new Date();
+  const timestampISO = date.toISOString();
+  const timestampLocal = getLocalTimestamp(date);
+
   if (useJson) {
-    return JSON.stringify({ timestamp, level, context, message: msg, ...(meta ? { meta } : {}) });
+    return JSON.stringify({
+      timestamp: timestampISO,
+      timestampLocal,
+      level,
+      context,
+      message: msg,
+      ...(meta ? { meta } : {})
+    });
   }
-  const prefix = `[${timestamp}] [${level.toUpperCase().padEnd(5)}] [${context}]`;
+
+  const prefix = `[${timestampLocal}] [${level.toUpperCase().padEnd(5)}] [${context}]`;
   const metaStr = meta ? ` | ${JSON.stringify(meta)}` : '';
   return `${prefix} ${msg}${metaStr}`;
 }
@@ -71,8 +116,13 @@ function createLogger(context = 'App') {
       const meta = { totalDurationMs: totalDuration, status, ...extra };
       console.log(formatMessage(context, 'info', `${SYMBOLS.success} PIPELINE SUMMARY: ${status} in ${totalDuration} ms`, meta));
     },
-    SYMBOLS
+    SYMBOLS,
+    getLocalTimestamp,
+    getSystemTimezone
   };
 }
+
+createLogger.getLocalTimestamp = getLocalTimestamp;
+createLogger.getSystemTimezone = getSystemTimezone;
 
 module.exports = createLogger;
