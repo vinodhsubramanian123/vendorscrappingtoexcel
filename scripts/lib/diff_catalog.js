@@ -18,7 +18,8 @@ function parsePrice(val) {
 
 function formatDate(dateStr) {
   if (!dateStr) return new Date().toISOString().split('T')[0];
-  return dateStr.split('T')[0];
+  const matched = String(dateStr).match(/^\d{4}-\d{2}-\d{2}/);
+  return matched ? matched[0] : new Date().toISOString().split('T')[0];
 }
 
 /**
@@ -37,7 +38,11 @@ function processCatalogDiff(catalogData, historyDir) {
   // Load existing price history log
   let priceHistory = {};
   if (fs.existsSync(priceHistoryPath)) {
-    try { priceHistory = JSON.parse(fs.readFileSync(priceHistoryPath, 'utf-8')); } catch {}
+    try {
+      priceHistory = JSON.parse(fs.readFileSync(priceHistoryPath, 'utf-8'));
+    } catch (err) {
+      console.warn(`  ⚠️ Warning: Corrupted price_history.json at ${priceHistoryPath}: ${err.message}`);
+    }
   }
 
   // Find previous catalog snapshots (excluding today's file if re-running same day)
@@ -51,7 +56,11 @@ function processCatalogDiff(catalogData, historyDir) {
 
   let prevCatalog = null;
   if (prevSnapshotPath && fs.existsSync(prevSnapshotPath)) {
-    try { prevCatalog = JSON.parse(fs.readFileSync(prevSnapshotPath, 'utf-8')); } catch {}
+    try {
+      prevCatalog = JSON.parse(fs.readFileSync(prevSnapshotPath, 'utf-8'));
+    } catch (err) {
+      console.warn(`  ⚠️ Warning: Corrupted previous snapshot at ${prevSnapshotPath}: ${err.message}`);
+    }
   }
 
   // Build previous SKU lookup map

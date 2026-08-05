@@ -5,9 +5,8 @@
 
 'use strict';
 
-const WebSocket = require('ws');
 const fs    = require('fs');
-const XLSX  = require('xlsx');
+const XLSX  = require('xlsx-js-style');
 const path  = require('path');
 const { sendCommand, getOCATarget, connectWS, sleep } = require('./lib/cdp');
 
@@ -151,8 +150,8 @@ async function main() {
     if (expStats.totalShowMore > 0) {
       assert(expStats.totalShowMore > 0,
         `In-flight: Total showmore toggles (${expStats.totalShowMore}) > 0`);
-      assert(expStats.scrollHeight >= 1000,
-        `In-flight: scrollHeight (${expStats.scrollHeight}px) >= 1,000px (Rule #19)`);
+      assert(expStats.scrollHeight >= 15000,
+        `In-flight: scrollHeight (${expStats.scrollHeight}px) >= 15,000px (Rule #19)`);
     } else {
       console.log('  ⚠️  ADVISORY: Live page is not currently on an expanded Menu tab (post-flight eval mode).');
     }

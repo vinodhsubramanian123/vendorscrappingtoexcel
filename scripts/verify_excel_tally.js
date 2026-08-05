@@ -5,7 +5,7 @@
 
 'use strict';
 
-const XLSX   = require('xlsx');
+const XLSX   = require('xlsx-js-style');
 const fs     = require('fs');
 const path   = require('path');
 const crypto = require('crypto');
@@ -23,18 +23,21 @@ const targetDir  = path.dirname(xlsxPath);
 const xlsxBase   = path.basename(xlsxPath, '.xlsx');                    // e.g. DL380_Gen12_SFF_OCA_Catalog
 const filePrefix = xlsxBase.replace(/_OCA_Catalog$/, '');               // e.g. DL380_Gen12_SFF
 const jsonPath   = path.join(targetDir, `${filePrefix}_Catalog.json`);
-// PDF naming convention: HPE_{prefix}_QuickSpecs.pdf
 let pdfPath = path.join(targetDir, `HPE_${filePrefix}_QuickSpecs.pdf`);
 if (!fs.existsSync(pdfPath)) {
   const existingPdfs = fs.readdirSync(targetDir).filter(f => f.endsWith('.pdf'));
   if (existingPdfs.length > 0) pdfPath = path.join(targetDir, existingPdfs[0]);
 }
 
+const auditResults = { timestamp: new Date().toISOString(), chassis: filePrefix, checks: [] };
+
 function assert(condition, message) {
   if (condition) {
     console.log(`  ✅ PASS: ${message}`);
+    auditResults.checks.push({ status: 'PASS', message });
   } else {
     console.error(`  ❌ FAIL: ${message}`);
+    auditResults.checks.push({ status: 'FAIL', message });
     throw new Error(`Guardrail Failure: ${message}`);
   }
 }
@@ -96,18 +99,21 @@ async function main() {
   assert(summarySkuSum > 0, `Category Summary SKU sum (${summarySkuSum}) > 0`);
   assert(summarySheet.length >= 3, `Category Summary has ${summarySheet.length} subcategory rows (>= 3)`);
 
-  // ── AUDIT 4: Data Quality (Qty regex + Hierarchy depth) ──────────────────
+  // ── AUDIT 4: Data Quality (Qty regex + Hierarchy depth + Option Type) ──
   console.log('\n--- AUDIT 4: Data Quality Guardrails ---');
-  let cleanQtyCount      = 0;
-  let validHierarchyCount = 0;
+  let cleanQtyCount       = 0;
+  let validHierarchyCount  = 0;
+  let validOptionTypeCount = 0;
 
   allSkusSheet.forEach(row => {
     const qty = String(row['Current Qty'] || row['Quantity'] || '');
     if (/^\d+$/.test(qty)) cleanQtyCount++;
 
-    // Rule #20: Hierarchy Path MUST contain >= 3 '>' delimiters (4-level path)
     const pathStr = String(row['Hierarchy Path'] || '');
     if ((pathStr.match(/>/g) || []).length >= 3) validHierarchyCount++;
+
+    const optType = String(row['Option Type'] || '');
+    if (['Standard', 'CTO', 'BTO', 'FIO'].includes(optType)) validOptionTypeCount++;
   });
 
   assert(
@@ -117,6 +123,10 @@ async function main() {
   assert(
     validHierarchyCount === allSkusSheet.length,
     `100% of SKUs (${validHierarchyCount}/${allSkusSheet.length}) have 4-level Hierarchy Path (>= 3 '>' delimiters, Rule #20)`
+  );
+  assert(
+    validOptionTypeCount === allSkusSheet.length,
+    `100% of SKUs (${validOptionTypeCount}/${allSkusSheet.length}) have valid Option Type (Standard/CTO/BTO/FIO, Rule #30)`
   );
 
   // ── AUDIT 5: Category-Specific Sheet Tallies ──────────────────────────────
@@ -153,6 +163,10 @@ async function main() {
   } else {
     console.log('  ⚠️  ADVISORY: history/ directory not yet established for this chassis.');
   }
+
+  // Write structured audit result file
+  const auditJsonPath = path.join(targetDir, 'audit_result.json');
+  fs.writeFileSync(auditJsonPath, JSON.stringify(auditResults, null, 2));
 
   console.log('\n================================================================');
   console.log('🎉 ALL AUDIT CHECKS PASSED — PIPELINE 100% COMPLIANT!');

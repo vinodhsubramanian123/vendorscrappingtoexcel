@@ -43,7 +43,9 @@ function verifyAll() {
   let passCount = 0;
   let failCount = 0;
 
+  const suiteStart = Date.now();
   xlsxFiles.sort().forEach((xlsxPath, idx) => {
+    const itemStart = Date.now();
     const relPath = path.relative(PROJECT_ROOT, xlsxPath);
     console.log(`\n----------------------------------------------------------------`);
     console.log(`[${idx + 1}/${xlsxFiles.length}] Auditing: ${relPath}`);
@@ -62,6 +64,8 @@ function verifyAll() {
         cwd: PROJECT_ROOT
       });
 
+      const itemDuration = ((Date.now() - itemStart) / 1000).toFixed(2);
+      console.log(`  ⏱️ Verified ${relPath} in ${itemDuration}s`);
       passCount++;
     } catch (err) {
       console.error(`❌ AUDIT FAILED for ${relPath}:`, err.message);
@@ -69,8 +73,9 @@ function verifyAll() {
     }
   });
 
+  const totalDuration = ((Date.now() - suiteStart) / 1000).toFixed(2);
   console.log('\n================================================================');
-  console.log(`📊 PORTFOLIO AUDIT SUMMARY: ${passCount}/${xlsxFiles.length} PASSED`);
+  console.log(`📊 PORTFOLIO AUDIT SUMMARY: ${passCount}/${xlsxFiles.length} PASSED in ${totalDuration}s`);
   if (failCount === 0) {
     console.log('🎉 100% PORTFOLIO CERTIFICATION PASSED!');
   } else {

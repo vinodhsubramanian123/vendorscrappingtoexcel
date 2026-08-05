@@ -3,6 +3,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-18%2B-brightgreen.svg)](https://nodejs.org/)
 [![CDP](https://img.shields.io/badge/Protocol-Chrome_DevTools_Protocol_9222-blue.svg)](https://chromedevtools.github.io/devtools-protocol/)
 [![HPE OCA](https://img.shields.io/badge/Target-HPE_Online_Configuration_Application-orange.svg)](https://oca.ext.hpe.com)
+[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20Mint%20%7C%20Windows-blue.svg)]()
 
 A high-performance, zero-hardcoding scraper and intelligence classification engine for the **HPE Online Configuration Application (OCA)** portal.
 
@@ -10,97 +11,46 @@ Generates multi-sheet Excel workbooks, structured JSON companions, TSV intermedi
 
 ---
 
-## 📊 Pipeline State of Health
+## ⚡ Quick Start & Cross-Platform Prerequisites
 
-| Product | Family | SKUs | Sheets | QuickSpecs PDF | Audit Status | Last Scraped |
-|---------|--------|------|--------|----------------|-------------|-------------|
-| HPE ProLiant DL380 Gen12 SFF | ProLiant | 1,037 | 29 | ✅ Verified (2.06 MB) | ✅ 100% PASS | 2026-08-05 |
-| HPE Alletra 5000 (Storage) | Alletra | 404 | 8 | ✅ Verified (2.06 MB) | ✅ 100% PASS | 2026-08-05 |
-| HPE ProLiant DL380 Gen11 | ProLiant | 1,414 | 24 | ✅ Verified (2.06 MB) | ✅ 100% PASS | 2026-08-05 |
-| HPE StoreEver MSL3040 Tape Library | StoreEver | 128 | 12 | ✅ Verified (2.06 MB) | ✅ 100% PASS | 2026-08-05 |
-| HPE Cray Supercomputing GX5000 Rack | Cray | 46 | 11 | ⚠️ Advisory | ✅ 100% PASS | 2026-08-05 |
-| HPE Synergy VC 100Gb F32 Module | Synergy | 141 | 9 | ✅ Verified (0.89 MB) | ✅ 100% PASS | 2026-08-05 |
+### 1. Prerequisites
+- **Node.js ≥ 18**
+- Run `npm install` (installs `ws`, `xlsx`, and `xlsx-js-style`)
+- Chrome or Chromium browser running with Remote Debugging enabled on port 9222
 
-**Total Portfolio Intelligence**: **3,170 unique SKUs** across 6 product lines in 5 families.
+### 2. Browser Launch Command (CDP Port 9222)
 
-### 🌟 Key Features Implemented
-- **Automated WebLogic Dialog & Session Timeout Protocol**: Intercepts JS alerts/confirms and DOM session prompts automatically.
-- **CTO vs Base SKU Normalization (Rule #30)**: Strips `CTO`, `BTO`, `FIO` suffixes to yield clean base SKUs + `Option Type` schema column.
-- **Historical Snapshot Versioning & Price Delta Tracking**: Auto-saves date-stamped snapshots in `history/` and logs cumulative price trails.
-- **MD5-Fingerprinted QuickSpecs PDF Downloader**: Automatically downloads and verifies QuickSpecs PDFs via active session or PSNOW.
-- **Master Catalog Registry Auto-Synchronizer (`npm run registry:sync`)**: Automatically indexes all catalog JSON outputs and maintains `outputs/SCRAPED_CATALOGS.md`.
-- **Standalone Post-Flight Audit Mode**: `test_pipeline_evals.js` supports `--post-flight-only` and adaptive threshold assertions (`> 500` chars or `tableCount > 0`).
+Before running scrapers, open your browser with remote debugging on port 9222:
 
----
-
-## 🎯 Project Goals & Business Purpose
-
-```mermaid
-graph LR
-    A["HPE Partner Portal & OCA Session"] -->|"CDP Scraping"| B["Raw DOM & Table Extraction"]
-    B -->|"Classification Engine"| C["Structured JSON & TSVs"]
-    C -->|"Diff Engine"| H["Price History & Delta Tracking"]
-    H -->|"Excel Generator"| D["Multi-Sheet Excel Workbook (xlsx-js-style)"]
-    C -->|"Notebook LM Import"| E["Google Notebook LM Intelligence"]
-    C -->|"BOM Engine Import"| F["Vendor BOM Comparison Engine"]
-    A -->|"QuickSpecs Downloader"| G["MD5-Fingerprinted QuickSpecs PDF"]
+**macOS:**
+```bash
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+  --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
 ```
 
-1. **Catalog Intelligence Extraction**: Capture complete product options, component relationships, quantity constraints, and configuration rules from live HPE OCA quotes.
-2. **Multi-Product Line Support**: Universal compatibility across **HPE ProLiant** (servers), **HPE Synergy** (composable frames & compute modules), **HPE Alletra / Nimble / StoreOnce** (storage systems), **HPE Aruba** (networking switches), and **HPE Cray** (supercomputing cabinets).
-3. **Zero Hardcoding Architecture**: 100% path and product dynamic. Scripts derive chassis names, base SKUs, output paths, and category mappings dynamically from the DOM.
-4. **BOM Comparison & Notebook LM Ready**: Generates structured 17-field SKU schemas with 4-level hierarchy paths (`HPE OCA > {Chassis} [{BaseSKU}] > {Main Category} > {Sub-Category}`) for seamless cross-vendor BOM validation.
-5. **Price & SKU Delta Tracking**: Historical snapshots enable color-coded diff reports (Green=Added, Red=Removed, Amber=Price Changed) for procurement intelligence.
-
----
-
-## 🔄 End-to-End Workflow Architecture
-
-```mermaid
-graph TD
-    subgraph "Stage 1: CDP Connection"
-        A1["CDP Port 9222 getOCATarget()"] -->|"Find oca.ext.hpe.com"| A2["WebSocket Connection"]
-    end
-
-    subgraph "Stage 2: Traversal & Expansion"
-        B1["Solution Traversal (4-Level Protocol)"] --> B2["Expand All & Show More Checkboxes"]
-        B2 -->|"Assert scrollHeight >= 15000px"| B3["DOM Expanded"]
-    end
-
-    subgraph "Stage 3: Extraction & Caching"
-        C1["Chunked Text Extraction <= 50K"] --> C3["Raw JSON Payload"]
-        C2["Row Array Table Extraction"] --> C3
-        C4["QuickSpecs PDF Downloader"] -->|"MD5 Fingerprint Cache Check"| C5["HPE QuickSpecs PDF"]
-    end
-
-    subgraph "Stage 4: Classification & Build"
-        C3 --> D1["build_catalog.js Classification Engine"]
-        D1 -->|"Parse Constraints max/required/no max"| D2["Category & Sub-Table Merger"]
-        D2 -->|"Role Mapper"| D3["TSVs + Catalog JSON"]
-    end
-
-    subgraph "Stage 5: Diff & History"
-        D3 --> DH1["diff_catalog.js Diff Engine"]
-        DH1 -->|"Compare with Previous Snapshots"| DH2["Enriched Catalog with Diff Status"]
-    end
-
-    subgraph "Stage 6: Excel & Audit"
-        DH2 --> E1["generate_xlsx.js Excel Generator (xlsx-js-style)"]
-        E1 --> E2["verify_excel_tally.js & test_pipeline_evals.js Audit Assertions"]
-        E2 -->|"All Checks Pass"| E3["Master Registry Auto-Syncer sync_registry.js"]
-    end
+**Linux Mint / Ubuntu / Fedora:**
+```bash
+google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
+# or for Chromium:
+chromium-browser --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
 ```
 
----
+**Windows (PowerShell):**
+```powershell
+& "C:\Program Files\Google\Chrome\Application\chrome.exe" `
+  --remote-debugging-port=9222 --user-data-dir="$env:TEMP\chrome-debug"
+```
 
-## ⚡ Quick Start
+**Windows (cmd.exe):**
+```cmd
+chcp 65001
+"C:\Program Files\Google\Chrome\Application\chrome.exe" ^
+  --remote-debugging-port=9222 --user-data-dir="%TEMP%\chrome-debug"
+```
 
-### Prerequisites
-- Node.js ≥ 18
-- `npm install` (installs `ws` and `xlsx`)
-- Active authenticated session in the Antigravity browser on `oca.ext.hpe.com`
+> **Note**: Log into the HPE Partner Portal (`https://partner.hpe.com`) in the launched browser window, then navigate to your target chassis configuration quote in OCA.
 
-### Single-Command Integrated Run
+### 3. Single-Command Integrated Run
 Navigate to the target chassis or solution in OCA, then run:
 
 ```bash

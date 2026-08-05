@@ -1,0 +1,80 @@
+{
+  "mainCategories": [
+    "Energy Star", "Processor", "Memory", "Smart Chassis", "Ambient Temperature",
+    "Storage Devices", "Security Options", "Factory Configuration Settings", "Networking",
+    "Accessories", "OS Boot Device", "Manufacturing Services", "Rack Options",
+    "Graphics Options", "Power Supplies", "Private Cloud Business Edition", "AI-at-Scale",
+    "HPC Software Products", "HPE Compute Ops Management", "OEM Software",
+    "ProLiant Media Kits and License", "Server Management Software", "SGI Software",
+    "Hybrid RAID", "Supported Operating System", "Supported OS License Pack",
+    "Virtualization", "Ad-Hoc", "Synergy Framing", "Cray Interconnect", "Alletra Controller",
+    "Array Selection", "Base Array Components", "Add-on Storage", "MISC Hardware",
+    "Base Array", "Expansion Shelves", "Spare Parts", "Switches",
+    "Tape Drives", "MSL Options", "Cables", "Expansion Modules", "Storage Media", "Power Cords", "Software",
+    "Encryption Kit", "Power Supply", "Compute Blades", "Cabinet Power and Cooling", "Cabinet Power",
+    "Compute and Storage", "Management Hardware", "Interconnects", "Frame Options", "Operating Environment", "Cooling Options",
+    "Transceivers", "Direct Attach Cables", "Interconnect Modules", "Optical Transceivers", "Storage Modules", "Composer",
+    "QSFP Options", "SFP Options", "License Upgrade", "Licenses"
+  ],
+  "componentRoles": [
+    {
+      "role": "Base Chassis",
+      "patterns": ["configure-to-order", "cto server", "frame cto", "chassis cto", "p73282-b21"],
+      "subcatPatterns": ["base"]
+    },
+    {
+      "role": "Synergy Infrastructure",
+      "patterns": ["synergy frame", "frame link module", "composer", "image streamer"]
+    },
+    {
+      "role": "FIO Setting / Preset",
+      "patterns": ["fio setting", "fio tracking", "password fio", "ras os control", "platform certificate"]
+    },
+    {
+      "role": "Fabric & Interconnect",
+      "patterns": ["transceiver", "dac cable", "direct attach", "slingshot", "virtual connect", "sas switch module", "fabric module"]
+    },
+    {
+      "role": "Interconnect / Cable",
+      "patterns": ["cable", "cbl", "power cord", "cord"]
+    },
+    {
+      "role": "Storage Controller",
+      "patterns": ["controller", "mr408i", "mr416i", "mr216i", "mr932i", "vroc", "raid", "hba", "smart array"]
+    },
+    {
+      "role": "Enablement / Cage",
+      "patterns": ["cage", "bay", "midplane", "enablement", "media bay", "drive enclosure", "expansion shelf"]
+    },
+    {
+      "role": "Riser & Expansion",
+      "patterns": ["riser", "retimer", "tertiary", "line card"]
+    },
+    {
+      "role": "Power & Thermal",
+      "patterns": ["heat sink", "heatsink", "fan", "cooling", "liquid cooling", "power supply", "ps kit", "pdu"]
+    },
+    {
+      "role": "CPU / Processor",
+      "patterns": ["xeon", "epyc", "processor"],
+      "subcatPatterns": ["processor"],
+      "parentPatterns": ["processor"]
+    },
+    {
+      "role": "Memory",
+      "patterns": ["memory", "dimm"],
+      "subcatPatterns": ["memory"],
+      "parentPatterns": ["memory"]
+    },
+    {
+      "role": "Networking",
+      "patterns": ["ethernet", "infiniband", "fibre channel", "ocp3", "ocp", "adapter", "aruba"],
+      "parentPatterns": ["networking"]
+    },
+    {
+      "role": "Software & License",
+      "patterns": ["saas", "ltu", "rtu", "license", "ilo", "oneview", "ops management", "software", "rhel", "windows", "suse", "vmware", "nvidia rtx"],
+      "parentPatterns": ["software"]
+    }
+  ]
+}

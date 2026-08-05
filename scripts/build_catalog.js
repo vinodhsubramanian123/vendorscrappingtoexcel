@@ -97,23 +97,20 @@ if (IS_VERBOSE) {
 // ============================================================
 console.log('\n--- Step 2: Mapping Parent Categories ---');
 
-const KNOWN_MAIN_CATEGORIES = [
-  'Energy Star', 'Processor', 'Memory', 'Smart Chassis', 'Ambient Temperature',
-  'Storage Devices', 'Security Options', 'Factory Configuration Settings', 'Networking',
-  'Accessories', 'OS Boot Device', 'Manufacturing Services', 'Rack Options',
-  'Graphics Options', 'Power Supplies', 'Private Cloud Business Edition', 'AI-at-Scale',
-  'HPC Software Products', 'HPE Compute Ops Management', 'OEM Software',
-  'ProLiant Media Kits and License', 'Server Management Software', 'SGI Software',
-  'Hybrid RAID', 'Supported Operating System', 'Supported OS License Pack',
-  'Virtualization', 'Ad-Hoc', 'Synergy Framing', 'Cray Interconnect', 'Alletra Controller',
-  'Array Selection', 'Base Array Components', 'Add-on Storage', 'MISC Hardware',
-  'Base Array', 'Expansion Shelves', 'Spare Parts', 'Switches',
-  'Tape Drives', 'MSL Options', 'Cables', 'Expansion Modules', 'Storage Media', 'Power Cords', 'Software',
-  'Encryption Kit', 'Power Supply', 'Compute Blades', 'Cabinet Power and Cooling', 'Cabinet Power',
-  'Compute and Storage', 'Management Hardware', 'Interconnects', 'Frame Options', 'Operating Environment', 'Cooling Options',
-  'Transceivers', 'Direct Attach Cables', 'Interconnect Modules', 'Optical Transceivers', 'Storage Modules', 'Composer',
-  'QSFP Options', 'SFP Options', 'License Upgrade', 'Licenses'
-];
+const configPath = path.join(__dirname, 'config', 'categories.json');
+let KNOWN_MAIN_CATEGORIES = [];
+let COMPONENT_ROLES_CONFIG = [];
+
+if (fs.existsSync(configPath)) {
+  try {
+    const parsedConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    KNOWN_MAIN_CATEGORIES = parsedConfig.mainCategories || [];
+    COMPONENT_ROLES_CONFIG = parsedConfig.componentRoles || [];
+  } catch (err) {
+    console.warn(`  ⚠️ Failed to parse config/categories.json: ${err.message}`);
+  }
+}
+
 
 // Hybrid category discovery: combine KNOWN_MAIN_CATEGORIES + dynamic section headings
 const mainCategories = [...KNOWN_MAIN_CATEGORIES];
@@ -377,46 +374,23 @@ for (const entry of orderedEntries) {
 
 console.log(`Merged ${mergedSubtableCount} sub-tables into preceding parent subcategories (DOM index order).`);
 
-// ============================================================
-// Step 5: Helper Functions for TSV Generation
-// ============================================================
-
 function getComponentRole(sku, subCat, parentCat) {
   const desc   = (sku['Description'] || '').toLowerCase();
   const sub    = (subCat || '').toLowerCase();
   const parent = (parentCat || '').toLowerCase();
   const pn     = (sku['Product #'] || '').toLowerCase();
 
-  // Base Chassis & Frames (ProLiant, Synergy 12000, Cray EX, Alletra Enclosure)
-  if (desc.includes('configure-to-order') || desc.includes('cto server') || desc.includes('frame CTO') || desc.includes('chassis CTO') || sub.includes('base') || pn === 'p73282-b21') return 'Base Chassis';
-  if (desc.includes('synergy frame') || desc.includes('frame link module') || desc.includes('composer') || desc.includes('image streamer')) return 'Synergy Infrastructure';
-
-  // FIO & Presets
-  if (desc.includes('fio setting') || desc.includes('fio tracking') || desc.includes('password fio') || desc.includes('ras os control') || desc.includes('platform certificate')) return 'FIO Setting / Preset';
-
-  // Interconnect, Transceivers, Cables & Fabric Switches
-  if (desc.includes('transceiver') || desc.includes('dac cable') || desc.includes('direct attach') || desc.includes('slingshot') || desc.includes('virtual connect') || desc.includes('sas switch module') || desc.includes('fabric module')) return 'Fabric & Interconnect';
-  if (desc.includes('cable') || desc.includes('cbl') || desc.includes('power cord') || desc.includes('cord')) return 'Interconnect / Cable';
-
-  // Storage Controllers & Storage Enclosures (ProLiant, Alletra, Nimble, StoreOnce, Synergy D3940)
-  if (desc.includes('controller') || desc.includes('mr408i') || desc.includes('mr416i') || desc.includes('mr216i') || desc.includes('mr932i') || desc.includes('vroc') || desc.includes('raid') || desc.includes('hba') || desc.includes('smart array')) return 'Storage Controller';
-  if (desc.includes('cage') || desc.includes('bay') || desc.includes('midplane') || desc.includes('enablement') || desc.includes('media bay') || desc.includes('drive enclosure') || desc.includes('expansion shelf')) return 'Enablement / Cage';
-
-  // Expansion & Risers
-  if (desc.includes('riser') || desc.includes('retimer') || desc.includes('tertiary') || desc.includes('line card')) return 'Riser & Expansion';
-
-  // Power & Thermal
-  if (desc.includes('heat sink') || desc.includes('heatsink') || desc.includes('fan') || desc.includes('cooling') || desc.includes('liquid cooling') || desc.includes('power supply') || desc.includes('ps kit') || desc.includes('pdu')) return 'Power & Thermal';
-
-  // Compute & Memory
-  if (desc.includes('xeon') || desc.includes('epyc') || desc.includes('processor') || sub.includes('processor') || parent.includes('processor')) return 'CPU / Processor';
-  if (desc.includes('memory') || desc.includes('dimm') || sub.includes('memory') || parent.includes('memory')) return 'Memory';
-
-  // Networking (Ethernet, InfiniBand, Fibre Channel, OCP)
-  if (desc.includes('ethernet') || desc.includes('infiniband') || desc.includes('fibre channel') || desc.includes('ocp3') || desc.includes('ocp') || desc.includes('adapter') || desc.includes('aruba') || parent.includes('networking')) return 'Networking';
-
-  // Software, Operating Systems & Management
-  if (desc.includes('saas') || desc.includes('ltu') || desc.includes('rtu') || desc.includes('license') || desc.includes('ilo') || desc.includes('oneview') || desc.includes('ops management') || desc.includes('software') || desc.includes('rhel') || desc.includes('windows') || desc.includes('suse') || desc.includes('vmware') || desc.includes('nvidia rtx') || parent.includes('software')) return 'Software & License';
+  for (const item of COMPONENT_ROLES_CONFIG) {
+    if (item.patterns && item.patterns.some(p => desc.includes(p) || pn.includes(p))) {
+      return item.role;
+    }
+    if (item.subcatPatterns && item.subcatPatterns.some(p => sub.includes(p))) {
+      return item.role;
+    }
+    if (item.parentPatterns && item.parentPatterns.some(p => parent.includes(p))) {
+      return item.role;
+    }
+  }
 
   return 'Hardware Component';
 }
@@ -424,7 +398,7 @@ function getComponentRole(sku, subCat, parentCat) {
 function generateMainSheet(entries) {
   const rows = [[
     'Main Category', 'Sub-Category', 'Hierarchy Path', 'Component Role', 'Constraint Text',
-    'Subcategory Max Qty', 'Table Rule/Note', 'Product #', 'Description', 'Current Qty',
+    'Subcategory Max Qty', 'Table Rule/Note', 'Product #', 'Option Type', 'Description', 'Current Qty',
     'Unit Price (USD)', 'Price Delta (USD)', 'Extended Price (USD)', 'Price per GB (USD)',
     'HPE Recommended', 'Start Date', 'Discontinued Date',
     'Diff Status', 'Previous List Price (USD)', 'Price Change (USD)', 'Price Change (%)', 'Price History Trail'
@@ -449,7 +423,7 @@ function generateMainSheet(entries) {
 
       rows.push([
         entry.parentCategory, entry.subCategory, hierarchyPath, role, constraintStr, maxQtyVal,
-        entry.rules.join(' | '), sku['Product #'] || '', sku['Description'] || '', cleanQty,
+        entry.rules.join(' | '), sku['Product #'] || '', sku['Option Type'] || 'Standard', sku['Description'] || '', cleanQty,
         sku['Price (USD)'] || sku['Unit Price (USD)'] || '', sku['Price Delta (USD)'] || '', sku['Extended Price (USD)'] || '',
         sku['Price per GB (USD)'] || '', sku['HPE Recommended'] || '', sku['Start Date'] || sku['Start'] || '', sku['Discontinued Date'] || sku['Discontinued'] || '',
         sku['Diff Status'] || 'UNCHANGED', sku['Previous List Price (USD)'] || 'N/A', sku['Price Change (USD)'] || '$0.00', sku['Price Change (%)'] || '0.00%', sku['Price History Trail'] || ''
@@ -458,6 +432,9 @@ function generateMainSheet(entries) {
   }
   return rows.join('\n');
 }
+
+
+
 
 function generateRulesSheet(entries) {
   const rows = [['Main Category', 'Sub-Category', 'Constraint', 'Rule Type', 'Rule Text'].join('\t')];

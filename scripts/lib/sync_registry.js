@@ -8,23 +8,29 @@
 
 const fs   = require('fs');
 const path = require('path');
-const { updateScrapedRegistry, REGISTRY_PATH } = require('./registry');
+const { updateScrapedRegistry } = require('./registry');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
 const OUTPUTS_ROOT = path.join(PROJECT_ROOT, 'outputs');
 
 function findCatalogJsonFiles(dir) {
   let results = [];
-  const list  = fs.readdirSync(dir);
+  if (!fs.existsSync(dir)) return results;
+
+  const list = fs.readdirSync(dir);
 
   list.forEach(file => {
+    if (file.startsWith('.')) return; // Skip dotfiles (.DS_Store, etc)
     const filePath = path.join(dir, file);
-    const stat     = fs.statSync(filePath);
-
-    if (stat && stat.isDirectory()) {
-      results = results.concat(findCatalogJsonFiles(filePath));
-    } else if (file.endsWith('_Catalog.json') && !filePath.includes('raw_data')) {
-      results.push(filePath);
+    try {
+      const stat = fs.statSync(filePath);
+      if (stat && stat.isDirectory()) {
+        results = results.concat(findCatalogJsonFiles(filePath));
+      } else if (file.endsWith('_Catalog.json') && !filePath.includes('raw_data')) {
+        results.push(filePath);
+      }
+    } catch (err) {
+      console.warn(`  ⚠️ Could not stat ${filePath}: ${err.message}`);
     }
   });
 

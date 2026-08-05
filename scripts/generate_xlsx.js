@@ -53,7 +53,7 @@ const summaryData = parseTSV(path.join(scrapsDir, `${filePrefix}_Catalog_Summary
 // ── Build workbook ────────────────────────────────────────────────────────────
 const wb = XLSX.utils.book_new();
 
-// ── Column widths for 22-field SKU schema (17 base + 5 diff fields) ──────────
+// ── Column widths for 23-field SKU schema (18 base + 5 diff fields) ──────────
 const SKU_COL_WIDTHS = [
   { wch: 25 }, // Main Category
   { wch: 35 }, // Sub-Category
@@ -63,6 +63,7 @@ const SKU_COL_WIDTHS = [
   { wch: 15 }, // Subcategory Max Qty
   { wch: 60 }, // Table Rule/Note
   { wch: 16 }, // Product #
+  { wch: 14 }, // Option Type
   { wch: 70 }, // Description
   { wch: 12 }, // Current Qty
   { wch: 16 }, // Unit Price (USD)
@@ -124,6 +125,20 @@ function enableSheetUsability(ws) {
   if (!ws || !ws['!ref']) return;
   ws['!autofilter'] = { ref: ws['!ref'] };
   ws['!views']      = [{ state: 'frozen', xSplit: 0, ySplit: 1, activeCell: 'A2' }];
+
+  // Style header row
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  const headerStyle = {
+    font: { name: 'Calibri', sz: 11, bold: true, color: { rgb: 'FFFFFF' } },
+    fill: { fgColor: { rgb: '0072C6' } },
+    alignment: { vertical: 'center' }
+  };
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const cellRef = XLSX.utils.encode_cell({ r: 0, c });
+    if (ws[cellRef]) {
+      ws[cellRef].s = headerStyle;
+    }
+  }
 }
 
 // Sheet 1: Category Summary
@@ -150,17 +165,15 @@ rulesWS['!cols'] = [
 enableSheetUsability(rulesWS);
 XLSX.utils.book_append_sheet(wb, rulesWS, 'Rules & Constraints');
 
-// Sheet 4: Catalog Diff & History (Dedicated diff sheet)
+// Sheet 4: Catalog Diff & History (Dedicated diff sheet — ONLY when diffs exist)
 const diffRows = skuData.data.filter(r =>
   r['Diff Status'] === 'ADDED' || r['Diff Status'] === 'REMOVED' || r['Diff Status'] === 'PRICE_CHANGED'
 );
 
-// Include sheet if diff rows exist or if history status is present
-if (diffRows.length > 0 || skuData.data.some(r => r['Diff Status'])) {
-  const diffDataToRender = diffRows.length > 0 ? diffRows : skuData.data;
-  const diffWS = XLSX.utils.json_to_sheet(diffDataToRender);
+if (diffRows.length > 0) {
+  const diffWS = XLSX.utils.json_to_sheet(diffRows);
   diffWS['!cols'] = SKU_COL_WIDTHS;
-  applyDiffStyles(diffWS, diffDataToRender);
+  applyDiffStyles(diffWS, diffRows);
   enableSheetUsability(diffWS);
   XLSX.utils.book_append_sheet(wb, diffWS, 'Catalog Diff & History');
 }

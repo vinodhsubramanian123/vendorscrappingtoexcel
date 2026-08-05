@@ -1,15 +1,13 @@
 // Universal QuickSpecs PDF Downloader for HPE OCA & PSNOW Portals
 // Usage: node scripts/download_quickspecs_pdf.js <docId_or_url> <dest_absolute_path> [--force]
-// Example: node scripts/download_quickspecs_pdf.js a00073551enw \
-//          outputs/ProLiant/Gen12/DL380_Gen12_SFF/HPE_DL380_Gen12_SFF_QuickSpecs.pdf
 
 'use strict';
 
 const fs      = require('fs');
 const path    = require('path');
 const crypto  = require('crypto');
-const WebSocket = require('ws');
 const { sendCommand, getAnyPageTarget, connectWS, sleep, CDP_PORT } = require('./lib/cdp');
+const { moveFile, cleanStrayPDFs } = require('./lib/fs_compat');
 
 if (!process.argv[2] || !process.argv[3]) {
   console.error('Usage: node scripts/download_quickspecs_pdf.js <docId_or_url> <dest_absolute_path> [--force]');
@@ -66,85 +64,81 @@ async function main() {
   const newTargetId = createRes.targetId;
   wsMain.close();
 
-  const ws = new WebSocket(`ws://localhost:${CDP_PORT}/devtools/page/${newTargetId}`);
-  await new Promise((res, rej) => { ws.on('open', res); ws.on('error', rej); });
+  const ws = await connectWS(`ws://localhost:${CDP_PORT}/devtools/page/${newTargetId}`);
 
-  // Direct Chrome to save downloads into the same directory as destPath
-  await sendCommand(ws, 'Page.setDownloadBehavior', {
-    behavior: 'allow',
-    downloadPath: downloadDir
-  });
+  try {
+    // Direct Chrome to save downloads into the same directory as destPath
+    await sendCommand(ws, 'Page.setDownloadBehavior', {
+      behavior: 'allow',
+      downloadPath: downloadDir
+    });
 
-  // Navigate the new tab to the QuickSpecs document page
-  console.log(`Navigating to ${targetUrl}...`);
-  await sendCommand(ws, 'Page.navigate', { url: targetUrl });
+    // Navigate the new tab to the QuickSpecs document page
+    console.log(`Navigating to ${targetUrl}...`);
+    await sendCommand(ws, 'Page.navigate', { url: targetUrl });
 
-  // Wait for PSNOW SPA to render
-  console.log('Waiting for PSNOW document viewer to initialize (10s)...');
-  await sleep(10000);
+    // Wait for PSNOW SPA to render
+    console.log('Waiting for PSNOW document viewer to initialize (10s)...');
+    await sleep(10000);
 
-  // Click the download button or trigger window.location.href
-  console.log('Triggering PDF download...');
-  await sendCommand(ws, 'Runtime.evaluate', {
-    expression: `(() => {
-      const btn = document.querySelector(
-        '#downloadButton, #downloadPdfLink, a[href*="downloadDoc"], a.download-button'
-      );
-      if (btn) {
-        if (btn.href) { window.location.href = btn.href; }
-        else { btn.click(); }
-        return true;
-      }
-      return false;
-    })()`,
-    returnByValue: true
-  });
+    // Click the download button or trigger window.location.href
+    console.log('Triggering PDF download...');
+    await sendCommand(ws, 'Runtime.evaluate', {
+      expression: `(() => {
+        const btn = document.querySelector(
+          '#downloadButton, #downloadPdfLink, a[href*="downloadDoc"], a.download-button'
+        );
+        if (btn) {
+          if (btn.href) { window.location.href = btn.href; }
+          else { btn.click(); }
+          return true;
+        }
+        return false;
+      })()`,
+      returnByValue: true
+    });
 
-  // Poll for a new PDF in downloadDir (file-diff detection — robust against filename changes)
-  console.log('Polling for completed PDF download...');
-  let downloaded = false;
-  let newFilePath = null;
+    // Poll for a new PDF in downloadDir (file-diff detection — robust against filename changes)
+    console.log('Polling for completed PDF download...');
+    let downloaded = false;
+    let newFilePath = null;
 
-  for (let i = 0; i < 20; i++) {
-    await sleep(1000);
-    const filesNow  = fs.readdirSync(downloadDir).filter(f => f.endsWith('.pdf') && !f.endsWith('.crdownload'));
-    const newFiles  = filesNow.filter(f => !filesBefore.has(f));
-    if (newFiles.length > 0) {
-      const candidate = path.join(downloadDir, newFiles[0]);
-      if (fs.statSync(candidate).size > 500000) {
-        newFilePath = candidate;
-        downloaded  = true;
-        break;
+    for (let i = 0; i < 20; i++) {
+      await sleep(1000);
+      const filesNow  = fs.readdirSync(downloadDir).filter(f => f.endsWith('.pdf') && !f.endsWith('.crdownload'));
+      const newFiles  = filesNow.filter(f => !filesBefore.has(f));
+      if (newFiles.length > 0) {
+        const candidate = path.join(downloadDir, newFiles[0]);
+        if (fs.statSync(candidate).size > 500000) {
+          newFilePath = candidate;
+          downloaded  = true;
+          break;
+        }
       }
     }
-  }
 
-  ws.close();
+    if (downloaded && newFilePath) {
+      // Move to the canonical destination name if different (handles EXDEV on Windows)
+      if (newFilePath !== destPath) {
+        moveFile(newFilePath, destPath);
+      }
 
-  if (downloaded && newFilePath) {
-    // Move to the canonical destination name if different
-    if (newFilePath !== destPath) {
-      if (fs.existsSync(destPath)) fs.unlinkSync(destPath);
-      fs.renameSync(newFilePath, destPath);
+      // Safe clean up of recent stray temporary PDFs only (max 2 min old)
+      cleanStrayPDFs(downloadDir, destPath, 120000);
+
+      const finalStats = fs.statSync(destPath);
+      const md5 = crypto.createHash('md5').update(fs.readFileSync(destPath)).digest('hex');
+      console.log(`\n✅ QUICKSPECS PDF DOWNLOAD SUCCESSFUL!`);
+      console.log(`Destination:       ${destPath}`);
+      console.log(`Size:              ${(finalStats.size / 1024 / 1024).toFixed(2)} MB`);
+      console.log(`Fingerprint (MD5): ${md5}`);
+      process.exit(0);
+    } else {
+      console.error(`\n❌ PDF download failed — no new file > 500 KB appeared after 20 seconds.`);
+      process.exit(1);
     }
-
-    // Clean up any stray PDFs left in the download dir
-    fs.readdirSync(downloadDir)
-      .filter(f => f.endsWith('.pdf') && path.join(downloadDir, f) !== destPath)
-      .forEach(f => {
-        try { fs.unlinkSync(path.join(downloadDir, f)); console.log(`Cleaned stray: ${f}`); } catch {}
-      });
-
-    const finalStats = fs.statSync(destPath);
-    const md5 = crypto.createHash('md5').update(fs.readFileSync(destPath)).digest('hex');
-    console.log(`\n✅ QUICKSPECS PDF DOWNLOAD SUCCESSFUL!`);
-    console.log(`Destination:       ${destPath}`);
-    console.log(`Size:              ${(finalStats.size / 1024 / 1024).toFixed(2)} MB`);
-    console.log(`Fingerprint (MD5): ${md5}`);
-    process.exit(0);
-  } else {
-    console.error(`\n❌ PDF download failed — no new file > 500 KB appeared after 20 seconds.`);
-    process.exit(1);
+  } finally {
+    try { ws.close(); } catch {}
   }
 }
 

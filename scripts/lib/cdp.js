@@ -9,6 +9,7 @@
 
 const WebSocket = require('ws');
 const http      = require('http');
+const domExtract = require('./dom_extract');
 
 const CDP_PORT        = 9222;
 const DEFAULT_TIMEOUT = 45000;   // ms — generous for slow OCA pages
@@ -28,21 +29,32 @@ function sendCommand(ws, method, params = {}, timeoutMs = DEFAULT_TIMEOUT) {
     const id = _nextMsgId++;
     let timer;
 
+    const cleanup = () => {
+      ws.removeListener('message', handler);
+      ws.removeListener('close', closeHandler);
+      clearTimeout(timer);
+    };
+
     const handler = (raw) => {
       let msg;
       try { msg = JSON.parse(raw.toString()); } catch { return; }
       if (msg.id !== id) return;
-      ws.removeListener('message', handler);
-      clearTimeout(timer);
+      cleanup();
       if (msg.error) reject(new Error(`CDP error [${method}]: ${JSON.stringify(msg.error)}`));
       else resolve(msg.result);
     };
 
+    const closeHandler = () => {
+      cleanup();
+      reject(new Error(`WebSocket closed unexpectedly while waiting for CDP command: ${method}`));
+    };
+
     ws.on('message', handler);
+    ws.on('close', closeHandler);
     ws.send(JSON.stringify({ id, method, params }));
 
     timer = setTimeout(() => {
-      ws.removeListener('message', handler);
+      cleanup();
       reject(new Error(`CDP timeout (${timeoutMs} ms) waiting for: ${method}`));
     }, timeoutMs);
   });
@@ -150,9 +162,13 @@ async function setupDialogAutoHandler(ws) {
           console.log(`  ⚡ JS Dialog Intercepted: "${msg.params.message}" (${msg.params.type}) — Auto Accepting...`);
           await sendCommand(ws, 'Page.handleJavaScriptDialog', { accept: true });
         }
-      } catch {}
+      } catch (err) {
+        // Safe debug output
+      }
     });
-  } catch {}
+  } catch (err) {
+    console.warn('  ⚠️ setupDialogAutoHandler advisory:', err.message);
+  }
 }
 
 /**
@@ -180,10 +196,46 @@ async function dismissDOMModals(ws) {
         confirmBtns.forEach(btn => btn.click());
       })()`
     });
-  } catch {}
+  } catch (err) {
+    // Non-fatal modal dismiss warning
+  }
+}
+
+/**
+ * Expand all sections and "Show More" checkboxes on active page.
+ */
+async function expandSections(ws) {
+  await dismissDOMModals(ws);
+  await sendCommand(ws, 'Runtime.evaluate', {
+    expression: `(() => {
+      Array.from(document.querySelectorAll('a, button, span')).forEach(el => {
+        const t = el.innerText ? el.innerText.trim() : '';
+        if (t === 'Expand All' || t === 'Expand Subsections') el.click();
+      });
+      document.querySelectorAll('input[id*="showmore"]').forEach(i => {
+        if (!i.checked) i.click();
+      });
+      document.querySelectorAll('label[for*="showmore"]').forEach(label => {
+        const inp = document.getElementById(label.getAttribute('for'));
+        if (inp && !inp.checked) label.click();
+      });
+    })()`,
+    returnByValue: true
+  });
 }
 
 /** Async sleep helper */
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-module.exports = { sendCommand, getOCATarget, getAnyPageTarget, connectWS, setupDialogAutoHandler, dismissDOMModals, sleep, CDP_PORT };
+module.exports = {
+  sendCommand,
+  getOCATarget,
+  getAnyPageTarget,
+  connectWS,
+  setupDialogAutoHandler,
+  dismissDOMModals,
+  expandSections,
+  sleep,
+  CDP_PORT,
+  ...domExtract
+};
