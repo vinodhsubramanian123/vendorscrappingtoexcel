@@ -119,18 +119,27 @@ function applyDiffStyles(ws, data) {
   }
 }
 
+// ── Enable Freeze Header Row & AutoFilter for clean UX ───────────────────────
+function enableSheetUsability(ws) {
+  if (!ws || !ws['!ref']) return;
+  ws['!autofilter'] = { ref: ws['!ref'] };
+  ws['!views']      = [{ state: 'frozen', xSplit: 0, ySplit: 1, activeCell: 'A2' }];
+}
+
 // Sheet 1: Category Summary
 const summaryWS = XLSX.utils.json_to_sheet(summaryData.data);
 summaryWS['!cols'] = [
   { wch: 30 }, { wch: 45 }, { wch: 15 },
   { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
 ];
+enableSheetUsability(summaryWS);
 XLSX.utils.book_append_sheet(wb, summaryWS, 'Category Summary');
 
 // Sheet 2: All SKUs
 const skuWS = XLSX.utils.json_to_sheet(skuData.data);
 skuWS['!cols'] = SKU_COL_WIDTHS;
 applyDiffStyles(skuWS, skuData.data);
+enableSheetUsability(skuWS);
 XLSX.utils.book_append_sheet(wb, skuWS, 'All SKUs');
 
 // Sheet 3: Rules & Constraints
@@ -138,6 +147,7 @@ const rulesWS = XLSX.utils.json_to_sheet(rulesData.data);
 rulesWS['!cols'] = [
   { wch: 30 }, { wch: 45 }, { wch: 15 }, { wch: 20 }, { wch: 100 },
 ];
+enableSheetUsability(rulesWS);
 XLSX.utils.book_append_sheet(wb, rulesWS, 'Rules & Constraints');
 
 // Sheet 4: Catalog Diff & History (Dedicated diff sheet)
@@ -151,6 +161,7 @@ if (diffRows.length > 0 || skuData.data.some(r => r['Diff Status'])) {
   const diffWS = XLSX.utils.json_to_sheet(diffDataToRender);
   diffWS['!cols'] = SKU_COL_WIDTHS;
   applyDiffStyles(diffWS, diffDataToRender);
+  enableSheetUsability(diffWS);
   XLSX.utils.book_append_sheet(wb, diffWS, 'Catalog Diff & History');
 }
 
@@ -175,6 +186,7 @@ for (const cat of orderedCategories) {
   const ws       = XLSX.utils.json_to_sheet(catSKUs);
   ws['!cols']    = SKU_COL_WIDTHS;
   applyDiffStyles(ws, catSKUs);
+  enableSheetUsability(ws);
   const sheetName = cat.length > 31 ? cat.substring(0, 31) : cat;
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
 }
