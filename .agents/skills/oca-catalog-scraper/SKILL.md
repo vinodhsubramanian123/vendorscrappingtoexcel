@@ -19,12 +19,14 @@ Extract complete product catalog intelligence from the HPE OCA portal for any HP
 | HPE ProLiant DL380 Gen11 | ProLiant | `DL380_Gen11` | 1,414 | ✅ 100% | ✅ Verified (2.06 MB) |
 | HPE StoreEver MSL3040 Tape Library | StoreEver | `MSL3040_Tape` | 128 | ✅ 100% | ✅ Verified (2.06 MB) |
 | HPE Cray Supercomputing GX5000 Rack | Cray | `GX5000_General_RACK` | 46 | ✅ 100% | ⚠️ Advisory |
-| HPE Synergy VC 100Gb F32 Module | Synergy | `HPE_Virtual_Connect...` | 141 | ✅ 100% | ⚠️ Advisory |
+| HPE Synergy VC 100Gb F32 Module | Synergy | `HPE_Virtual_Connect...` | 141 | ✅ 100% | ✅ Verified (0.89 MB) |
 
 **Total Portfolio Intelligence**: **3,170 unique SKUs** across 6 product lines in 5 families.
 
 **WebLogic & Legacy UI Modal Handling**: Automated JS dialog listener (`setupDialogAutoHandler`) + DOM session extension handler (`dismissDOMModals`) integrated into all scrapers.
-**Catalog Diff & Price Tracking Engine**: Production-ready (`scripts/lib/diff_catalog.js`) — saves date-stamped snapshots under `history/` and outputs color-coded diff sheets.
+**Catalog Diff & Price Tracking Engine**: Production-ready (`scripts/lib/diff_catalog.js`) — saves date-stamped snapshots under `history/` and outputs color-coded diff sheets (`xlsx-js-style`).
+**Master Catalog Registry Auto-Synchronizer**: Production-ready (`scripts/lib/sync_registry.js` / `npm run registry:sync`) — auto-indexes all outputs in `outputs/SCRAPED_CATALOGS.md`.
+**Standalone Post-Flight Audit Mode**: Production-ready (`test_pipeline_evals.js --post-flight-only`) — verifies JSON schemas, Excel tallies, and PDF size without requiring active CDP browser attachment.
 
 ---
 

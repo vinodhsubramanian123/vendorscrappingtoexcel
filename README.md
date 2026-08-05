@@ -28,6 +28,8 @@ Generates multi-sheet Excel workbooks, structured JSON companions, TSV intermedi
 - **CTO vs Base SKU Normalization (Rule #30)**: Strips `CTO`, `BTO`, `FIO` suffixes to yield clean base SKUs + `Option Type` schema column.
 - **Historical Snapshot Versioning & Price Delta Tracking**: Auto-saves date-stamped snapshots in `history/` and logs cumulative price trails.
 - **MD5-Fingerprinted QuickSpecs PDF Downloader**: Automatically downloads and verifies QuickSpecs PDFs via active session or PSNOW.
+- **Master Catalog Registry Auto-Synchronizer (`npm run registry:sync`)**: Automatically indexes all catalog JSON outputs and maintains `outputs/SCRAPED_CATALOGS.md`.
+- **Standalone Post-Flight Audit Mode**: `test_pipeline_evals.js` supports `--post-flight-only` and adaptive threshold assertions (`> 500` chars or `tableCount > 0`).
 
 ---
 
@@ -37,18 +39,18 @@ Generates multi-sheet Excel workbooks, structured JSON companions, TSV intermedi
 graph LR
     A["HPE Partner Portal & OCA Session"] -->|"CDP Scraping"| B["Raw DOM & Table Extraction"]
     B -->|"Classification Engine"| C["Structured JSON & TSVs"]
-    C -->|"Excel Generator"| D["Multi-Sheet Excel Workbook"]
+    C -->|"Diff Engine"| H["Price History & Delta Tracking"]
+    H -->|"Excel Generator"| D["Multi-Sheet Excel Workbook (xlsx-js-style)"]
     C -->|"Notebook LM Import"| E["Google Notebook LM Intelligence"]
     C -->|"BOM Engine Import"| F["Vendor BOM Comparison Engine"]
     A -->|"QuickSpecs Downloader"| G["MD5-Fingerprinted QuickSpecs PDF"]
-    C -->|"Diff Engine (PLANNED)"| H["Price History & Delta Tracking"]
 ```
 
 1. **Catalog Intelligence Extraction**: Capture complete product options, component relationships, quantity constraints, and configuration rules from live HPE OCA quotes.
 2. **Multi-Product Line Support**: Universal compatibility across **HPE ProLiant** (servers), **HPE Synergy** (composable frames & compute modules), **HPE Alletra / Nimble / StoreOnce** (storage systems), **HPE Aruba** (networking switches), and **HPE Cray** (supercomputing cabinets).
 3. **Zero Hardcoding Architecture**: 100% path and product dynamic. Scripts derive chassis names, base SKUs, output paths, and category mappings dynamically from the DOM.
 4. **BOM Comparison & Notebook LM Ready**: Generates structured 17-field SKU schemas with 4-level hierarchy paths (`HPE OCA > {Chassis} [{BaseSKU}] > {Main Category} > {Sub-Category}`) for seamless cross-vendor BOM validation.
-5. **Price & SKU Delta Tracking** *(planned)*: Historical snapshots enable color-coded diff reports (Green=Added, Red=Removed, Amber=Price Changed) for procurement intelligence.
+5. **Price & SKU Delta Tracking**: Historical snapshots enable color-coded diff reports (Green=Added, Red=Removed, Amber=Price Changed) for procurement intelligence.
 
 ---
 
@@ -77,15 +79,15 @@ graph TD
         D2 -->|"Role Mapper"| D3["TSVs + Catalog JSON"]
     end
 
-    subgraph "Stage 5: Diff & History (PLANNED)"
+    subgraph "Stage 5: Diff & History"
         D3 --> DH1["diff_catalog.js Diff Engine"]
         DH1 -->|"Compare with Previous Snapshots"| DH2["Enriched Catalog with Diff Status"]
     end
 
     subgraph "Stage 6: Excel & Audit"
-        DH2 --> E1["generate_xlsx.js Excel Generator"]
-        E1 --> E2["verify_excel_tally.js Audit Assertions"]
-        E2 -->|"All Checks Pass"| E3["Master Registry SCRAPED_CATALOGS.md"]
+        DH2 --> E1["generate_xlsx.js Excel Generator (xlsx-js-style)"]
+        E1 --> E2["verify_excel_tally.js & test_pipeline_evals.js Audit Assertions"]
+        E2 -->|"All Checks Pass"| E3["Master Registry Auto-Syncer sync_registry.js"]
     end
 ```
 

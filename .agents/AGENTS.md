@@ -19,26 +19,24 @@ This workspace contains tools for scraping, parsing, and organising HPE server p
 
 **Total Portfolio Intelligence**: **3,170 unique SKUs** across 6 product lines in 5 families.
 
-### 🔴 Known Bugs & Gaps (Must Fix Before Adding Products)
-| ID | Bug | Script | Line(s) | Severity |
-|----|-----|--------|---------|----------|
-| **G1** | No historical diff / price tracking engine exists | `diff_catalog.js` (missing) | — | 🔴 CRITICAL |
-| **G2** | `verify_excel_tally.js` crashes when PDF is absent — `fs.readFileSync(pdfPath)` on L133 runs unconditionally despite graceful `hasPdf` guard on L50-58 | `verify_excel_tally.js` | 133 | 🔴 CRITICAL |
-| **G3** | `test_pipeline_evals.js` hardcodes ProLiant-specific sheet names (`Processor`, `Memory`, `Smart Chassis`, etc.) — fails for storage/networking products | `test_pipeline_evals.js` | 176-183 | 🔴 CRITICAL |
-| **G4** | `test_pipeline_evals.js` asserts `textLength > 60000` — storage wizard scrapes produce ~5-15K chars | `test_pipeline_evals.js` | 135 | 🔴 CRITICAL |
-| **G5** | `xlsx` library (SheetJS CE) cannot do cell-level styling (no font colors, fills, strikethrough) — blocks color-coded diff sheets | `generate_xlsx.js`, `package.json` | — | 🔴 CRITICAL |
-| **G7** | `scrape_oca_solution.js` doesn't extract `sections` data that `build_catalog.js` uses for dynamic category discovery | `scrape_oca_solution.js` | 235-247 | 🟡 MODERATE |
-| **G8** | `updateScrapedRegistry()` copy-pasted across both solution scrapers (DRY violation) | Both scrapers | — | 🟡 MODERATE |
-| **G9** | `verify_excel_tally.js` Audit 5 hardcodes 7 ProLiant category sheets | `verify_excel_tally.js` | 120-129 | 🟡 MODERATE |
-| **G10** | `cdp.js` `connectWS()` has no retry logic — single failure kills the scrape | `cdp.js` | 125-131 | 🟡 MODERATE |
-| **G12** | `build_catalog.js` Step numbering wrong — console says "Step 5" but code is Step 6 | `build_catalog.js` | 502 | 🟢 MINOR |
+### ✅ Resolved & Certified Pipeline Health (100% Audit Pass)
+| ID | Issue / Feature | Status | Resolution / Implemented Module |
+|----|-----------------|--------|--------------------------------|
+| **G1** | Historical diff & price tracking engine | ✅ RESOLVED | Production module `scripts/lib/diff_catalog.js` computes SKU additions, removals (tombstones), and price trails |
+| **G2** | Graceful PDF existence check in tally audit | ✅ RESOLVED | `verify_excel_tally.js` handles absent QuickSpecs PDFs gracefully without crashing |
+| **G3** | Universal category sheet validation | ✅ RESOLVED | `test_pipeline_evals.js` dynamically checks core sheets across server, storage, tape, composable, supercomputing lines |
+| **G4** | Adaptive text length & post-flight audit mode | ✅ RESOLVED | `test_pipeline_evals.js` supports `--post-flight-only` and adaptive threshold assertions (`> 500` chars or `tableCount > 0`) |
+| **G5** | Cell-level Excel styling (colors & strikethroughs) | ✅ RESOLVED | `generate_xlsx.js` uses `xlsx-js-style` for Green (`#E6F4EA`) Added, Red (`#FDE7E7`) Removed, Amber (`#FFF3E0`) Price Changed |
+| **G7** | DOM section header landmark extraction | ✅ RESOLVED | `scrape_oca_solution.js` extracts explicit `sections` array with tag names, text, and class names |
+| **G8** | DRY registry updater | ✅ RESOLVED | Extracted to shared production helper `scripts/lib/registry.js` |
+| **G9** | Dynamic Category-Specific Sheet Tallies | ✅ RESOLVED | `verify_excel_tally.js` Audit 5 dynamically filters non-core sheets |
+| **G10**| CDP Connection Retry & Backoff | ✅ RESOLVED | `cdp.js` `connectWS()` includes automatic exponential backoff retries |
+| **G12**| Step Numbering Correction | ✅ RESOLVED | Console output step numbering synced with code execution stages |
 
-### 🚧 Upcoming Feature: Catalog Diff & Price Tracking Engine
-- **New module**: `scripts/lib/diff_catalog.js` — computes SKU diffs against previous `history/catalog_{date}.json` snapshots
-- **New directory**: `outputs/{Family}/{Gen}/{Model}/history/` — stores date-stamped catalog snapshots + `price_history.json`
-- **New Excel sheet**: `Catalog Diff & History` with color-coded rows (Green=Added, Red+Strikethrough=Removed, Amber=Price Changed)
-- **Dependency change**: Replace `xlsx` with `xlsx-js-style` (drop-in fork with cell styling support)
-- **New AGENTS rule**: Rule #28 (Historical Snapshot Versioning & Color-Coded Price Diffs)
+### 🚀 Production Features Active
+- **Catalog Diff & Price Tracking Engine**: `scripts/lib/diff_catalog.js` saves date-stamped snapshots in `history/catalog_{YYYY-MM-DD}.json` and logs cumulative price trails in `price_history.json`.
+- **Master Catalog Registry Auto-Synchronizer**: `scripts/lib/sync_registry.js` (`npm run registry:sync`) automatically scans and updates `outputs/SCRAPED_CATALOGS.md`.
+- **WebLogic & Legacy UI Modal Interceptor**: Auto-accepts JS alert dialogs (`Page.handleJavaScriptDialog`) and session extension popups (`dismissDOMModals`).
 
 ---
 
@@ -54,17 +52,18 @@ booktoSkill/
 ├── scripts/                               ← ALL Node.js scripts live here
 │   ├── lib/
 │   │   ├── cdp.js                         ← shared CDP connection & command module
-│   │   ├── diff_catalog.js                ← [PLANNED] catalog diff & price history engine
-│   │   └── registry.js                    ← [PLANNED] shared registry update (DRY extract)
+│   │   ├── diff_catalog.js                ← catalog diff & price history engine
+│   │   ├── registry.js                    ← shared registry table updater (DRY)
+│   │   └── sync_registry.js               ← master registry auto-synchronizer
 │   ├── scrape_oca.js                      ← CDP raw data extractor
 │   ├── expand_and_rescrape.js             ← expand DOM then re-scrape
 │   ├── scrape_oca_solution.js             ← generic E2E server & solution scraper
 │   ├── scrape_oca_storage_solution.js     ← dedicated storage solution wizard scraper (Alletra/Nimble/MSA)
 │   ├── build_catalog.js                   ← parse raw JSON → catalog JSON + TSVs
-│   ├── generate_xlsx.js                   ← TSVs → multi-sheet Excel workbook
+│   ├── generate_xlsx.js                   ← TSVs → multi-sheet Excel workbook (xlsx-js-style)
 │   ├── download_quickspecs_pdf.js         ← download + cache QuickSpecs PDF
-│   ├── verify_excel_tally.js              ← post-flight audit (6 checks; 7th planned for diff)
-│   ├── test_pipeline_evals.js             ← pre/in/post-flight eval suite
+│   ├── verify_excel_tally.js              ← post-flight audit (7 checks including historical diff)
+│   ├── test_pipeline_evals.js             ← pre/in/post-flight eval suite (--post-flight-only mode)
 │   ├── demo_qs_vs_menu_cdp.js             ← QuickSpecs vs Menu link demo
 │   └── live_visual_demo_cdp.js            ← visual browser demo
 ├── outputs/                               ← ALL scrape outputs live here
@@ -78,13 +77,13 @@ booktoSkill/
 │               │   ├── {prefix}_Catalog_SKUs.tsv
 │               │   ├── {prefix}_Catalog_Rules.tsv
 │               │   └── {prefix}_Catalog_Summary.tsv
-│               ├── history/               ← [PLANNED] date-stamped snapshots + price trail
+│               ├── history/               ← date-stamped snapshots + price trail
 │               │   ├── catalog_{YYYY-MM-DD}.json
 │               │   └── price_history.json
 │               ├── {prefix}_Catalog.json
 │               ├── {prefix}_OCA_Catalog.xlsx
 │               └── HPE_{prefix}_QuickSpecs.pdf
-├── node_modules/                          ← npm dependencies (ws, xlsx → xlsx-js-style)
+├── node_modules/                          ← npm dependencies (ws, xlsx-js-style)
 ├── README.md                              ← project documentation & run commands
 └── package.json                           ← npm configuration & script targets
 ```
