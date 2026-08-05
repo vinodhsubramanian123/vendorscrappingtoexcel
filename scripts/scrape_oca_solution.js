@@ -238,6 +238,30 @@ async function main() {
     returnByValue: true
   });
 
+  // Extract DOM section header elements (landmarks)
+  console.log('Extracting DOM section headers (landmarks)...');
+  const sectionsResult = await sendCommand(ws, 'Runtime.evaluate', {
+    expression: `(() => {
+      const headers = Array.from(document.querySelectorAll('h1, h2, h3, h4, .section-header, .menu_category_header, [class*="category_header"], [class*="section_title"]'));
+      return JSON.stringify(headers.map(h => ({
+        tagName: h.tagName,
+        text: (h.innerText || '').trim(),
+        className: h.className || ''
+      })).filter(h => h.text.length > 0));
+    })()`,
+    returnByValue: true
+  });
+
+  let sections = [];
+  try {
+    sections = typeof sectionsResult.result.value === 'string'
+      ? JSON.parse(sectionsResult.result.value)
+      : (sectionsResult.result.value || []);
+  } catch (e) {
+    sections = [];
+  }
+  console.log(`Extracted ${sections.length} DOM section headers`);
+
   let tables = [];
   try {
     tables = typeof tableResult.result.value === 'string'
