@@ -14,9 +14,28 @@
     "Encryption Kit", "Power Supply", "Compute Blades", "Cabinet Power and Cooling", "Cabinet Power",
     "Compute and Storage", "Management Hardware", "Interconnects", "Frame Options", "Operating Environment", "Cooling Options",
     "Transceivers", "Direct Attach Cables", "Interconnect Modules", "Optical Transceivers", "Storage Modules", "Composer",
-    "QSFP Options", "SFP Options", "License Upgrade", "Licenses"
+    "QSFP Options", "SFP Options", "License Upgrade", "Licenses",
+    "Support Services", "HPE Support Services", "Deployment Services", "Professional Services", "Service Credits", "Factory Express Services"
   ],
   "componentRoles": [
+    {
+      "role": "Base Support (Mandatory)",
+      "patterns": ["tech care", "complete care", "foundation care", "base support", "essential", "basic", "critical"],
+      "subcatPatterns": ["support", "tech care", "complete care"],
+      "parentPatterns": ["support services", "hpe support services"]
+    },
+    {
+      "role": "Deployment & Installation",
+      "patterns": ["factory express", "start-up", "startup", "installation", "deployment", "integration", "onsite"],
+      "subcatPatterns": ["deployment", "factory express"],
+      "parentPatterns": ["deployment services"]
+    },
+    {
+      "role": "Professional & Advisory Services",
+      "patterns": ["advisory", "consulting", "service credit", "credits", "education", "training"],
+      "subcatPatterns": ["professional", "service credit", "advisory"],
+      "parentPatterns": ["professional services", "service credits"]
+    },
     {
       "role": "Base Chassis",
       "patterns": ["configure-to-order", "cto server", "frame cto", "chassis cto", "p73282-b21"],

@@ -3,7 +3,7 @@
  * scripts/lib/registry.js — Shared Master Catalog Registry Updater
  *
  * Maintains outputs/SCRAPED_CATALOGS.md table of scraped product catalogs.
- * Imported by scrape_oca_solution.js and scrape_oca_storage_solution.js (DRY).
+ * Imported by scrape_oca_solution.js, scrape_oca_storage_solution.js, and sync_registry.js (DRY).
  */
 
 const fs   = require('fs');
@@ -15,7 +15,7 @@ const OUTPUTS_ROOT  = path.join(PROJECT_ROOT, 'outputs');
 const REGISTRY_PATH = path.join(OUTPUTS_ROOT, 'SCRAPED_CATALOGS.md');
 
 /**
- * Update outputs/SCRAPED_CATALOGS.md with a new scrape entry.
+ * Update outputs/SCRAPED_CATALOGS.md with a new or updated scrape entry.
  * @param {object} info - Scrape details object
  */
 function updateScrapedRegistry(info) {
@@ -38,7 +38,7 @@ function updateScrapedRegistry(info) {
   const pdfStr   = pdfPath ? `[PDF](${pdfPath})` : 'Advisory (No QS Link)';
 
   const normOutputDir = toForwardSlash(info.outputDir);
-  const relOutputDir  = normOutputDir.replace(/.*\/outputs\//, 'outputs/');
+  const relOutputDir  = normOutputDir.replace(/.*\/outputs\//, 'outputs/').replace(/\/+$/, '') + '/';
 
   const skuDisplayCount = info.skuCount !== undefined ? info.skuCount : (info.tablesCount || 0);
 
@@ -46,12 +46,20 @@ function updateScrapedRegistry(info) {
     `| ${dateStr} | ${info.solutionName || 'OCA Solution'} | ${info.family} | ` +
     `${info.gen} | \`${info.chassisName}\` | **${skuDisplayCount}** | ` +
     `[${path.basename(xlsxPath)}](${xlsxPath}) | [${path.basename(jsonPath)}](${jsonPath}) | ` +
-    `${pdfStr} | \`${relOutputDir}/\` |\n`;
+    `${pdfStr} | \`${relOutputDir}\` |\n`;
 
-  // Dedup by relative output folder cell match
-  const isDuplicate = content.includes(`\`${relOutputDir}/\``) || content.includes(normOutputDir);
+  // Check if an existing row matches this output folder
+  const lines = content.split('\n');
+  const existingLineIndex = lines.findIndex(line => line.includes(`\`${relOutputDir}\``));
 
-  if (!isDuplicate) {
+  if (existingLineIndex > -1) {
+    // Update row in place
+    lines[existingLineIndex] = newRow.trim();
+    content = lines.join('\n');
+    fs.writeFileSync(REGISTRY_PATH, content);
+    console.log(`Updated existing row in Master Registry for: ${relOutputDir}`);
+  } else {
+    // Append new row
     const divider = '| :--- | :--- | :--- | :--- | :--- | ---: | :--- | :--- | :--- | :--- |\n';
     if (content.includes(divider)) {
       content = content.replace(divider, divider + newRow);
@@ -59,9 +67,7 @@ function updateScrapedRegistry(info) {
       content += newRow;
     }
     fs.writeFileSync(REGISTRY_PATH, content);
-    console.log(`Updated Master Registry: ${REGISTRY_PATH}`);
-  } else {
-    console.log(`Registry already has entry for: ${relOutputDir} — skipping duplicate.`);
+    console.log(`Added new row to Master Registry: ${relOutputDir}`);
   }
 }
 

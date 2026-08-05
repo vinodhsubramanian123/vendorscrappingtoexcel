@@ -10,30 +10,31 @@ Extract complete product catalog intelligence from the HPE OCA portal for any HP
 
 ---
 
-## Current State & Certified Products (as of 2026-08-05)
+## Current State & Certified Products (as of 2026-08-06)
 
 | Product | Family | Output Prefix | SKUs | Audit | QuickSpecs PDF |
 |---------|--------|---------------|------|-------|----------------|
-| HPE ProLiant DL380 Gen12 SFF | ProLiant | `DL380_Gen12_SFF` | 1,037 | ✅ 100% | ✅ Verified (2.06 MB) |
-| HPE Alletra 5000 Storage | Alletra | `Alletra_Storage_System` | 404 | ✅ 100% | ✅ Verified (2.06 MB) |
-| HPE ProLiant DL380 Gen11 | ProLiant | `DL380_Gen11` | 1,414 | ✅ 100% | ✅ Verified (2.06 MB) |
-| HPE StoreEver MSL3040 Tape Library | StoreEver | `MSL3040_Tape` | 128 | ✅ 100% | ✅ Verified (2.06 MB) |
+| HPE ProLiant DL380 Gen12 SFF | ProLiant | `DL380_Gen12_SFF` | 951 | ✅ 100% | ✅ Verified (2.06 MB) |
+| HPE Alletra Storage System | Alletra | `Alletra_Storage_System` | 92 | ✅ 100% | ✅ Verified (2.06 MB) |
+| HPE ProLiant DL380 Gen11 | ProLiant | `DL380_Gen11` | 1,253 | ✅ 100% | ✅ Verified (2.06 MB) |
+| HPE StoreEver MSL3040 Tape Library | StoreEver | `MSL3040_Tape` | 85 | ✅ 100% | ✅ Verified (2.06 MB) |
 | HPE Cray Supercomputing GX5000 Rack | Cray | `GX5000_General_RACK` | 46 | ✅ 100% | ⚠️ Advisory |
-| HPE Synergy VC 100Gb F32 Module | Synergy | `HPE_Virtual_Connect...` | 141 | ✅ 100% | ✅ Verified (0.89 MB) |
+| HPE Synergy VC 100Gb F32 Module | Synergy | `SY100Gb_F32_Module` | 141 | ✅ 100% | ✅ Verified (0.89 MB) |
 
-**Total Portfolio Intelligence**: **3,170 unique SKUs** across 6 product lines in 5 families.
+**Total Portfolio Intelligence**: **2,568 unique SKUs** across 6 product lines in 5 families.
 
 **WebLogic & Legacy UI Modal Handling**: Automated JS dialog listener (`setupDialogAutoHandler`) + DOM session extension handler (`dismissDOMModals`) integrated into all scrapers.
 **Catalog Diff & Price Tracking Engine**: Production-ready (`scripts/lib/diff_catalog.js`) — saves date-stamped snapshots under `history/` and outputs color-coded diff sheets (`xlsx-js-style`).
 **Master Catalog Registry Auto-Synchronizer**: Production-ready (`scripts/lib/sync_registry.js` / `npm run registry:sync`) — auto-indexes all outputs in `outputs/SCRAPED_CATALOGS.md`.
 **Standalone Post-Flight Audit Mode**: Production-ready (`test_pipeline_evals.js --post-flight-only`) — verifies JSON schemas, Excel tallies, and PDF size without requiring active CDP browser attachment.
+**Centralized HPE SKU Normalization Utility**: Production-ready (`scripts/lib/sku.js`) — provides unified validation for hyphenated hardware SKUs (`P73282-B21`), 6-char hardware SKUs (`C0H28A`, `Q2R32A`), and service SKUs (`H7J34A3`).
 
 ---
 
 ## Prerequisites
 - User must be logged in to the HPE Partner Portal in the Antigravity browser (OCA requires HPE Partner credentials)
 - OCA page must be open on a specific chassis or solution configuration
-- Node.js with `ws` and `xlsx` packages installed (`npm install ws xlsx`)
+- Node.js with `ws`, `xlsx`, and `xlsx-js-style` packages installed (`npm install ws xlsx xlsx-js-style`)
 - All scripts live in `scripts/` (with shared CDP connection helper in `scripts/lib/cdp.js`) — **never write output files to root**
 
 ---
@@ -168,21 +169,22 @@ node scripts/download_quickspecs_pdf.js \
 ```
 The script checks MD5 fingerprint first — if file exists and size > 500 KB, returns `⚡ [CACHE HIT]` without re-downloading.
 
-### Step 8 — Run Post-Flight Audit (all 6 checks)
+### Step 8 — Run Post-Flight Audit (all 7 checks)
 ```bash
 node scripts/verify_excel_tally.js \
   outputs/ProLiant/Gen12/DL380_Gen12_SFF/DL380_Gen12_SFF_OCA_Catalog.xlsx
 ```
-All 6 audit checks must pass:
+All 7 audit checks must pass:
 - ✅ File existence + PDF size > 500 KB (advisory when PDF absent)
 - ✅ All required Excel sheets present
 - ✅ `All SKUs` row count equals JSON `totalUniqueSKUs`
 - ✅ `Current Qty` passes `/^\d+$/` on 100% of rows
 - ✅ `Hierarchy Path` has ≥ 3 `>` delimiters on 100% of rows (4-level path)
 - ✅ All category-specific sheets contain > 0 SKUs
+- ✅ Historical diff & price tracking verified
 
 ### Step 9 — Update Registry
-Add a row to `outputs/SCRAPED_CATALOGS.md` with the chassis details and links.
+Add or update a row in `outputs/SCRAPED_CATALOGS.md` with `npm run registry:sync`.
 
 ---
 
@@ -191,96 +193,9 @@ To run all of Steps 1–9 automatically for the active browser session:
 ```bash
 npm run scrape          # Server / Compute products
 npm run scrape:storage  # Storage Solution Wizard products
+npm run rebuild         # Rebuild all catalogs from raw_data
+npm test                # Run 100% portfolio audit suite
 ```
-
----
-
-## Classification Engine Deep Dive (`build_catalog.js`)
-
-### Internal Processing Steps
-1. **Step 1 — Subcategory Extraction**: Regex `\n{Name} (max N|required|no max)\n` finds all subcategory headers with quantity constraints
-2. **Step 2 — Parent Category Mapping**: Positions > `NAV_MENU_END` (1010) in `fullText`, augmented by dynamic `rawData.sections` discovery
-3. **Step 3 — Table Parsing**: Identifies header rows (containing `Product #` or `Description`), extracts data rows, sanitizes part numbers (strips concatenated row-indexes), normalizes `Current Qty`
-4. **Step 4 — Sub-Table Inheritance**: Tables without explicit subcategory headers inherit from the preceding matched subcategory by DOM table-index order
-5. **Step 5 — TSV Generation**: `generateMainSheet()` (17 cols), `generateRulesSheet()` (rules + config notes), `generateSummarySheet()` (subcategory aggregation)
-6. **Step 6 — Output**: Writes 3 TSVs to `intermittent_scraps/` + JSON companion
-
-### Key Internal Constants
-- `NAV_MENU_END = 1010` — text position threshold separating nav menu from content area
-- `maxQty = -1` → Unlimited, `maxQty = -2` → Required, positive → numeric cap
-- `chassisRoot` format: `{chassisLabel} [{baseSKU}]` (e.g. `DL380 Gen12 SFF [P73282-B21]`)
-
-### Component Role Classifier (`getComponentRole`)
-Assigns functional roles based on description keywords:
-- `Base Chassis`, `Synergy Infrastructure`, `FIO Setting / Preset`
-- `CPU / Processor`, `Memory`, `Storage Controller`, `Enablement / Cage`
-- `Networking`, `Riser & Expansion`, `Power & Thermal`
-- `Fabric & Interconnect`, `Interconnect / Cable`
-- `Software & License`, `Hardware Component` (fallback)
-
----
-
-## Complex Multi-Product Architecture Handling
-
-| Product Family | Example Products | Component Categories & Roles Handled |
-|----------------|------------------|---------------------------------------|
-| **HPE ProLiant** | DL380, DL360, ML350 | Compute, Memory, Riser Cards, Smart Chassis, Power Supplies, Storage Controllers |
-| **HPE Synergy** | 12000 Frame, SY480, SY660 | Frame Link Modules, Compute Modules, Virtual Connect Interconnects, SAS Switch, D3940 Storage Enclosures |
-| **HPE Storage** | Alletra 9000/6000, Nimble, StoreOnce | Storage Controllers, Expansion Shelves, SSD/HDD Media Packs, Fibre Channel HBAs |
-| **HPE Networking** | Aruba Switches, FlexFabric, Slingshot | Switch Chassis, Line Cards, Transceivers, DAC Cables, Network Management Software |
-| **HPE Cray** | Cray EX Cabinets, Liquid Cooled | Cray EX Cabinet, Liquid Cooling Blades, Slingshot Switches, Power Distribution Units (PDUs) |
-
----
-
-## SKU Data Schema (17 base fields + 5 diff fields planned)
-
-### Base Fields (17)
-
-| # | Field | Description | Example |
-|---|-------|-------------|---------|
-| 1 | Main Category | Top-level functional group | `Processor` |
-| 2 | Sub-Category | Specific component group | `Heatsink Kit` |
-| 3 | Hierarchy Path | Full tree path (≥ 3 `>` delimiters) | `HPE OCA > DL380 Gen12 SFF [P73282-B21] > Processor > Heatsink Kit` |
-| 4 | Component Role | Functional classification | `Power & Thermal` |
-| 5 | Constraint Text | Raw constraint label | `max 2` |
-| 6 | Subcategory Max Qty | Numeric limit (`Unlimited`, `Required`, or integer string) | `2` |
-| 7 | Table Rule/Note | Configuration rule for this table | `Mixing of Heat sink is not allowed` |
-| 8 | Product # | HPE Part Number (extracted via regex) | `P74792-B21` |
-| 9 | Description | Full product name | `HPE ProLiant DL380 Gen12 Performance Heat Sink Kit` |
-| 10 | Current Qty | Clean integer string (always `/^\d+$/`) | `0` |
-| 11 | Unit Price (USD) | List price | `316.00` |
-| 12 | Price Delta (USD) | Price delta from baseline | `+18,243.00` |
-| 13 | Extended Price (USD) | Qty × Unit Price | `632.00` |
-| 14 | Price per GB (USD) | Memory-specific metric | `434.66` |
-| 15 | HPE Recommended | HPE recommended flag | `Yes` |
-| 16 | Start Date | Availability start | `02/24/2025` |
-| 17 | Discontinued Date | End of availability | `06/30/2029` |
-
-### Diff Fields (5 — Active Production)
-
-| # | Field | Description | Example |
-|---|-------|-------------|---------|
-| 18 | Diff Status | `ADDED`, `REMOVED`, `PRICE_CHANGED`, `UNCHANGED` | `PRICE_CHANGED` |
-| 19 | Previous List Price (USD) | Price from last scrape | `300.00` |
-| 20 | Price Change (USD) | Absolute delta | `+16.00` |
-| 21 | Price Change (%) | Percentage delta | `+5.33%` |
-| 22 | Price History Trail | Cumulative trail | `2026-08-01: $300.00 → 2026-08-05: $316.00 (▲)` |
-
----
-
-## Re-Scrape & Historical Delta Tracking Workflow
-
-When asked to re-run or update an existing catalog solution:
-1. Run `npm run scrape` (or `npm run scrape:storage` for storage wizards).
-2. `build_catalog.js` invokes `processCatalogDiff()` from `scripts/lib/diff_catalog.js`.
-3. It loads the previous snapshot from `history/catalog_{YYYY-MM-DD}.json` and `history/price_history.json`.
-4. Computes SKU diffs:
-   - **`ADDED`**: New SKUs get Green fill (`#E6F4EA`) + bold font.
-   - **`REMOVED`**: Discontinued SKUs are preserved as Tombstones (`[DISCONTINUED]`) with Red fill (`#FDE7E7`) + strikethrough.
-   - **`PRICE_CHANGED`**: Price changes get Amber fill (`#FFF3E0`) + delta fields.
-5. Saves new date-stamped snapshot under `history/` and writes styled Excel workbook with dedicated `Catalog Diff & History` sheet.
-6. Run `npm run registry:sync` to synchronize `outputs/SCRAPED_CATALOGS.md`.
-7. Run `npm run audit:all` to verify 100% portfolio compliance.
 
 ---
 
@@ -289,6 +204,7 @@ When asked to re-run or update an existing catalog solution:
 | Script | CLI Signature | Purpose |
 |--------|---------------|---------|
 | `scripts/lib/cdp.js` | N/A (module) | Shared CDP utilities (`sendCommand`, `getOCATarget`, `connectWS`, `sleep`) |
+| `scripts/lib/sku.js` | N/A (module) | Centralized HPE SKU regex, option suffix cleaning, and validation |
 | `scripts/lib/diff_catalog.js` | N/A (module) | Historical catalog diff & price history engine (tombstone injection) |
 | `scripts/lib/registry.js` | N/A (module) | Shared registry table updater (`updateScrapedRegistry`) |
 | `scripts/lib/sync_registry.js` | `npm run registry:sync` | Auto-scans `outputs/` and syncs `SCRAPED_CATALOGS.md` |
@@ -301,16 +217,7 @@ When asked to re-run or update an existing catalog solution:
 | `scripts/download_quickspecs_pdf.js` | `node scripts/download_quickspecs_pdf.js <docId> <dest_pdf_path>` | Download + MD5-cache QuickSpecs PDF |
 | `scripts/verify_excel_tally.js` | `node scripts/verify_excel_tally.js <output.xlsx>` | Post-flight 7-check audit (includes diff verification) |
 | `scripts/test_pipeline_evals.js` | `node scripts/test_pipeline_evals.js <output.xlsx> [--post-flight-only]` | Pre/in/post-flight eval suite (supports standalone post-flight mode) |
-| `scripts/verify_all.js` | `npm run audit:all` | One-shot portfolio audit suite across all outputs |
+| `scripts/verify_all.js` | `npm test` | One-shot portfolio audit suite across all outputs |
+| `scripts/rebuild_all.js` | `npm run rebuild` | Rebuild all product catalogs and Excel workbooks from raw_data |
 | `scripts/demo_qs_vs_menu_cdp.js` | `node scripts/demo_qs_vs_menu_cdp.js` | QuickSpecs vs Menu link visual demo |
 | `scripts/live_visual_demo_cdp.js` | `node scripts/live_visual_demo_cdp.js` | Live browser banner demo |
-
----
-
-## Extending to New Chassis or Product Lines
-1. User opens OCA and navigates to the target solution/chassis (authenticated session already open)
-2. Determine protocol: **Server** → `npm run scrape` | **Storage Wizard** → `npm run scrape:storage`
-3. Script auto-detects family/gen/model from DOM breadcrumbs
-4. Run `npm run registry:sync` to index the new catalog in master registry
-5. Run `npm run audit:all` — verify 100% portfolio certification
-6. **No code changes required** — all scripts are fully generic across all HPE product families

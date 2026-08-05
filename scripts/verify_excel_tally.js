@@ -9,6 +9,7 @@ const XLSX   = require('xlsx-js-style');
 const fs     = require('fs');
 const path   = require('path');
 const crypto = require('crypto');
+const { isValidHpeSKU } = require('./lib/sku');
 
 // ── Argument handling ─────────────────────────────────────────────────────────
 const xlsxPath = process.argv[2];
@@ -99,11 +100,14 @@ async function main() {
   assert(summarySkuSum > 0, `Category Summary SKU sum (${summarySkuSum}) > 0`);
   assert(summarySheet.length >= 3, `Category Summary has ${summarySheet.length} subcategory rows (>= 3)`);
 
-  // ── AUDIT 4: Data Quality (Qty regex + Hierarchy depth + Option Type) ──
+  // ── AUDIT 4: Data Quality Guardrails ──────────────────────────────────
   console.log('\n--- AUDIT 4: Data Quality Guardrails ---');
   let cleanQtyCount       = 0;
   let validHierarchyCount  = 0;
   let validOptionTypeCount = 0;
+  let taaGtaCount          = 0;
+  let domPatternCount      = 0;
+  let validHpeSKUCount     = 0;
 
   allSkusSheet.forEach(row => {
     const qty = String(row['Current Qty'] || row['Quantity'] || '');
@@ -114,6 +118,21 @@ async function main() {
 
     const optType = String(row['Option Type'] || '');
     if (['Standard', 'CTO', 'BTO', 'FIO'].includes(optType)) validOptionTypeCount++;
+
+    const pn   = String(row['Product #'] || '').trim();
+    const desc = String(row['Description'] || '').trim();
+
+    if (/\bTAA\b|TAA Compliant|\bGTA\b|#GTA/i.test(pn) || /\bTAA\b|TAA Compliant|\bGTA\b|#GTA/i.test(desc)) {
+      taaGtaCount++;
+    }
+
+    if (/pat0|00300/i.test(pn)) {
+      domPatternCount++;
+    }
+
+    if (isValidHpeSKU(pn)) {
+      validHpeSKUCount++;
+    }
   });
 
   assert(
@@ -127,6 +146,18 @@ async function main() {
   assert(
     validOptionTypeCount === allSkusSheet.length,
     `100% of SKUs (${validOptionTypeCount}/${allSkusSheet.length}) have valid Option Type (Standard/CTO/BTO/FIO, Rule #30)`
+  );
+  assert(
+    taaGtaCount === 0,
+    `0 TAA / GTA Compliant SKUs found in export (${taaGtaCount} violations, Rule #33 MEA Dubai Exclusion)`
+  );
+  assert(
+    domPatternCount === 0,
+    `0 Internal DOM pattern IDs found in export (${domPatternCount} violations, Rule #35 DOM Pattern Elimination)`
+  );
+  assert(
+    validHpeSKUCount === allSkusSheet.length,
+    `100% of SKUs (${validHpeSKUCount}/${allSkusSheet.length}) pass strict HPE SKU regex (-B21 / Service SKU, Rule #35)`
   );
 
   // ── AUDIT 5: Category-Specific Sheet Tallies ──────────────────────────────

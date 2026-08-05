@@ -30,24 +30,30 @@ function parseProductMeta(rawText, pageTitle = '') {
   else if (/aruba/i.test(fullText))              family = 'Aruba';
 
   // 3. Model & Form Factor Detection
-  const modelMatch = fullText.match(/\b(DL\d{3}|ML\d{3}|RL\d{3}|SY\d{3}|GX\d{4}|MicroServer|MSL\d{4}|Alletra\s*\d{4}|Nimble\s*[A-Z0-9]+|StoreOnce\s*\d{4}|MSA\s*\d{4}|2060|2062|1060|2050|5010|5030|5050|6000|9000)\b/i);
-  const formFactorMatch = fullText.match(/\b(SFF|LFF|NHP|CTO|Compute|Storage|Enclosure|Frame|Rack)\b/i);
+  const modelMatch = fullText.match(/\b(DL\d{3}|ML\d{3}|RL\d{3}|SY\d{3}|GX\d{4}|MicroServer|MSL\d{4}|Alletra\s*\d{4}|Nimble\s*[A-Z0-9]+|StoreOnce\s*\d{4}|MSA\s*\d{4}|2060|2062|1060|2050|5010|5030|5050|6000|9000|Virtual\s*Connect|VC\s*\d+Gb|100Gb\s*F32)\b/i);
+  const formFactorMatch = fullText.match(/\b(SFF|LFF|NHP|CTO|Compute|Storage|Enclosure|Frame|Rack|Module)\b/i);
 
   let cleanName = '';
   if (modelMatch) {
-    const model = modelMatch[0].replace(/\s+/g, '_');
-    const ff    = formFactorMatch ? formFactorMatch[0].toUpperCase() : '';
-    cleanName   = `${model}_${gen}${ff ? '_' + ff : ''}`;
+    let model = modelMatch[0].replace(/\s+/g, '_');
+    if (/100Gb|Virtual_Connect|F32/i.test(model)) model = 'SY100Gb_F32';
+    const ff  = formFactorMatch ? formFactorMatch[0].toUpperCase() : '';
+    cleanName = `${model}${gen && gen !== 'General' ? '_' + gen : ''}${ff ? '_' + ff : ''}`;
   } else {
     cleanName = rawText
       .replace(/Collapse All|Expand All|Expand Subsections|Undo Selection|Remove Defaults|View HPE Recommended only/gi, '')
+      .replace(/\b[A-Z0-9]{3,8}-[A-Z0-9]{3,4}\b/gi, '') // Strip SKU IDs (Rule #15)
       .replace(/[^a-zA-Z0-9_\-]/g, '_')
       .replace(/_+/g, '_')
       .replace(/^_|_$/g, '');
   }
 
-  // Ensure cleanName is valid
-  cleanName = cleanName.replace(/^HPE_/i, '').replace(/[^a-zA-Z0-9_\-]/g, '_').replace(/_+/g, '_');
+  // Ensure cleanName is valid & free of verbose leading prefixes or stray trailing SKU IDs
+  cleanName = cleanName
+    .replace(/^HPE_/i, '')
+    .replace(/_[A-Z0-9]{5,8}-[A-Z0-9]{3,4}$/i, '')
+    .replace(/[^a-zA-Z0-9_\-]/g, '_')
+    .replace(/_+/g, '_');
 
   return { family, gen, cleanName };
 }

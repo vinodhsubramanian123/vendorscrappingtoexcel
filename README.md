@@ -134,7 +134,7 @@ outputs/
 │           │   ├── DL380_Gen12_SFF_Catalog_SKUs.tsv
 │           │   ├── DL380_Gen12_SFF_Catalog_Rules.tsv
 │           │   └── DL380_Gen12_SFF_Catalog_Summary.tsv
-│           ├── history/                   ← PLANNED: diff snapshots
+│           ├── history/                   ← ACTIVE: diff snapshots & price trail
 │           │   ├── catalog_2026-08-05.json
 │           │   └── price_history.json
 │           ├── DL380_Gen12_SFF_Catalog.json

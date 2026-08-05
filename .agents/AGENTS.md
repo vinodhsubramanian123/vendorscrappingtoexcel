@@ -5,19 +5,19 @@ This workspace contains tools for scraping, parsing, and organising HPE server p
 
 ---
 
-## Pipeline State of Health (Last Updated: 2026-08-05)
+## Pipeline State of Health (Last Updated: 2026-08-06)
 
 ### ✅ Certified Products (100% Audit Pass)
-| Product | Family | SKUs | Excel Sheets | QuickSpecs PDF | Status |
-|---------|--------|------|-------------|----------------|--------|
-| HPE ProLiant DL380 Gen12 SFF | ProLiant | 1,037 | 29 | ✅ Verified (2.06 MB) | ✅ 100% PASS |
-| HPE Alletra 5000 (Storage System) | Alletra | 404 | 8 | ✅ Verified (2.06 MB) | ✅ 100% PASS |
-| HPE ProLiant DL380 Gen11 | ProLiant | 1,414 | 24 | ✅ Verified (2.06 MB) | ✅ 100% PASS |
-| HPE StoreEver MSL3040 Tape Library | StoreEver | 128 | 12 | ✅ Verified (2.06 MB) | ✅ 100% PASS |
-| HPE Cray Supercomputing GX5000 Rack | Cray | 46 | 11 | ⚠️ Advisory (No DOM link) | ✅ 100% PASS |
-| HPE Synergy VC 100Gb F32 Module | Synergy | 141 | 9 | ✅ Verified (0.89 MB) | ✅ 100% PASS |
+| Product | Family | Output Prefix | SKUs | Excel Sheets | QuickSpecs PDF | Status |
+|---------|--------|---------------|------|-------------|----------------|--------|
+| HPE ProLiant DL380 Gen12 SFF | ProLiant | `DL380_Gen12_SFF` | 951 | 30 | ✅ Verified (2.06 MB) | ✅ 100% PASS |
+| HPE Alletra Storage System | Alletra | `Alletra_Storage_System` | 92 | 8 | ✅ Verified (2.06 MB) | ✅ 100% PASS |
+| HPE ProLiant DL380 Gen11 | ProLiant | `DL380_Gen11` | 1,253 | 24 | ✅ Verified (2.06 MB) | ✅ 100% PASS |
+| HPE StoreEver MSL3040 Tape Library | StoreEver | `MSL3040_Tape` | 85 | 11 | ✅ Verified (2.06 MB) | ✅ 100% PASS |
+| HPE Cray Supercomputing GX5000 Rack | Cray | `GX5000_General_RACK` | 46 | 11 | ⚠️ Advisory (No DOM link) | ✅ 100% PASS |
+| HPE Synergy VC 100Gb F32 Module | Synergy | `SY100Gb_F32_Module` | 141 | 8 | ✅ Verified (0.89 MB) | ✅ 100% PASS |
 
-**Total Portfolio Intelligence**: **3,170 unique SKUs** across 6 product lines in 5 families.
+**Total Portfolio Intelligence**: **2,568 unique SKUs** across 6 product lines in 5 families.
 
 ### ✅ Resolved & Certified Pipeline Health (100% Audit Pass)
 | ID | Issue / Feature | Status | Resolution / Implemented Module |
@@ -32,8 +32,13 @@ This workspace contains tools for scraping, parsing, and organising HPE server p
 | **G9** | Dynamic Category-Specific Sheet Tallies | ✅ RESOLVED | `verify_excel_tally.js` Audit 5 dynamically filters non-core sheets |
 | **G10**| CDP Connection Retry & Backoff | ✅ RESOLVED | `cdp.js` `connectWS()` includes automatic exponential backoff retries |
 | **G12**| Step Numbering Correction | ✅ RESOLVED | Console output step numbering synced with code execution stages |
+| **G13**| Centralized HPE SKU Utility & 6-Char Regex | ✅ RESOLVED | `scripts/lib/sku.js` handles `-B21`, 6-char (`C0H28A`, `Q2R32A`), and service SKUs cleanly across all checkers |
+| **G14**| Output Folder Naming Rule #15 Enforcement | ✅ RESOLVED | Enforced clean model shorthand (`SY100Gb_F32_Module`) without verbose titles or SKU IDs |
+| **G15**| Test Runner Excel Lock File Exclusion | ✅ RESOLVED | `verify_all.js` ignores `.~*_OCA_Catalog.xlsx` temporary files |
+| **G16**| Master Registry In-Place Row Update | ✅ RESOLVED | `registry.js` updates existing catalog rows in place during re-sync/re-scrape |
 
 ### 🚀 Production Features Active
+- **Centralized HPE SKU Normalizer**: `scripts/lib/sku.js` provides single source of truth for hardware SKUs, option mode suffixes (`CTO`/`BTO`/`FIO`), and service SKUs.
 - **Catalog Diff & Price Tracking Engine**: `scripts/lib/diff_catalog.js` saves date-stamped snapshots in `history/catalog_{YYYY-MM-DD}.json` and logs cumulative price trails in `price_history.json`.
 - **Master Catalog Registry Auto-Synchronizer**: `scripts/lib/sync_registry.js` (`npm run registry:sync`) automatically scans and updates `outputs/SCRAPED_CATALOGS.md`.
 - **WebLogic & Legacy UI Modal Interceptor**: Auto-accepts JS alert dialogs (`Page.handleJavaScriptDialog`) and session extension popups (`dismissDOMModals`).
@@ -53,7 +58,12 @@ booktoSkill/
 │   ├── lib/
 │   │   ├── cdp.js                         ← shared CDP connection & command module
 │   │   ├── diff_catalog.js                ← catalog diff & price history engine
+│   │   ├── dom_extract.js                 ← DOM text & table extraction helpers
+│   │   ├── fs_compat.js                   ← cross-platform file move & cleanup helpers
+│   │   ├── logger.js                      ← standardized console logger
+│   │   ├── product_meta.js                ← universal product family & model parser
 │   │   ├── registry.js                    ← shared registry table updater (DRY)
+│   │   ├── sku.js                         ← centralized HPE SKU regex & normalization
 │   │   └── sync_registry.js               ← master registry auto-synchronizer
 │   ├── scrape_oca.js                      ← CDP raw data extractor
 │   ├── expand_and_rescrape.js             ← expand DOM then re-scrape
@@ -64,6 +74,8 @@ booktoSkill/
 │   ├── download_quickspecs_pdf.js         ← download + cache QuickSpecs PDF
 │   ├── verify_excel_tally.js              ← post-flight audit (7 checks including historical diff)
 │   ├── test_pipeline_evals.js             ← pre/in/post-flight eval suite (--post-flight-only mode)
+│   ├── verify_all.js                      ← universal portfolio verification suite (npm test)
+│   ├── rebuild_all.js                     ← rebuild all catalogs from raw_data (npm run rebuild)
 │   ├── demo_qs_vs_menu_cdp.js             ← QuickSpecs vs Menu link demo
 │   └── live_visual_demo_cdp.js            ← visual browser demo
 ├── outputs/                               ← ALL scrape outputs live here
@@ -83,7 +95,7 @@ booktoSkill/
 │               ├── {prefix}_Catalog.json
 │               ├── {prefix}_OCA_Catalog.xlsx
 │               └── HPE_{prefix}_QuickSpecs.pdf
-├── node_modules/                          ← npm dependencies (ws, xlsx-js-style)
+├── node_modules/                          ← npm dependencies (ws, xlsx, xlsx-js-style)
 ├── README.md                              ← project documentation & run commands
 └── package.json                           ← npm configuration & script targets
 ```
@@ -165,7 +177,7 @@ booktoSkill/
     - `Category Summary` — Overview of all subcategories, constraints, SKU counts
     - `All SKUs` — Master catalog with all 17 fields (see SKU schema in SKILL.md) + 5 diff fields when history exists
     - `Rules & Constraints` — All configuration rules and mixing restrictions
-    - `Catalog Diff & History` — [PLANNED] Color-coded diff sheet (only when previous snapshots exist)
+    - `Catalog Diff & History` — Color-coded diff sheet (generated when previous snapshots exist)
     - Category-specific drill-down sheets: dynamically generated from SKU data (Required 7 first: Processor, Memory, Smart Chassis, Storage Devices, Networking, Power Supplies, Graphics Options — if present; then any extras)
     - `Metadata` — Chassis name, scrape date, total SKUs, total rules, total tables, output folder
 
@@ -178,7 +190,7 @@ booktoSkill/
     }
     ```
 
-15. **SCRAPED_CATALOGS.md registry** — After every successful scrape, add a row to `outputs/SCRAPED_CATALOGS.md` with: date, chassis model, total SKUs, links to xlsx/json/pdf, and output path.
+15. **SCRAPED_CATALOGS.md registry** — After every successful scrape, add or update a row in `outputs/SCRAPED_CATALOGS.md` with: date, chassis model, total SKUs, links to xlsx/json/pdf, and output path.
 
 ---
 
@@ -192,18 +204,17 @@ outputs/{Family}/{Gen}/{Model}_{FormFactor}/
 |---------|------|---------|
 | `{Family}` | HPE product family | `ProLiant`, `Synergy`, `Alletra`, `Aruba`, `Cray` |
 | `{Gen}` | Generation | `Gen12`, `Gen11`, `Gen10Plus`, `Storage`, `Networking` |
-| `{Model}_{FormFactor}` | Model + form factor shorthand (no verbose OCA names, no SKU IDs) | `DL380_Gen12_SFF`, `DL360_Gen12_LFF`, `SY480_Gen11_Compute`, `Alletra_9000` |
+| `{Model}_{FormFactor}` | Model + form factor shorthand (no verbose OCA names, no SKU IDs) | `DL380_Gen12_SFF`, `DL360_Gen12_LFF`, `SY100Gb_F32_Module`, `Alletra_9000` |
 
-> **Never** use the verbose OCA-generated folder name (e.g. `HPE_ProLiant_Compute_DL380_Gen12_SFF_NC_Configure-to-order_Server_P73282-B21`). Always use the clean shorthand above.
+> **Never** use verbose OCA-generated folder names (e.g. `HPE_ProLiant_Compute_DL380_Gen12_SFF_NC_..._P73282-B21`). Always use clean shorthand above.
 
 ---
 
 ## Dependencies
 
-16. **Required npm packages**: `ws` (WebSocket for CDP), `xlsx` (Excel generation) — planned migration to `xlsx-js-style` for cell-level styling
+16. **Required npm packages**: `ws` (WebSocket for CDP), `xlsx` (Excel generation), `xlsx-js-style` (cell-level styling with colors and strikethroughs)
     ```bash
-    npm install ws xlsx     # already done; node_modules/ exists
-    # Planned: npm install ws xlsx-js-style  (drop-in replacement for color-coded diffs)
+    npm install ws xlsx xlsx-js-style
     ```
 
 ---
@@ -224,7 +235,7 @@ outputs/{Family}/{Gen}/{Model}_{FormFactor}/
 
 19. **In-Flight Expansion Assertion**: After clicking "Expand All", "Expand Subsections", and all `input[id*="showmore"]`, assert `document.body.scrollHeight > 15000`. Retry expansion if height is below threshold.
 
-20. **Post-Flight Data Quality Assertions** (run via `node scripts/verify_excel_tally.js <output_xlsx_path>`):
+20. **Post-Flight Data Quality Assertions** (run via `node scripts/verify_excel_tally.js <output_xlsx_path>` or `npm test`):
     - `Current Qty` MUST pass `/^\d+$/` on **100%** of SKUs (zero text pollution)
     - `Hierarchy Path` MUST contain ≥ 3 `>` delimiters on 100% of SKUs
     - Excel `All SKUs` row count MUST equal JSON `totalUniqueSKUs`
@@ -267,7 +278,7 @@ outputs/{Family}/{Gen}/{Model}_{FormFactor}/
     1. User navigates to the new chassis in OCA (authenticated session)
     2. Run `node scripts/scrape_oca_solution.js` — it auto-detects product family/gen/model from the DOM
     3. Output automatically goes to `outputs/{Family}/{Gen}/{Model}_{FormFactor}/`
-    4. Add a row to `outputs/SCRAPED_CATALOGS.md` after successful scrape
+    4. Run `npm run registry:sync` to index the new catalog
     5. **No code changes required** — scripts are fully generic
 
 26. When the **OCA portal UI changes**, check:
@@ -282,16 +293,16 @@ outputs/{Family}/{Gen}/{Model}_{FormFactor}/
 
 ---
 
-## Catalog Diff & Price Tracking (Rule #28 — PLANNED)
+## Catalog Diff & Price Tracking (Rule #28 — ACTIVE PRODUCTION)
 
-28. **Historical Snapshot Versioning & Color-Coded Price Diffs** (implementation pending):
+28. **Historical Snapshot Versioning & Color-Coded Price Diffs**:
     - **Snapshot storage**: `outputs/{Family}/{Gen}/{Model}/history/catalog_{YYYY-MM-DD}.json` — one per scrape date
     - **Price history log**: `outputs/{Family}/{Gen}/{Model}/history/price_history.json` — cumulative trail per SKU
     - **Diff status taxonomy**: Every SKU tagged as `ADDED`, `REMOVED`, `PRICE_CHANGED`, or `UNCHANGED`
     - **Color conventions**: Green font (`#137333`) = Added, Red font + strikethrough (`#C5221F`) = Removed, Amber font (`#B06000`) = Price Changed
     - **Mandate**: REMOVED SKUs must NEVER be silently dropped — they persist in the Excel as tombstone rows with visual indicators
     - **Price delta fields**: `Previous List Price (USD)`, `Price Change (USD)`, `Price Change (%)`, `Price History Trail`
-    - **Downstream BOM impact**: When the BOM Comparison Engine (separate workspace) imports catalogs, diff metadata enables intelligent procurement decision-making ("this SKU was recently discontinued" / "price increased 15% since last month")
+    - **Downstream BOM impact**: When the BOM Comparison Engine imports catalogs, diff metadata enables intelligent procurement decision-making ("this SKU was recently discontinued" / "price increased 15% since last month")
 
 ---
 
@@ -313,12 +324,12 @@ graph TD
 
     subgraph "Processing Layer"
         F["build_catalog.js (Classification Engine)"]
-        G["diff_catalog.js (lib) — PLANNED"]
+        G["diff_catalog.js (lib) — ACTIVE PRODUCTION"]
         H["generate_xlsx.js (Excel Generator)"]
     end
 
     subgraph "Quality Layer"
-        I["verify_excel_tally.js (6-check Audit)"]
+        I["verify_excel_tally.js (7-check Audit)"]
         J["test_pipeline_evals.js (Pre/In/Post Evals)"]
         K["download_quickspecs_pdf.js (MD5 Cache)"]
     end
@@ -340,7 +351,7 @@ graph TD
 | `scrape_oca_storage_solution.js` | Live CDP session | `raw_data/oca_raw_data_full.json` | Wizard sub-tab iteration, `<select>` → synthetic tables |
 | `build_catalog.js` | `oca_raw_data_full.json` | `*_Catalog.json` + 3 TSVs | Subcategory regex, NAV_MENU_END=1010, table-index inheritance |
 | `generate_xlsx.js` | 3 TSVs + `*_Catalog.json` | `*_OCA_Catalog.xlsx` | Dynamic category sheets, 17-col schema, column widths |
-| `verify_excel_tally.js` | `*_OCA_Catalog.xlsx` + `*_Catalog.json` | PASS/FAIL | 6 audit checks, MD5 fingerprint |
+| `verify_excel_tally.js` | `*_OCA_Catalog.xlsx` + `*_Catalog.json` | PASS/FAIL | 7 audit checks, MD5 fingerprint |
 | `download_quickspecs_pdf.js` | docId + dest path | QuickSpecs PDF | MD5 cache, dedicated Chrome tab, file-diff detection |
 
 ---
@@ -352,3 +363,21 @@ graph TD
     - An explicit schema column `Option Type` is populated with `CTO`, `BTO`, `FIO`, or `Standard`.
     - Base SKUs allow direct cross-catalog lookup and price history tracking across build modes.
 
+31. **Standalone Base Chassis List Pricing vs Solution Totals**:
+    - Never confuse total pre-configured solution/quote bundle totals ($60K–$180K containing dual CPUs, RAM, GPUs, NVMe) with standalone Base Chassis CTO list prices ($4,500–$7,500).
+    - Capture standalone Base Chassis list prices from the search/autocomplete dropdown or base chassis table rows.
+
+32. **Price-Prioritized CTO vs Smart CTO Selection Protocol**:
+    - When duplicate `CTO` and `Smart CTO` rows exist for the same chassis SKU in the autocomplete list, `build_catalog.js` uses `hasValidPrice` to automatically retain the `CTO` row with a valid non-zero list price (e.g. `$5,070.00`) and discard the unpriced `-` `Smart CTO` row.
+
+33. **MEA / Dubai Regional Exclusion Protocol**:
+    - All `TAA`, `TAA Compliant`, `GTA`, and `#GTA` chassis variants and SKUs are automatically filtered out from primary catalog exports per MEA (Dubai) regional procurement requirements.
+
+34. **Services Full-Depth Scraping Protocol**:
+    - OCA Services live on dedicated tabs (`#extended_overview_suisvc` for Support Services and `#other-services` for Deployment & Professional Services).
+    - Scrapers must iterate through all detail sections and pagination pages to capture 100% of Base Support tiers (Tech Care Essential/Basic, Complete Care, 3Y/4Y/5Y terms), Deployment, and Professional Services.
+
+35. **Strict HPE Part Number Regex Validation (`scripts/lib/sku.js`)**:
+    - Hardware SKUs MUST pass `isValidHpeSKU()` matching hyphenated hardware SKUs (e.g. `P73282-B21`, `P69729-F21`, `804394-B21`) or standard 6-character hardware SKUs (e.g. `C0H28A`, `Q2R32A`, `BC002A`, `N9X06A`, `TC480A`).
+    - Service SKUs MUST match `/^[HURS][A-Z0-9]{4,7}$/i` (e.g. `H7J32A`, `HV1H3E`, `H06CDE`).
+    - Internal DOM pattern IDs (`dl380pat001b94fb`) and arbitrary numeric strings (`0030031`) are strictly rejected.

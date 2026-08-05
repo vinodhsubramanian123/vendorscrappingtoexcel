@@ -9,6 +9,7 @@ const fs    = require('fs');
 const XLSX  = require('xlsx-js-style');
 const path  = require('path');
 const { sendCommand, getOCATarget, connectWS, sleep } = require('./lib/cdp');
+const { isValidHpeSKU } = require('./lib/sku');
 
 // ── Argument handling ─────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
@@ -215,13 +216,43 @@ async function main() {
 
   // Rule #20: Hierarchy Path must have >= 3 '>' delimiters
   let hierarchyOk = 0;
+  let taaGtaCount = 0;
+  let domPatternCount = 0;
+  let validHpeSKUCount = 0;
+
   allSkusSheet.forEach(row => {
     const hp = row['Hierarchy Path'] || '';
     if ((hp.match(/>/g) || []).length >= 3) hierarchyOk++;
+
+    const pn   = String(row['Product #'] || '').trim();
+    const desc = String(row['Description'] || '').trim();
+
+    if (/\bTAA\b|TAA Compliant|\bGTA\b|#GTA/i.test(pn) || /\bTAA\b|TAA Compliant|\bGTA\b|#GTA/i.test(desc)) {
+      taaGtaCount++;
+    }
+    if (/pat0|00300/i.test(pn)) {
+      domPatternCount++;
+    }
+    if (isValidHpeSKU(pn)) {
+      validHpeSKUCount++;
+    }
   });
+
   assert(
     hierarchyOk === allSkusSheet.length,
     `Post-flight: 100% of Excel rows (${hierarchyOk}/${allSkusSheet.length}) have 4-level Hierarchy Path (Rule #20)`
+  );
+  assert(
+    taaGtaCount === 0,
+    `Post-flight: 0 TAA / GTA Compliant SKUs in export (${taaGtaCount} violations, Rule #33 MEA Dubai Exclusion)`
+  );
+  assert(
+    domPatternCount === 0,
+    `Post-flight: 0 Internal DOM pattern IDs in export (${domPatternCount} violations, Rule #35 DOM Pattern Elimination)`
+  );
+  assert(
+    validHpeSKUCount === allSkusSheet.length,
+    `Post-flight: 100% of Excel SKUs (${validHpeSKUCount}/${allSkusSheet.length}) pass strict HPE SKU regex (-B21 / Service SKU, Rule #35)`
   );
 
   // ── GUARDRAIL 5: QuickSpecs PDF ───────────────────────────────────────────

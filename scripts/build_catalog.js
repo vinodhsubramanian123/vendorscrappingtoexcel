@@ -10,6 +10,7 @@
 const fs   = require('fs');
 const path = require('path');
 const { processCatalogDiff } = require('./lib/diff_catalog');
+const { HPE_SKU_EXTRACT_REGEX, cleanBaseSKU, classifyOptionType } = require('./lib/sku');
 
 // ── CLI Arguments ─────────────────────────────────────────────────────────────
 const rawInputPath   = process.argv[2];
@@ -183,6 +184,7 @@ if (unclassifiedSubcats > 0) {
 console.log('\n--- Step 3: Extracting Tables & SKUs ---');
 
 const allSKURows   = [];
+const allSKUMap    = new Map();
 const processedPNs = new Set();
 const tableEntries = [];
 let skippedTables  = 0;
@@ -239,16 +241,17 @@ for (let ti = 1; ti < tables.length; ti++) {
       }
     }
 
-    // Sanitize Product # (strip concatenated row-index tokens)
-    const rawPN   = obj['Product #'] || '';
-    const pnMatch = rawPN.match(/([A-Z0-9]{3}[A-Z0-9\-]{2,20}[A-Z0-9])/);
-    let pn        = pnMatch ? pnMatch[1] : rawPN.replace(/\s+/g, '').trim();
+    // Sanitize Product # — strictly extract HPE hardware and Service SKUs
+    // Rejects internal DOM pattern IDs (e.g. dl380pat001b94fb) and arbitrary numeric strings
+    const rawPN     = obj['Product #'] || '';
+    const hpeMatch  = rawPN.match(HPE_SKU_EXTRACT_REGEX);
+    if (!hpeMatch) {
+      continue; // Skip rows that do not have a valid HPE part number SKU
+    }
 
-    // Separate CTO / BTO / FIO procurement mode attribute from base Product #
-    let optionType = 'Standard';
-    if (/CTO$/i.test(pn))      { optionType = 'CTO'; pn = pn.replace(/CTO$/i, ''); }
-    else if (/BTO$/i.test(pn)) { optionType = 'BTO'; pn = pn.replace(/BTO$/i, ''); }
-    else if (/FIO$/i.test(pn)) { optionType = 'FIO'; pn = pn.replace(/FIO$/i, ''); }
+    const matchedRaw = hpeMatch[1].toUpperCase();
+    const pn         = cleanBaseSKU(matchedRaw);
+    const optionType = classifyOptionType(matchedRaw);
 
     if (pn) {
       obj['Product #']   = pn;
@@ -259,6 +262,12 @@ for (let ti = 1; ti < tables.length; ti++) {
     const rawQty = String(obj['Current Qty'] || obj['Quantity'] || '0').replace(/\s+/g, '').trim();
     obj['Current Qty'] = /^\d+$/.test(rawQty) ? rawQty : '0';
     delete obj['Quantity'];
+
+    // Filter out TAA Compliant & GTA / #GTA SKUs for MEA (Dubai) region requirement
+    const descText = obj['Description'] || '';
+    if (/\bTAA\b|TAA Compliant|\bGTA\b|#GTA/i.test(pn) || /\bTAA\b|TAA Compliant|\bGTA\b|#GTA/i.test(descText)) {
+      continue;
+    }
 
     if (pn && pn.length >= 3 && pn.length < 30 && !pn.includes('Product #') && !pn.includes('Optional') && !pn.includes('Please make')) {
       skus.push(obj);
@@ -328,18 +337,33 @@ for (let ti = 1; ti < tables.length; ti++) {
     skus
   });
 
-  // Deduplicate into master SKU list
+  // Deduplicate into master SKU list with price-prioritization
   for (const sku of skus) {
     const pn = sku['Product #'];
+    if (!pn) continue;
+
+    const newSKURow = {
+      parentCategory: parentCat,
+      subCategory:    matchedSubcat ? matchedSubcat.name : '(Sub-table)',
+      constraint:     matchedSubcat ? matchedSubcat.constraint : '',
+      rules:          tableRules.join(' | '),
+      ...sku
+    };
+
+    const hasValidPrice = (row) => {
+      const p = String(row['Unit Price (USD)'] || row['Price (USD)'] || row['Price'] || '').replace(/[\$,\s]/g, '');
+      return !isNaN(parseFloat(p)) && parseFloat(p) > 0;
+    };
+
     if (!processedPNs.has(pn)) {
       processedPNs.add(pn);
-      allSKURows.push({
-        parentCategory: parentCat,
-        subCategory:    matchedSubcat ? matchedSubcat.name : '(Sub-table)',
-        constraint:     matchedSubcat ? matchedSubcat.constraint : '',
-        rules:          tableRules.join(' | '),
-        ...sku
-      });
+      allSKUMap.set(pn, newSKURow);
+    } else {
+      // If duplicate SKU (e.g. CTO vs Smart CTO), prioritize the entry with a valid list price
+      const existing = allSKUMap.get(pn);
+      if (existing && !hasValidPrice(existing) && hasValidPrice(newSKURow)) {
+        allSKUMap.set(pn, newSKURow);
+      }
     }
   }
 
@@ -349,6 +373,7 @@ for (let ti = 1; ti < tables.length; ti++) {
 }
 
 console.log(`Processed ${tableEntries.length} valid product tables (${skippedTables} non-SKU/wrapper tables skipped).`);
+allSKURows.push(...allSKUMap.values());
 console.log(`Extracted ${processedPNs.size} unique SKUs.`);
 
 // ============================================================
