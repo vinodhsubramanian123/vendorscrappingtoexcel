@@ -215,6 +215,39 @@ function evalNetworkingOcp(items) {
 }
 
 /**
+ * Aspect 4B: PCIe Slot Capacity & Riser Expansion Card Math Pre-Check
+ */
+function evalPcieRiserSlots(items) {
+  let requiredPcieCards = 0;
+  let primaryRiserCount = 0;
+  let secondaryRiserCount = 0;
+  let tertiaryRiserCount = 0;
+
+  for (const it of items) {
+    const desc = it.description.toLowerCase();
+    const sku  = cleanBaseSKU(it.sku);
+
+    // Count PCIe Expansion Cards (GPUs, NICs, HBAs, Controllers, Accelerator Cards)
+    if (desc.includes('adapter') || desc.includes('controller') || desc.includes('hba') || desc.includes('nvidia') || desc.includes('pcie') || desc.includes('gpu')) {
+      if (!desc.includes('ocp') && !desc.includes('embedded') && !desc.includes('lom') && !desc.includes('cable') && !desc.includes('cage')) {
+        requiredPcieCards += it.quantity;
+      }
+    }
+
+    // Count Risers
+    if (desc.includes('primary riser') || desc.includes('main riser')) primaryRiserCount += it.quantity;
+    if (desc.includes('secondary riser')) secondaryRiserCount += it.quantity;
+    if (desc.includes('tertiary riser')) tertiaryRiserCount += it.quantity;
+  }
+
+  // Base Chassis provides 2 standard slots; Primary adds 3; Secondary adds 3; Tertiary adds 2.
+  const totalSlotsAvailable = 2 + (primaryRiserCount * 3) + (secondaryRiserCount * 3) + (tertiaryRiserCount * 2);
+  const needsSecondaryRiser = requiredPcieCards > (2 + primaryRiserCount * 3);
+
+  return { requiredPcieCards, primaryRiserCount, secondaryRiserCount, tertiaryRiserCount, totalSlotsAvailable, needsSecondaryRiser };
+}
+
+/**
  * Aspect 5: Power & Environmental Pre-Check
  */
 function evalPowerEnvironment(items) {
@@ -259,12 +292,23 @@ function evaluatePhysicalMath(items) {
   const memory = evalMemoryChannel(items);
   const storage = evalStorageTriMode(items);
   const network = evalNetworkingOcp(items);
+  const pcie    = evalPcieRiserSlots(items);
   const power = evalPowerEnvironment(items);
   const support = evalSupportManufacturing(items);
 
   const errors = [];
   const warnings = [];
   const missingDependencies = [];
+
+  // Rule: PCIe Slot Capacity vs Riser Math
+  if (pcie.requiredPcieCards > pcie.totalSlotsAvailable) {
+    warnings.push(`PCIe expansion cards count (${pcie.requiredPcieCards}) exceeds available chassis/riser PCIe slots (${pcie.totalSlotsAvailable}). Additional Riser Kit required.`);
+  }
+
+  // Rule: CPU 2 PCIe Lane Allocation requirement for Secondary/Tertiary Risers
+  if ((pcie.secondaryRiserCount > 0 || pcie.tertiaryRiserCount > 0) && compute.cpuCount < 2) {
+    errors.push(`Secondary/Tertiary Riser configured with only 1 CPU socket populated. Secondary PCIe bus lines require 2nd CPU socket.`);
+  }
 
   // Rule 1: High TDP thermal requirement
   if (compute.maxCpuTdpWatts >= HIGH_TDP_THRESHOLD_WATTS && !compute.hasHighPerfFans) {

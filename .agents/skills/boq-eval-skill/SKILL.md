@@ -25,7 +25,7 @@ This skill provides an automated, agentic workflow for ingesting raw customer BO
    ├── 1. Compute & Thermal: CPU TDP vs Heatsinks (`P74792-B21`), High-Perf Fan Kits (`P48820-B21`)
    ├── 2. Memory & Channel: 32 DIMM max, 8 channels/CPU socket, 96GB/128GB/3DS/bit-width rules
    ├── 3. Storage & Tri-Mode: EDSFF vs SFF/LFF cages, Box 1/2 cables (`P76453-B21`), Battery (`P01366-B21`)
-   ├── 4. Networking & OCP: OCP 3.0 NIC slots A/B, rear OCP cable enablement kits (`P72201-B21`)
+   ├── 4. Networking, PCIe & Risers: OCP 3.0 NIC slots, PCIe Slot Capacity vs Riser Math, CPU 2 PCIe Bus Allocation
    ├── 5. Power & Ambient: -48VDC Lug Kits (`P36877-B21`), Titanium 96% PSUs, AC/DC cord filtering
    └── 6. Support & Services: CTO `-B21` option suffixes, OS FIO rules, Tech Care 3Y/5Y tiers
        │

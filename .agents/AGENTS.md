@@ -395,3 +395,32 @@ graph TD
     4. **Notebook Validations (RAG)**: Query Gemini NotebookLM (`nlm-skill`) to cross-reference constraints and solve gaps using synced documentation.
     5. **HITL Portal Trial**: Output 5-Tier Strategic Resolution Reports. The user attempts to build the top-ranked solution manually in the OCA vendor portal.
     6. **Feedback & Automation Learning**: If the portal rejects the configuration, run `npm run eval:boq <file> --simulate-portal-error "<error>"` to log a permanent `KnowledgeDelta`, ensuring the system inherently learns the new rule for future quotes.
+
+---
+
+## Universal Pre-Computed & Runtime Physical Math Engine (Rule #37)
+
+37. **Dual-Layer Physical & Mathematical Constraint Engine**:
+    - **Layer 1: Pre-computed Catalog Constraint Matrices** (`build_catalog.js` & `*_Catalog.json`): During catalog extraction, quantity constraints `(max N)`, `(required)`, `(no max)` and table rules are compiled into structured matrices (e.g. Memory Channels per CPU socket, PCIe slot budgets per Riser card, Storage Controller Cable Kit dependencies). These matrices are ingested into NotebookLM (`nlm-skill`) so RAG queries can answer constraint math questions instantly.
+    - **Layer 2: Runtime Physical Math Evaluator** (`scripts/lib/boq_evaluator.js`): During BOQ evaluation, the system executes real-time mathematical validation across 6 physical aspects:
+      1. **Compute & Thermal Math**: $\text{Max CPU TDP Watts} \ge 240\text{W} \implies \text{High-Performance Fan Kit mandatory}$.
+      2. **Memory & Channel Math**: $\text{Total DIMMs} \pmod 8 == 0$ (Balanced channel population across sockets).
+      3. **PCIe Slot Capacity & Riser Math**: $\text{Required PCIe Cards} > \text{Available Slots} \implies \text{Riser Expansion Kit mandatory}$; $\text{Secondary/Tertiary Riser} \implies 2\text{nd CPU Socket mandatory}$.
+      4. **Storage Interconnect Math**: $\text{Tri-Mode Controller} + \text{Front Drive Box 1/2} \implies \text{Dedicated Cable Kit (e.g. P76453-B21) mandatory}$.
+      5. **Power & Environmental Math**: $\text{-48VDC Power Supply} \implies \text{DC Lug Kit mandatory}$.
+      6. **Support & Service Math**: $\text{Hardware SKUs} \implies \text{Mandatory Tech Care Support Tier}$.
+    - **Vendor-Agnostic Genericity**: All physical math functions use generic component roles (`Compute`, `Memory`, `Storage`, `Interconnect`, `Power`, `Support`) so the exact same evaluation logic applies across HPE, Dell PowerEdge, Cisco UCS, Lenovo ThinkSystem, Huawei, NetApp, and Aruba lines.
+
+---
+
+## Category Math & Chassis Defaults Conflict Resolution Engine (Rule #38)
+
+38. **Dynamic Chassis Defaults & Category Math Integration**:
+    - **Base Chassis Default Ingestion**: Every base chassis configuration comes with factory baseline defaults (default AC power supplies, standard cooling fans, default 0-drive configuration, base PCIe slots).
+    - **Category Math Aggregation**: The final configuration is computed as:
+      $$\text{Solution BOM} = \text{Base Chassis Defaults} + \sum (\text{Category Selected Options}) + \sum (\text{Derived Dependencies}) - \text{Overridden Defaults}$$
+    - **Conflict Resolution & Clear Reasoning Chain**: When category options conflict with chassis defaults (e.g. High TDP CPU > 240W overrides standard fans with High-Performance Fan Kit; -48VDC power supply overrides AC power supplies), the evaluator:
+      1. Detects the conflict without crashing.
+      2. Outputs explicit reasoning: *"High TDP Processor (250W >= 240W) configured without High-Performance Fan Kit. Default Standard Fans replaced with High-Performance Fan Kit P48820-B21."*
+      3. Dynamically injects mandatory missing dependencies into the BOM.
+    - **Zero Hardcoding & Autonomous Learning**: All subcategory constraints `(max N)`, `(required)`, `(no max)` are parsed dynamically from the scraped catalog JSON and Excel summary sheet. Vendor portal rejections logged via `npm run eval:boq --simulate-portal-error` update the conflict resolution rules dynamically via `catalog_deltas.json` without modifying source code.
