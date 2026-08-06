@@ -18,34 +18,39 @@ Generates multi-sheet Excel workbooks, structured JSON companions, TSV intermedi
 - Run `npm install` (installs `ws`, `xlsx`, and `xlsx-js-style`)
 - Chrome or Chromium browser running with Remote Debugging enabled on port 9222
 
-### 2. Browser Launch Command (CDP Port 9222)
+### 2. Browser Launch Command (CDP Port 9222 — Hands-Free Automation)
 
-Before running scrapers, open your browser with remote debugging on port 9222:
+Before running scrapers, open your browser with remote debugging on port 9222 and permission-suppression flags:
 
 **macOS:**
 ```bash
 /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
-  --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
+  --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug \
+  --deny-permission-prompts --disable-notifications --disable-popup-blocking
 ```
 
 **Linux Mint / Ubuntu / Fedora:**
 ```bash
-google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
+google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug \
+  --deny-permission-prompts --disable-notifications --disable-popup-blocking
 # or for Chromium:
-chromium-browser --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
+chromium-browser --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug \
+  --deny-permission-prompts --disable-notifications --disable-popup-blocking
 ```
 
 **Windows (PowerShell):**
 ```powershell
 & "C:\Program Files\Google\Chrome\Application\chrome.exe" `
-  --remote-debugging-port=9222 --user-data-dir="$env:TEMP\chrome-debug"
+  --remote-debugging-port=9222 --user-data-dir="$env:TEMP\chrome-debug" `
+  --deny-permission-prompts --disable-notifications --disable-popup-blocking
 ```
 
 **Windows (cmd.exe):**
 ```cmd
 chcp 65001
 "C:\Program Files\Google\Chrome\Application\chrome.exe" ^
-  --remote-debugging-port=9222 --user-data-dir="%TEMP%\chrome-debug"
+  --remote-debugging-port=9222 --user-data-dir="%TEMP%\chrome-debug" ^
+  --deny-permission-prompts --disable-notifications --disable-popup-blocking
 ```
 
 > **Note**: Log into the HPE Partner Portal (`https://partner.hpe.com`) in the launched browser window, then navigate to your target chassis configuration quote in OCA.

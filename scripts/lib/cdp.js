@@ -150,17 +150,25 @@ async function connectWS(debuggerUrl, retries = 3, backoffMs = 1500) {
 }
 
 /**
- * Automatically handle JS alert/confirm dialogs and DOM modal popups (WebLogic / legacy UI).
+ * Automatically handle JS alert/confirm dialogs, permission requests, and DOM modal popups (WebLogic / legacy UI).
  */
 async function setupDialogAutoHandler(ws) {
   try {
     await sendCommand(ws, 'Page.enable');
+    // Enable download behavior to prevent download confirmation dialogs
+    try {
+      await sendCommand(ws, 'Page.setDownloadBehavior', { behavior: 'allow', downloadPath: '/tmp' });
+    } catch (_) {}
+
     ws.on('message', async (data) => {
       try {
         const msg = JSON.parse(data);
         if (msg.method === 'Page.javascriptDialogOpening') {
           console.log(`  ⚡ JS Dialog Intercepted: "${msg.params.message}" (${msg.params.type}) — Auto Accepting...`);
           await sendCommand(ws, 'Page.handleJavaScriptDialog', { accept: true });
+        } else if (msg.method === 'Page.fileChooserOpened') {
+          console.log('  ⚡ File Chooser Intercepted — Auto Bypassing...');
+          await sendCommand(ws, 'Page.handleFileChooser', { action: 'cancel' });
         }
       } catch (err) {
         // Safe debug output
@@ -172,7 +180,7 @@ async function setupDialogAutoHandler(ws) {
 }
 
 /**
- * Handle DOM session extension prompts and modal proceed/confirm buttons.
+ * Handle DOM session extension prompts, cookie banners, and modal proceed/confirm/allow buttons.
  */
 async function dismissDOMModals(ws) {
   try {
@@ -186,11 +194,16 @@ async function dismissDOMModals(ws) {
           });
         sessionBtns.forEach(btn => btn.click());
 
-        // Handle modal confirmation dialogs (Proceed / Continue / Confirm / OK) — ignoring Cancel / Delete
+        // Handle permission & notification popups / cookie consent banners (Allow, Accept All, Proceed, OK)
+        const consentBtns = Array.from(document.querySelectorAll('#onetrust-accept-btn-handler, .cookie-accept, .cc-accept, .btn-allow, button[id*="allow"], button[class*="allow"], button[id*="accept"]'))
+          .filter(el => el.offsetWidth > 0 && el.offsetHeight > 0);
+        consentBtns.forEach(btn => btn.click());
+
+        // Handle modal confirmation dialogs (Proceed / Continue / Confirm / OK / Allow) — ignoring Cancel / Delete
         const confirmBtns = Array.from(document.querySelectorAll('.modal-dialog button, .ui-dialog button, .dialog-button, .popup-button, .modal-footer button, #btnContinue, .btn-confirm'))
           .filter(el => {
             const t = (el.innerText || el.value || '').trim().toLowerCase();
-            return (t === 'proceed' || t === 'continue' || t === 'ok' || t === 'yes' || t === 'confirm' || t === 'accept')
+            return (t === 'proceed' || t === 'continue' || t === 'ok' || t === 'yes' || t === 'confirm' || t === 'accept' || t === 'allow')
               && !t.includes('cancel') && !t.includes('delete') && !t.includes('remove');
           });
         confirmBtns.forEach(btn => btn.click());
