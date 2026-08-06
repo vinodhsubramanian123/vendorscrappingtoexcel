@@ -32,3 +32,21 @@
 | **CATEGORY** | Category-wide mutual exclusions | `Mixing of x4 and x8 memory is not allowed.` |
 | **SUBCATEGORY** | Slot limits and required components | `max 32` DIMMs, `required` Support Service |
 | **SKU** | Direct part pairings | `Lug Kit P36877-B21 required for -48VDC PSU P17023-B21` |
+
+---
+
+## 3. Pointnext Support SKU & Suffix Code Taxonomy
+
+### Modular SKU Construction
+$$\text{Product \# (SKU)} = \text{Parent Service Family Code} + \text{Chassis Product Suffix Code}$$
+
+- **Parent Service Family Code**: `HU4A6A5` (5Y Tech Care Essential), `H7J34A3` (3Y Tech Care Basic), `HS7Y7E` (5Y Tech Care Basic), `H67B8E` (4Y Tech Care Critical), `H30ZCE` (3Y Complete Care).
+- **Chassis Product Suffix Matrix**:
+  - `00DJ` = HPE ProLiant DL360 Gen11 (1U Rack) ➔ `HU4A6A500DJ`
+  - `00DK` = HPE ProLiant DL380 Gen11 (2U Rack) ➔ `HU4A6A500DK`
+  - `0C4U` = HPE ProLiant DL360 Gen12 (1U Rack) ➔ `HU4A6A50C4U`
+  - `0C4V` = HPE ProLiant DL380 Gen12 (2U Rack) ➔ `HU4A6A50C4V`
+
+### Dynamic Support Pricing Scaling Formula
+$$\text{Support List Price} = \text{Base Chassis Support} + (\text{CPU TDP Factor} \times N_{\text{CPU}}) + (\text{RAM GB Factor} \times \text{RAM}_{\text{GB}}) + \text{Storage Factor}$$
+

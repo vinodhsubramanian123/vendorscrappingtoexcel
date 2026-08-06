@@ -444,3 +444,16 @@ graph TD
       - **Rank 4**: Maximum Density & Future Scalability Expansion (Full PCIe/Riser & 1DPC Memory headroom).
       - **Rank 5**: Budget & CapEx Minimized Buildable Tier.
     - Every rank includes multi-metric tradeoff indicators (`Intent Alignment %`, `SKU Modifications Count`, `Cost Delta $`, `Capacity Expansion Headroom`) and explicit technical rationale for pre-flight alignment with customer sales teams.
+
+---
+
+## Pointnext Support SKU Construction & Dynamic Price Scaling Taxonomy (Rule #40)
+
+40. **HPE Pointnext Hardware Support SKU Construction & Price Scaling**:
+    - **Modular SKU Construction**: HPE Pointnext hardware support SKUs use a 2-part modular structure:
+      $$\text{Product \# (SKU)} = \text{Parent Service Family Code} + \text{Chassis Product Suffix Code}$$
+      - **Parent Service Family Code**: `HU4A6A5` (5Y Tech Care Essential), `H7J34A3` (3Y Tech Care Basic), `HS7Y7E` (5Y Tech Care Basic), `H67B8E` (4Y Tech Care Critical), `H30ZCE` (3Y Complete Care).
+      - **Chassis Product Suffix Code**: `00DJ` (DL360 Gen11 1U), `00DK` (DL380 Gen11 2U), `0C4U` (DL360 Gen12 1U), `0C4V` (DL380 Gen12 2U).
+    - **Dynamic Hardware Support Price Math**: Pointnext support list prices scale dynamically based on total node hardware list price and populated component TDP/capacity:
+      $$\text{Support List Price} = \text{Base Chassis Tier} + (\text{CPU TDP Factor} \times N_{\text{CPU}}) + (\text{RAM GB Factor} \times \text{RAM}_{\text{GB}}) + \text{Storage Factor}$$
+    - **Multi-Tab Extraction Mandate**: Scrapers MUST extract `Menu` (options catalog), `Services` (Pointnext Tech Care options), AND `BOM` (calculated itemized support lines `HU4A6A50C4V`, `H39VPA1 5A6`) tabs to guarantee 100% complete intelligence.
