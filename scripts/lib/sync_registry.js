@@ -13,9 +13,15 @@ const { updateScrapedRegistry } = require('./registry');
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
 const OUTPUTS_ROOT = path.join(PROJECT_ROOT, 'outputs');
 
-function findCatalogJsonFiles(dir) {
+function findCatalogJsonFiles(dir, visitedInodes = new Set()) {
   let results = [];
   if (!fs.existsSync(dir)) return results;
+
+  try {
+    const dirStat = fs.lstatSync(dir);
+    if (dirStat.ino && visitedInodes.has(dirStat.ino)) return results;
+    if (dirStat.ino) visitedInodes.add(dirStat.ino);
+  } catch {}
 
   const list = fs.readdirSync(dir);
 
@@ -23,9 +29,12 @@ function findCatalogJsonFiles(dir) {
     if (file.startsWith('.')) return; // Skip dotfiles (.DS_Store, etc)
     const filePath = path.join(dir, file);
     try {
-      const stat = fs.statSync(filePath);
+      const stat = fs.lstatSync(filePath);
+      if (stat && stat.isSymbolicLink()) {
+        return; // Skip directory symlinks to avoid circular reference loops
+      }
       if (stat && stat.isDirectory()) {
-        results = results.concat(findCatalogJsonFiles(filePath));
+        results = results.concat(findCatalogJsonFiles(filePath, visitedInodes));
       } else if (file.endsWith('_Catalog.json') && !filePath.includes('raw_data')) {
         results.push(filePath);
       }

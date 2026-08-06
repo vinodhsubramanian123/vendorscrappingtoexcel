@@ -7,7 +7,7 @@
 const fs   = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { sendCommand, getOCATarget, connectWS, setupDialogAutoHandler, sleep } = require('./lib/cdp');
+const { sendCommand, getOCATarget, connectWS, setupDialogAutoHandler, extractTablesAsRows, extractChunkedText, sleep } = require('./lib/cdp');
 const { updateScrapedRegistry } = require('./lib/registry');
 const { parseProductMeta } = require('./lib/product_meta');
 
@@ -161,25 +161,10 @@ async function main() {
       }
     } else {
       console.log('No wizard sub-tabs found — performing standard page extraction...');
-      const fallbackRes = await sendCommand(ws, 'Runtime.evaluate', {
-        expression: `(() => {
-          const text = document.body.innerText;
-          const tables = Array.from(document.querySelectorAll('table')).map((t, idx) => {
-            const rows = [];
-            t.querySelectorAll('tr').forEach(tr => {
-              const cells = [];
-              tr.querySelectorAll('td, th').forEach(cell => cells.push(cell.innerText.trim()));
-              if (cells.length > 0) rows.push(cells);
-            });
-            return { tableIndex: idx, subTab: 'Storage', rowCount: rows.length, rows };
-          });
-          return JSON.stringify({ text, tables });
-        })()`,
-        returnByValue: true
-      });
-      const fallbackData = JSON.parse(fallbackRes.result.value);
-      combinedFullText = fallbackData.text;
-      fallbackData.tables.forEach(t => allTables.push(t));
+      const extractedText = await extractChunkedText(ws, 50000);
+      combinedFullText = extractedText.fullText;
+      const extractedTables = await extractTablesAsRows(ws);
+      extractedTables.forEach(t => allTables.push({ ...t, subTab: 'Storage' }));
     }
 
     // STEP 3: Detect Metadata & Save Output

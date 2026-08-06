@@ -66,6 +66,7 @@ console.log('--- Step 1: Extracting Subcategories & Quantity Constraints ---');
 
 // Permissive regex capturing (max N), (required), (no max), (optional), (min N)
 const subcatRegex = /\n([^\n]{3,80})\s*\((max\s+(\d+)|required|no max|optional|min\s+(\d+))\)/gi;
+subcatRegex.lastIndex = 0;
 const subcatList = [];
 let match;
 while ((match = subcatRegex.exec(fullText)) !== null) {
@@ -139,7 +140,7 @@ for (const mc of mainCategories) {
       const idx = fullText.indexOf(p, searchPos);
       if (idx === -1) break;
       if (idx > NAV_MENU_END) { bestIdx = idx; break; }
-      searchPos = idx + p.length;
+      searchPos = Math.max(searchPos + 1, idx + p.length);
     }
   }
   if (bestIdx > -1) {

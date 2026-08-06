@@ -99,14 +99,14 @@ async function main() {
     });
 
     // Poll for a new PDF in downloadDir (file-diff detection — robust against filename changes)
-    console.log('Polling for completed PDF download...');
+    console.log('Polling for completed PDF download (max 30s)...');
     let downloaded = false;
     let newFilePath = null;
 
-    for (let i = 0; i < 20; i++) {
+    for (let i = 1; i <= 30; i++) {
       await sleep(1000);
-      const filesNow  = fs.readdirSync(downloadDir).filter(f => f.endsWith('.pdf') && !f.endsWith('.crdownload'));
-      const newFiles  = filesNow.filter(f => !filesBefore.has(f));
+      const filesNow = fs.readdirSync(downloadDir).filter(f => f.endsWith('.pdf') && !f.endsWith('.crdownload'));
+      const newFiles = filesNow.filter(f => !filesBefore.has(f));
       if (newFiles.length > 0) {
         const candidate = path.join(downloadDir, newFiles[0]);
         if (fs.statSync(candidate).size > 500000) {
@@ -115,6 +115,7 @@ async function main() {
           break;
         }
       }
+      if (i % 5 === 0) console.log(`  ...still waiting for download stream (${i}s)...`);
     }
 
     if (downloaded && newFilePath) {
@@ -134,7 +135,7 @@ async function main() {
       console.log(`Fingerprint (MD5): ${md5}`);
       process.exit(0);
     } else {
-      console.error(`\n❌ PDF download failed — no new file > 500 KB appeared after 20 seconds.`);
+      console.error(`\n❌ PDF download failed — no new file > 500 KB appeared after 30 seconds.`);
       process.exit(1);
     }
   } finally {

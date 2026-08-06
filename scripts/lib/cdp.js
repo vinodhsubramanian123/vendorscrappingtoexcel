@@ -27,12 +27,12 @@ let _nextMsgId = 1;
 function sendCommand(ws, method, params = {}, timeoutMs = DEFAULT_TIMEOUT) {
   return new Promise((resolve, reject) => {
     const id = _nextMsgId++;
-    let timer;
+    let timer = null;
 
     const cleanup = () => {
       ws.removeListener('message', handler);
       ws.removeListener('close', closeHandler);
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
     };
 
     const handler = (raw) => {
@@ -51,12 +51,18 @@ function sendCommand(ws, method, params = {}, timeoutMs = DEFAULT_TIMEOUT) {
 
     ws.on('message', handler);
     ws.on('close', closeHandler);
-    ws.send(JSON.stringify({ id, method, params }));
 
     timer = setTimeout(() => {
       cleanup();
       reject(new Error(`CDP timeout (${timeoutMs} ms) waiting for: ${method}`));
     }, timeoutMs);
+
+    try {
+      ws.send(JSON.stringify({ id, method, params }));
+    } catch (err) {
+      cleanup();
+      reject(new Error(`Failed to send CDP command [${method}]: ${err.message}`));
+    }
   });
 }
 
@@ -153,6 +159,9 @@ async function connectWS(debuggerUrl, retries = 3, backoffMs = 1500) {
  * Automatically handle JS alert/confirm dialogs, permission requests, and DOM modal popups (WebLogic / legacy UI).
  */
 async function setupDialogAutoHandler(ws) {
+  if (ws._dialogHandlerAttached) return;
+  ws._dialogHandlerAttached = true;
+
   try {
     await sendCommand(ws, 'Page.enable');
     // Enable download behavior to prevent download confirmation dialogs
