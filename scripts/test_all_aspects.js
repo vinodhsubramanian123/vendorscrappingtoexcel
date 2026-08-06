@@ -112,6 +112,37 @@ const payload = formatNotebookQueryPayload(items, evalResults);
 assert(payload.includes('Memory capacity > 32GB'), `Attribute filter 'Memory capacity > 32GB' included in query prompt`);
 assert(payload.includes('P48820-B21'), `Direct SKU fix P48820-B21 included in RAG payload prompt`);
 
+// -------------------------------------------------------------------
+// Test Group 7: Budget-Constrained Optimization & Golden Rule Assurance
+// -------------------------------------------------------------------
+console.log(`\n🔹 Test Group 7: Budget-Constrained Optimization & Golden Rule Assurance`);
+const { optimizeForBudget } = require('./lib/budget_optimizer');
+
+const budgetExceededRes = optimizeForBudget(items, evalResults, 35000.00);
+assert(budgetExceededRes.isBudgetExceeded === true, `Identified budget overrun when target budget ($35,000) < mandatory cost ($${budgetExceededRes.mandatoryBomCostUsd})`);
+assert(budgetExceededRes.budgetOverrunUsd > 0, `Calculated minimum budget overrun delta (+$${budgetExceededRes.budgetOverrunUsd.toLocaleString()})`);
+
+const budgetSurplusRes = optimizeForBudget(items, evalResults, 600000.00);
+assert(budgetSurplusRes.isBudgetExceeded === false, `Identified budget surplus when target budget ($600,000) >= mandatory cost ($${budgetSurplusRes.mandatoryBomCostUsd})`);
+assert(budgetSurplusRes.remainingBudgetUsd > 0, `Calculated remaining budget surplus ($${budgetSurplusRes.remainingBudgetUsd.toLocaleString()})`);
+assert(budgetSurplusRes.recommendedUpgrades.length > 0, `Generated surplus budget performance upgrade recommendations`);
+
+// -------------------------------------------------------------------
+// Test Group 8: Zero Hardcoding & Dynamic Category Classification
+// -------------------------------------------------------------------
+console.log(`\n🔹 Test Group 8: Zero Hardcoding & Dynamic Category Classification`);
+const { classifyComponentRole } = require('./lib/product_meta');
+assert(classifyComponentRole('Processor', 'Intel Xeon 6730P') === 'Processor', `Classified Processor role dynamically`);
+assert(classifyComponentRole('Smart Memory', '64GB RDIMM') === 'Memory', `Classified Memory role dynamically`);
+assert(classifyComponentRole('Power Supplies', '1600W -48VDC') === 'Power Supply', `Classified Power Supply role dynamically`);
+
+// -------------------------------------------------------------------
+// Test Group 9: Automated CLIC Check Protocol Interface
+// -------------------------------------------------------------------
+console.log(`\n🔹 Test Group 9: Automated CLIC Check Protocol Interface`);
+const { triggerClicCheck } = require('./lib/cdp');
+assert(typeof triggerClicCheck === 'function', `CDP module exports triggerClicCheck function for HPE OCA inspection`);
+
 console.log(`\n================================================================`);
 console.log(`📊 FINAL TEST SUMMARY: ${totalPasses} PASSED | ${totalFails} FAILED`);
 console.log(`================================================================\n`);

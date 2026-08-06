@@ -58,4 +58,30 @@ function parseProductMeta(rawText, pageTitle = '') {
   return { family, gen, cleanName };
 }
 
-module.exports = { parseProductMeta };
+/**
+ * Dynamically classify component role from category name and item description.
+ * Zero hardcoding — pattern matches across HPE ProLiant, Synergy, Alletra, StoreEver, Cray, etc.
+ * @param {string} categoryName 
+ * @param {string} itemDescription 
+ * @returns {string} Dynamic component role
+ */
+function classifyComponentRole(categoryName = '', itemDescription = '') {
+  const cat = String(categoryName).toLowerCase();
+  const desc = String(itemDescription).toLowerCase();
+
+  if (cat.includes('processor') || desc.includes('processor') || desc.includes('xeon') || desc.includes('epyc')) return 'Processor';
+  if (cat.includes('memory') || desc.includes('memory') || desc.includes('rdimm') || desc.includes('ddr5')) return 'Memory';
+  if (cat.includes('power') || desc.includes('power supply') || desc.includes('flex slot') || desc.includes('-48vdc')) return 'Power Supply';
+  if (cat.includes('storage') || desc.includes('controller') || desc.includes('raid') || desc.includes('mr416i')) return 'Storage Controller';
+  if (cat.includes('network') || desc.includes('ethernet') || desc.includes('ocp') || desc.includes('adapter')) return 'Network Adapter';
+  if (cat.includes('drive') || desc.includes('cage') || desc.includes('hdd') || desc.includes('ssd')) return 'Drive Cage / Drive';
+  if (cat.includes('fan') || cat.includes('cooling') || desc.includes('fan kit') || desc.includes('heatsink')) return 'Cooling / Thermal';
+  if (cat.includes('support') || cat.includes('service') || desc.includes('tech care')) return 'Service & Support';
+
+  return 'Option Component';
+}
+
+module.exports = {
+  parseProductMeta,
+  classifyComponentRole
+};

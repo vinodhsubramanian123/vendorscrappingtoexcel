@@ -149,7 +149,17 @@ Examples:
 - Add HPE DL380 Gen12 Multipurpose NVMe Kit (\`P76449-B21\`) for direct-attach high-speed storage.`;
   }
 
-  // Step 4: Synthesize Final Markdown Report
+  // Step 4: Budget Optimization Analysis (Golden Rule Assurance)
+  let targetBudgetUsd = 0;
+  const bIdx = args.indexOf('--budget');
+  if (bIdx !== -1 && args[bIdx + 1]) {
+    targetBudgetUsd = parseFloat(args[bIdx + 1]) || 0;
+  }
+
+  const { optimizeForBudget } = require('./lib/budget_optimizer');
+  const budgetOpt = optimizeForBudget(items, evalResults, targetBudgetUsd);
+
+  // Step 5: Synthesize Final Markdown Report
   const reportDir = path.dirname(outputPath);
   if (!fs.existsSync(reportDir)) fs.mkdirSync(reportDir, { recursive: true });
 
@@ -157,16 +167,20 @@ Examples:
   reportContent += `**Target BOQ File**: \`${inputFile}\`  \n`;
   reportContent += `**Target Gemini Notebook**: \`Dl 380 Spec Gen 12\` (\`${notebookId}\`)  \n`;
   reportContent += `**Evaluation Date**: ${new Date().toISOString()}  \n`;
-  reportContent += `**Quantitative Confidence Score**: \`${evalResults.confidence.score} / 1.00\` (${evalResults.confidence.isHitlTriggered ? '🚨 HITL Review Required' : '✅ Certified Buildable'})  \n\n`;
-  reportContent += `---\n\n`;
+  reportContent += `**Quantitative Confidence Score**: \`${evalResults.confidence.score} / 1.00\` (${evalResults.confidence.isHitlTriggered ? '🚨 HITL Review Required' : '✅ Certified Buildable'})  \n`;
+  if (targetBudgetUsd > 0) {
+    reportContent += `**Target CapEx Budget**: \`$${targetBudgetUsd.toLocaleString()} USD\`  \n`;
+  }
+  reportContent += `\n---\n\n`;
 
   reportContent += `## 📋 1. Consolidated BOQ Hardware Items (${items.length})\n\n`;
-  reportContent += `| # | Product # (SKU) | Consolidated Qty | Description |\n`;
-  reportContent += `|---|---|---|---|\n`;
+  reportContent += `| # | Product # (SKU) | Consolidated Qty | Description | Est. Unit Price (USD) | Extended Price (USD) |\n`;
+  reportContent += `|---|---|---|---|---|---|\n`;
   items.forEach((it, idx) => {
-    reportContent += `| ${idx + 1} | \`${it.sku}\` | ${it.quantity} | ${it.description} |\n`;
+    reportContent += `| ${idx + 1} | \`${it.sku}\` | ${it.quantity} | ${it.description} | \$${(it.unitPriceUsd || 0).toLocaleString()} | \$${(it.extendedPriceUsd || 0).toLocaleString()} |\n`;
   });
-  reportContent += `\n---\n\n`;
+  reportContent += `\n**Current Baseline BOM Total**: \`$${budgetOpt.currentBomCostUsd.toLocaleString()} USD\`\n\n`;
+  reportContent += `---\n\n`;
 
   reportContent += `## ⚡ 2. Modular 6-Aspect Physical Pre-Checks\n\n`;
   reportContent += `- **Aspect 1: Compute & Thermal**: ${evalResults.cpuCount} CPUs (Max TDP: ${evalResults.maxCpuTdpWatts}W) | High-Perf Fans: ${evalResults.hasHighPerfFans ? '✅ Present' : '❌ Missing'}\n`;
@@ -187,7 +201,27 @@ Examples:
   }
 
   reportContent += `---\n\n`;
-  reportContent += `## 🤖 3. Grounded Gemini Notebook RAG Solution Validation\n\n`;
+  reportContent += `## 💰 3. Budget-Constrained Optimization & Golden Rule Assurance\n\n`;
+  reportContent += `${budgetOpt.goldenRuleSummary}\n\n`;
+  reportContent += `- **Mandatory Buildable Cost**: \`$${budgetOpt.mandatoryBomCostUsd.toLocaleString()} USD\` (Includes all direct SKU fixes)\n`;
+  if (budgetOpt.isBudgetExceeded) {
+    reportContent += `- **Minimum Budget Overrun Delta**: \`+$${budgetOpt.budgetOverrunUsd.toLocaleString()} USD\`\n`;
+    reportContent += `> **Engineering Rationale**: The Golden Rule mandates that solution validation must eliminate 100% of unbuildable errors. Budget caps cannot override mandatory thermal cooling, power terminal safety, or write-cache lithium-ion battery requirements.\n\n`;
+  } else if (targetBudgetUsd > 0) {
+    reportContent += `- **Remaining Budget Surplus**: \`$${budgetOpt.remainingBudgetUsd.toLocaleString()} USD\`\n\n`;
+    if (budgetOpt.recommendedUpgrades.length > 0) {
+      reportContent += `### 🌟 Recommended Surplus Budget Performance Upgrades\n\n`;
+      reportContent += `| Component Upgrade | Recommended SKU | Qty | Cost (USD) | Performance Benefit |\n`;
+      reportContent += `|---|---|---|---|---|\n`;
+      budgetOpt.recommendedUpgrades.forEach(upg => {
+        reportContent += `| ${upg.upgrade} | \`${upg.sku}\` | ${upg.qty} | \$${upg.costUsd.toLocaleString()} | ${upg.benefit} |\n`;
+      });
+      reportContent += `\n`;
+    }
+  }
+
+  reportContent += `---\n\n`;
+  reportContent += `## 🤖 4. Grounded Gemini Notebook RAG Solution Validation\n\n`;
   reportContent += `${ragAnswer}\n\n`;
   reportContent += `---\n\n`;
   reportContent += `*Report generated automatically by HPE BOQ Evaluation Engine.*  \n`;

@@ -237,6 +237,51 @@ async function expandSections(ws) {
   });
 }
 
+/**
+ * Trigger HPE OCA CLIC Check (Configuration Language & Inspection Engine Check)
+ * and extract inspection error messages, root causes, and recommended direct SKU fixes.
+ * @param {WebSocket} ws 
+ * @param {'root' | 'component'} level 
+ * @returns {Promise<object>} CLIC inspection results
+ */
+async function triggerClicCheck(ws, level = 'root') {
+  await dismissDOMModals(ws);
+  const evalRes = await sendCommand(ws, 'Runtime.evaluate', {
+    expression: `(() => {
+      // Find top-right CLIC Check button
+      const clicBtn = document.querySelector('#clic_check, .btn-clic, #nav_clic, [id*="clic_check"], a[href*="clic"], button[title*="CLIC"]');
+      if (clicBtn) {
+        clicBtn.click();
+        return { clicked: true, level };
+      }
+      return { clicked: false, level };
+    })()`,
+    returnByValue: true
+  });
+
+  await sleep(2000);
+  await dismissDOMModals(ws);
+
+  const errorRes = await sendCommand(ws, 'Runtime.evaluate', {
+    expression: `(() => {
+      const modal = document.querySelector('.clic-error-modal, .ui-dialog, .modal-dialog, #clic_results');
+      if (!modal) return { hasErrors: false, errorText: '', rootCause: '', recommendedSkus: [] };
+
+      const errorText = modal.innerText || '';
+      const skuMatches = errorText.match(/\\b([A-Z0-9]{3,8}-[A-Z0-9]{3,4}|[A-Z0-9]{6})\\b/g) || [];
+      return {
+        hasErrors: errorText.toLowerCase().includes('error') || errorText.toLowerCase().includes('incompatible'),
+        errorText: errorText.trim(),
+        rootCause: errorText.substring(0, 300),
+        recommendedSkus: Array.from(new Set(skuMatches))
+      };
+    })()`,
+    returnByValue: true
+  });
+
+  return (errorRes && errorRes.result) ? errorRes.result.value : { hasErrors: false };
+}
+
 /** Async sleep helper */
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
@@ -248,6 +293,7 @@ module.exports = {
   setupDialogAutoHandler,
   dismissDOMModals,
   expandSections,
+  triggerClicCheck,
   sleep,
   CDP_PORT,
   ...domExtract
