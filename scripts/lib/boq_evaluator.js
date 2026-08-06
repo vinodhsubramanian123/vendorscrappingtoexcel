@@ -299,6 +299,21 @@ function evaluatePhysicalMath(items) {
     });
   }
 
+  // Rule 81392308: CLIC Unbuildable Error Check (P73282-B21 Front Drive Cage / No-Drive FIO Kit)
+  const hasBaseChassis = items.some(it => cleanBaseSKU(it.sku) === 'P73282-B21');
+  const hasNoDriveFioKit = items.some(it => cleanBaseSKU(it.sku) === '873763-B21');
+  const hasDriveCageKit = items.some(it => cleanBaseSKU(it.sku) === 'P75741-B21' || cleanBaseSKU(it.sku) === 'P76449-B21');
+
+  if (hasBaseChassis && storage.driveCount === 0 && !hasNoDriveFioKit && !hasDriveCageKit) {
+    missingDependencies.push({
+      rule: 'CLIC Rule 81392308: 8SFF Front Cage / No Drive FIO Requirement',
+      sku: '873763-B21',
+      description: '873763-B21 FIO HPE 8SFF Front Remove SPEC Perf FIO (or 8SFF Front Cage Kit P75741-B21)',
+      quantity: 1,
+      reason: 'UNBUILDABLE CONFIGURATION (Rule 81392308): P73282-B21 DL380 Gen12 SFF NC chassis ordered without drives requires 873763-B21 FIO Kit or an explicit 8SFF Front Drive Cage Kit.'
+    });
+  }
+
   // Rule 4: Controller Smart Storage Battery requirement
   if (storage.hasStorageController && !storage.hasSmartBattery) {
     warnings.push(`Storage controller configured without Smart Storage Battery to protect write cache.`);
