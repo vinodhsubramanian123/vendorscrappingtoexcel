@@ -225,9 +225,17 @@ Run `node scripts/verify_excel_tally.js <output_xlsx_path>` to verify all post-f
 
 ---
 
-## 🔗 Downstream Integration
+## 🔗 Downstream Integration & Gemini Notebook MCP
 
-This pipeline feeds into:
-1. **Google Notebook LM**: Import `*_Catalog.json` for AI-powered product intelligence Q&A
-2. **Vendor BOM Comparison Engine** (separate workspace): Import Excel workbooks for cross-vendor BOM validation, physical saturation audits, and DAG-based compatibility rule enforcement
-3. **Price Tracking Dashboard** *(planned)*: Historical `price_history.json` enables trend analysis and procurement optimization
+This pipeline feeds directly into:
+1. **Google Notebook LM (Gemini Notebook)**: Import `*_Catalog.json` for AI-powered RAG product intelligence, grounded Q&A, and Studio generation (podcasts, reports, infographics, data tables).
+2. **Vendor BOM Comparison Engine** (separate workspace): Import Excel workbooks for cross-vendor BOM validation, physical saturation audits, and DAG-based compatibility rule enforcement.
+3. **Price Tracking Dashboard**: Historical `price_history.json` enables trend analysis and procurement optimization.
+
+---
+
+## 📚 Complete Project Documentation
+
+- 📖 **[docs/GEMINI_NOTEBOOK_SETUP_GUIDE.md](docs/GEMINI_NOTEBOOK_SETUP_GUIDE.md)** — Comprehensive step-by-step setup guide for `notebooklm-mcp-cli` v0.9.6 across **macOS (Intel/Apple Silicon)**, **Linux Mint / Ubuntu**, and **Windows 10/11 (PowerShell)**.
+- 🏛️ **[docs/PROJECT_ARCHITECTURE_AND_MD_FILES.md](docs/PROJECT_ARCHITECTURE_AND_MD_FILES.md)** — Architectural index and detailed breakdown of all project `.md` files (`AGENTS.md`, `SKILL.md`, `SCRAPED_CATALOGS.md`, `README.md`).
+
