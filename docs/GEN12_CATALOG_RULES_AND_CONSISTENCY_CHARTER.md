@@ -83,13 +83,18 @@ RANK 5: POWER SUPPLY REDUNDANCY & CABLE MATCHING
 
 ## 💰 3. Support Services & Chassis Pricing Taxonomy
 
-1. **Chassis Base Models**:
-   - Chassis SKUs carry base list prices (e.g. `DL380 Gen12 SFF CTO Server Base` or `DL380 Gen12 12EDSFF CTO Server`).
-   - Standard shorthand formatting: `outputs/{Family}/{Gen}/{Model}_{FormFactor}/`.
-2. **HPE Pointnext / Tech Care Support Services**:
-   - **Basic Support**: 3-Year 9x5 Next Business Day (NBD).
-   - **Essential Support**: 3-Year 24x7 4-Hour Onsite Response.
-   - **Critical Support**: 3-Year 24x7 6-Hour Call-to-Repair (CTR).
+1. **Chassis Base Models & Base List Pricing**:
+   - Chassis SKUs carry distinct base list prices (e.g. `P73282-B21` HPE ProLiant DL380 Gen12 SFF NC CTO Server Base = **$5,584.00 USD**).
+   - In promotional bundles, chassis list prices may appear suppressed or $0.00; when support services or promo bundles are modified, OCA reveals the raw chassis base price.
+   - Standard folder shorthand: `outputs/{Family}/{Gen}/{Model}_{FormFactor}/`.
+2. **PCIe Riser Topology & SKUs**:
+   - **Primary Riser Options**: Default Option-1 (3 slots: x8/x16/x8) or Option-2 (`P48803-B21`, 3 slots: x16/x16/x16).
+   - **Secondary Riser Options**: Option-1 (`P48802-B21`, 3 slots: x8/x16/x8) or Option-2 (`P51083-B21`, 3 slots: x16/x16/x16).
+   - **Tertiary Riser Options**: Option-1 (`P76451-B21`, 2 slots: x16/x16) or Option-2 (`P74737-B21`, 2 slots: x16/x8).
+3. **HPE Pointnext / Tech Care Support Services**:
+   - **Basic Support**: 3-Year/5-Year 9x5 Next Business Day (NBD).
+   - **Essential Support**: 3-Year/5-Year 24x7 4-Hour Onsite Response (e.g. `HU4A6A50C4V` = **$15,924.00 USD** for high-density hardware quotes).
+   - **Critical Support**: 3-Year/5-Year 24x7 6-Hour Call-to-Repair (CTR) with Outage Management.
    - Support service SKUs must be linked to the primary server hardware chassis node path (`HPE OCA > {Model} > Support Services`).
 
 ---
