@@ -82,12 +82,13 @@ $$C = 1.0 - \sum \text{Deductions}$$
 ## 4. Execution Command Reference
 
 ```bash
-# Standard Pre-Flight Evaluation & Report Synthesis
-node scripts/eval_boq.js test_boq_dl380_gen12.csv
+# Standard Pre-Flight Evaluation & Report Synthesis (npm target or direct script)
+npm run eval:boq test_boq_dl380_gen12.csv
+# or: node scripts/eval_boq.js test_boq_dl380_gen12.csv
 
 # Multi-Sheet Excel Evaluation
-node scripts/eval_boq.js customer_proposal.xlsx --output outputs/reports/Proposal_Eval.md
+npm run eval:boq customer_proposal.xlsx -- --output outputs/reports/Proposal_Eval.md
 
 # Simulate Partner Portal Error & Log KnowledgeDelta
-node scripts/eval_boq.js test_boq_dl380_gen12.csv --simulate-portal-error "ERR_STORAGE_CABLE_REQUIRED: Controller MR416i-p requires P76453-B21 Box 1/2 Cable Kit."
+npm run eval:boq test_boq_dl380_gen12.csv -- --simulate-portal-error "ERR_STORAGE_CABLE_REQUIRED: Controller MR416i-p requires P76453-B21 Box 1/2 Cable Kit."
 ```

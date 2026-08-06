@@ -52,8 +52,10 @@ booktoSkill/
 ├── .agents/
 │   ├── AGENTS.md                          ← these rules (project-scoped)
 │   └── skills/
-│       └── oca-catalog-scraper/
-│           └── SKILL.md                   ← step-by-step scraping skill
+│       ├── orchestrator-workflow-skill/   ← macro 6-stage lifecycle orchestration
+│       ├── oca-catalog-scraper/           ← step-by-step scraping skill
+│       ├── boq-eval-skill/                ← BOQ validation & pre-flight skill
+│       └── nlm-skill/                     ← Gemini NotebookLM RAG integration
 ├── scripts/                               ← ALL Node.js scripts live here
 │   ├── lib/
 │   │   ├── cdp.js                         ← shared CDP connection & command module
@@ -381,3 +383,15 @@ graph TD
     - Hardware SKUs MUST pass `isValidHpeSKU()` matching hyphenated hardware SKUs (e.g. `P73282-B21`, `P69729-F21`, `804394-B21`) or standard 6-character hardware SKUs (e.g. `C0H28A`, `Q2R32A`, `BC002A`, `N9X06A`, `TC480A`).
     - Service SKUs MUST match `/^[HURS][A-Z0-9]{4,7}$/i` (e.g. `H7J32A`, `HV1H3E`, `H06CDE`).
     - Internal DOM pattern IDs (`dl380pat001b94fb`) and arbitrary numeric strings (`0030031`) are strictly rejected.
+
+---
+
+## End-to-End Orchestrator Workflow (Rule #36)
+
+36. **The 6-Stage Continuous Learning Loop**: Any complex request managed in this workspace maps to one of these 6 lifecycle stages. Use the correct tool for each stage:
+    1. **Ingestion**: Live scraping using `oca-catalog-scraper`.
+    2. **Knowledge Sync & Delta Tracking**: Update historical JSON/Excel deltas (`diff_catalog.js`) and sync `_OCA_Catalog.xlsx` files to Google Drive for NotebookLM using `nlm-skill`.
+    3. **BOQ Upload & Pre-Flight**: Run physical/math evaluations using `boq-eval-skill`. **Loose Ambiguity Rule**: If the user's workload intent is ambiguous, DO NOT block; make educated assumptions, output Ranked Solutions, and explicitly state assumptions for the user.
+    4. **Notebook Validations (RAG)**: Query Gemini NotebookLM (`nlm-skill`) to cross-reference constraints and solve gaps using synced documentation.
+    5. **HITL Portal Trial**: Output 5-Tier Strategic Resolution Reports. The user attempts to build the top-ranked solution manually in the OCA vendor portal.
+    6. **Feedback & Automation Learning**: If the portal rejects the configuration, run `npm run eval:boq <file> --simulate-portal-error "<error>"` to log a permanent `KnowledgeDelta`, ensuring the system inherently learns the new rule for future quotes.

@@ -125,6 +125,19 @@ node scripts/test_pipeline_evals.js \
 
 ---
 
+## 🔄 End-to-End Orchestrator Workflow
+
+This workspace is governed by a macro-architecture known as the **6-Stage Continuous Learning Loop**, which coordinates three distinct AI Agent Skills (`oca-catalog-scraper`, `boq-eval-skill`, and `nlm-skill`):
+
+1. **Ingestion (Live Scraping)**: `oca-catalog-scraper` extracts live data via CDP.
+2. **Knowledge Sync & Delta Tracking**: JSON/Excel outputs are historically versioned and synced to Google Drive/NotebookLM (`nlm-skill`).
+3. **BOQ Upload & Pre-Flight**: User uploads a BOM. The `boq-eval-skill` runs physical/math checks and handles ambiguous user intent loosely by generating Ranked Solutions with stated assumptions.
+4. **Notebook Validations (RAG)**: The agent queries NotebookLM to cross-reference constraints and solve BOM gaps.
+5. **HITL Portal Trial**: The user manually tries the AI's top-ranked solution in the live vendor OCA portal.
+6. **Feedback & Automation Learning**: If rejected, the user provides the error. The agent logs a `KnowledgeDelta` (`npm run eval:boq --simulate-portal-error`), closing the loop so the system autonomously learns the rule for next time.
+
+---
+
 ## 📁 Output Folder Standard
 
 ```
@@ -216,6 +229,9 @@ Run `node scripts/verify_excel_tally.js <output_xlsx_path>` to verify all post-f
 | Script | Purpose | Key Flags / CLI Signature |
 |--------|---------|---------------------------|
 | `scripts/lib/cdp.js` | Shared CDP connection & WebSocket module | Module (`sendCommand`, `getOCATarget`, `connectWS`) |
+| `scripts/lib/product_meta.js` | Universal product family & form factor parser | Module (`parseProductMeta`, `classifyComponentRole`) |
+| `scripts/lib/catalog_formatter.js` | Loosely coupled catalog TSV & sheet formatter | Module (`generateMainSheet`, `generateRulesSheet`) |
+| `scripts/observability_status.js` | **Unified Pipeline Observability Dashboard** | `npm run status` |
 | `scripts/scrape_oca_solution.js` | **Integrated E2E solution scraper** | `npm run scrape` |
 | `scripts/scrape_oca_storage_solution.js` | **Storage wizard E2E scraper** | `npm run scrape:storage` |
 | `scripts/scrape_oca.js` | Raw CDP data extractor | `node scripts/scrape_oca.js <raw_out.json>` |
@@ -223,8 +239,16 @@ Run `node scripts/verify_excel_tally.js <output_xlsx_path>` to verify all post-f
 | `scripts/build_catalog.js` | Parse raw JSON → catalog JSON + TSVs | `node scripts/build_catalog.js <raw.json> <catalog.json> [--verbose]` |
 | `scripts/generate_xlsx.js` | TSVs → multi-sheet Excel workbook | `node scripts/generate_xlsx.js <output.xlsx>` |
 | `scripts/download_quickspecs_pdf.js` | Download + MD5-cache QuickSpecs PDF | `node scripts/download_quickspecs_pdf.js <docId> <pdf_dest>` |
-| `scripts/verify_excel_tally.js` | Post-flight audit | `node scripts/verify_excel_tally.js <output.xlsx>` |
+| `scripts/eval_boq.js` | **Pre-flight BOQ evaluator & 6-aspect check** | `npm run eval:boq <boq.csv>` |
+| `scripts/verify_excel_tally.js` | Post-flight 7-check audit | `node scripts/verify_excel_tally.js <output.xlsx>` |
 | `scripts/test_pipeline_evals.js` | Pre/in/post-flight evaluation suite | `node scripts/test_pipeline_evals.js <output.xlsx>` |
+| `scripts/verify_all.js` | **Universal Portfolio Audit Suite** | `npm test` |
+| `scripts/rebuild_all.js` | **Rebuild all product catalogs** | `npm run rebuild` |
+| `scripts/inspect_oca_session.js` | CDP session inspector utility | `npm run inspect:session` |
+| `scripts/visual_clic_inspector.js` | Visual CLIC check inspector utility | `npm run inspect:clic` |
+| `scripts/parse_clic_modal.js` | CLIC error modal parser | `npm run parse:clic` |
+| `scripts/test_all_aspects.js` | 6-Aspect solution pre-check test runner | `npm run test:aspects` |
+| `scripts/test_live_clic.js` | Live CLIC check integration test | `npm run test:clic` |
 | `scripts/demo_qs_vs_menu_cdp.js` | QuickSpecs link vs Menu link visual demo | `npm run demo:qs` |
 | `scripts/live_visual_demo_cdp.js` | Live visual verification browser demo | `npm run demo:live` |
 

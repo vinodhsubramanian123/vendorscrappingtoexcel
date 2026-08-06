@@ -31,7 +31,10 @@ function parseProductMeta(rawText, pageTitle = '') {
 
   // 3. Model & Form Factor Detection
   const modelMatch = fullText.match(/\b(DL\d{3}|ML\d{3}|RL\d{3}|SY\d{3}|GX\d{4}|MicroServer|MSL\d{4}|Alletra\s*\d{4}|Nimble\s*[A-Z0-9]+|StoreOnce\s*\d{4}|MSA\s*\d{4}|2060|2062|1060|2050|5010|5030|5050|6000|9000|Virtual\s*Connect|VC\s*\d+Gb|100Gb\s*F32)\b/i);
-  const formFactorMatch = fullText.match(/\b(SFF|LFF|NHP|CTO|Compute|Storage|Enclosure|Frame|Rack|Module)\b/i);
+  // Prioritize primary physical form factors (SFF, LFF, EDSFF, NHP) over generic brand descriptors (Compute, Storage)
+  const primaryFfMatch   = fullText.match(/\b(SFF|LFF|EDSFF|NHP)\b/i);
+  const secondaryFfMatch = fullText.match(/\b(Module|Frame|Rack|Enclosure|Storage|CTO)\b/i);
+  const formFactorMatch  = primaryFfMatch || secondaryFfMatch;
 
   let cleanName = '';
   if (modelMatch) {

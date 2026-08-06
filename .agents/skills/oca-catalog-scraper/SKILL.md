@@ -205,9 +205,12 @@ npm test                # Run 100% portfolio audit suite
 |--------|---------------|---------|
 | `scripts/lib/cdp.js` | N/A (module) | Shared CDP utilities (`sendCommand`, `getOCATarget`, `connectWS`, `sleep`) |
 | `scripts/lib/sku.js` | N/A (module) | Centralized HPE SKU regex, option suffix cleaning, and validation |
+| `scripts/lib/product_meta.js` | N/A (module) | Universal product family, generation, and physical form factor parser |
+| `scripts/lib/catalog_formatter.js` | N/A (module) | Loosely coupled catalog TSV & multi-sheet formatter (high maintainability) |
 | `scripts/lib/diff_catalog.js` | N/A (module) | Historical catalog diff & price history engine (tombstone injection) |
 | `scripts/lib/registry.js` | N/A (module) | Shared registry table updater (`updateScrapedRegistry`) |
 | `scripts/lib/sync_registry.js` | `npm run registry:sync` | Auto-scans `outputs/` and syncs `SCRAPED_CATALOGS.md` |
+| `scripts/observability_status.js` | `npm run status` | **Unified Pipeline Observability Dashboard** (CDP status, catalogs, KnowledgeDeltas, script wiring) |
 | `scripts/scrape_oca.js` | `node scripts/scrape_oca.js <raw_json_out>` | Initial CDP raw data extractor |
 | `scripts/expand_and_rescrape.js` | `node scripts/expand_and_rescrape.js <raw_json_out>` | Expand all DOM sections then re-scrape |
 | `scripts/scrape_oca_solution.js` | `npm run scrape` | Generic E2E solution scraper (extracts DOM section landmarks) |
@@ -215,9 +218,15 @@ npm test                # Run 100% portfolio audit suite
 | `scripts/build_catalog.js` | `node scripts/build_catalog.js <raw.json> <catalog.json>` | Parse raw JSON → classified catalog JSON + TSVs + diffs |
 | `scripts/generate_xlsx.js` | `node scripts/generate_xlsx.js <output.xlsx>` | TSVs → multi-sheet Excel workbook (`xlsx-js-style` colors + freeze panes + autofilters) |
 | `scripts/download_quickspecs_pdf.js` | `node scripts/download_quickspecs_pdf.js <docId> <dest_pdf_path>` | Download + MD5-cache QuickSpecs PDF |
+| `scripts/eval_boq.js` | `npm run eval:boq <file.csv>` | Pre-flight BOQ evaluator & 6-aspect physical check engine |
 | `scripts/verify_excel_tally.js` | `node scripts/verify_excel_tally.js <output.xlsx>` | Post-flight 7-check audit (includes diff verification) |
 | `scripts/test_pipeline_evals.js` | `node scripts/test_pipeline_evals.js <output.xlsx> [--post-flight-only]` | Pre/in/post-flight eval suite (supports standalone post-flight mode) |
 | `scripts/verify_all.js` | `npm test` | One-shot portfolio audit suite across all outputs |
 | `scripts/rebuild_all.js` | `npm run rebuild` | Rebuild all product catalogs and Excel workbooks from raw_data |
-| `scripts/demo_qs_vs_menu_cdp.js` | `node scripts/demo_qs_vs_menu_cdp.js` | QuickSpecs vs Menu link visual demo |
-| `scripts/live_visual_demo_cdp.js` | `node scripts/live_visual_demo_cdp.js` | Live browser banner demo |
+| `scripts/inspect_oca_session.js` | `npm run inspect:session` | CDP browser session inspector utility |
+| `scripts/visual_clic_inspector.js` | `npm run inspect:clic` | Visual CLIC check inspector utility |
+| `scripts/parse_clic_modal.js` | `npm run parse:clic` | CLIC modal error parser utility |
+| `scripts/test_all_aspects.js` | `npm run test:aspects` | 6-Aspect solution pre-check test runner |
+| `scripts/test_live_clic.js` | `npm run test:clic` | Live CLIC check integration test |
+| `scripts/demo_qs_vs_menu_cdp.js` | `npm run demo:qs` | QuickSpecs vs Menu link visual demo |
+| `scripts/live_visual_demo_cdp.js` | `npm run demo:live` | Live browser banner demo |

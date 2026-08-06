@@ -8,6 +8,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { execSync } = require('child_process');
 const { parseAndConsolidateBOQ, evaluatePhysicalMath, formatNotebookQueryPayload } = require('./lib/boq_evaluator');
 const { calculateConfidenceScore, processPortalFeedback } = require('./lib/feedback_loop');
@@ -92,24 +93,25 @@ Examples:
   const queryPayload = formatNotebookQueryPayload(items, evalResults);
   console.log(`\n🤖 Phase 3: Querying Gemini Notebook RAG (${notebookId})...`);
 
-  const tmpOutFile = '/tmp/boq_rag_response.json';
-  const tmpPromptFile = '/tmp/boq_prompt_clean.txt';
+  const tmpOutFile = path.join(os.tmpdir(), 'boq_rag_response.json');
+  const tmpPromptFile = path.join(os.tmpdir(), 'boq_prompt_clean.txt');
   fs.writeFileSync(tmpPromptFile, queryPayload.replace(/"/g, "'"), 'utf-8');
 
   let ragAnswer = '';
   try {
-    const envPath = `export PATH="$HOME/.local/bin:$PATH"; `;
-    const cmd = `${envPath} nlm notebook query ${notebookId} "$(cat ${tmpPromptFile})" --json > ${tmpOutFile} 2>&1`;
-    execSync(cmd, { encoding: 'utf-8', timeout: 90000 });
+    const cleanPrompt = queryPayload.replace(/["$`\\]/g, ' ');
+    const envPath = process.platform === 'win32' ? '' : `export PATH="$HOME/.local/bin:$PATH"; `;
+    const cmd = `${envPath} nlm notebook query ${notebookId} "${cleanPrompt}" --json`;
+    const execOut = execSync(cmd, { encoding: 'utf-8', timeout: 90000, maxBuffer: 10 * 1024 * 1024 });
+    fs.writeFileSync(tmpOutFile, execOut, 'utf-8');
 
-    if (fs.existsSync(tmpOutFile)) {
-      const rawOut = fs.readFileSync(tmpOutFile, 'utf-8');
+    if (execOut) {
       try {
-        const parsed = JSON.parse(rawOut);
+        const parsed = JSON.parse(execOut);
         if (parsed.answer) ragAnswer = parsed.answer;
-        else if (rawOut.trim()) ragAnswer = rawOut.trim();
+        else if (execOut.trim()) ragAnswer = execOut.trim();
       } catch (_) {
-        if (rawOut.trim()) ragAnswer = rawOut.trim();
+        if (execOut.trim()) ragAnswer = execOut.trim();
       }
     }
   } catch (err) {
