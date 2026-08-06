@@ -10,11 +10,13 @@
 // Matches:
 // 1. Hyphenated hardware SKUs: P73282-B21, 867796-B21, P07646-B21
 // 2. 6-character hardware SKUs: C0H28A, Q2R32A, BC002A, N9X06A, TC480A
-// 3. Service SKUs: H7J34A3, HA114A1, HU4A6E, U4391E, R4H12A, S2S05A
-const HPE_SKU_REGEX = /^([A-Z0-9]{3,8}-[A-Z0-9]{3,4}|[A-Z0-9]{6}|[HURS][A-Z0-9]{4,7})$/i;
+// 3. Service SKUs: H7J34A3, HA114A1, HU4A6E, U4391E, R4H12A, S2S05A, HU4A6A50C4V
+const HPE_SKU_REGEX = /^([A-Z0-9]{3,8}-[A-Z0-9]{3,4}|[A-Z0-9]{6}|[HURS][A-Z0-9]{4,10})$/i;
 
 // Match SKU within text with optional CTO/BTO/FIO suffix
-const HPE_SKU_EXTRACT_REGEX = /\b([A-Z0-9]{3,8}-[A-Z0-9]{3,4}(?:CTO|BTO|FIO)?|[A-Z0-9]{6}(?:CTO|BTO|FIO)?|[HURS][A-Z0-9]{4,7}(?:CTO|BTO|FIO)?)\b/i;
+const HPE_SKU_EXTRACT_REGEX = /\b([A-Z0-9]{3,8}-[A-Z0-9]{3,4}(?:CTO|BTO|FIO)?|[A-Z0-9]{6}(?:CTO|BTO|FIO)?|[HURS][A-Z0-9]{4,10}(?:CTO|BTO|FIO)?)\b/i;
+
+const COMMON_WORDS_FILTER = /^(SERVER|CHASSI|PROCES|SYSTEM|MODULE|OPTION|MEMORY|HEATSIN|RISER|CABLE|POWER|SUPPLY|KIT|BOARD|FRAME|DRIVE|BLADE|RACK|PROLIANT|COMPUTE)$/i;
 
 /**
  * Validate whether a string is a valid HPE SKU.
@@ -24,8 +26,9 @@ const HPE_SKU_EXTRACT_REGEX = /\b([A-Z0-9]{3,8}-[A-Z0-9]{3,4}(?:CTO|BTO|FIO)?|[A
 function isValidHpeSKU(skuStr) {
   if (!skuStr) return false;
   const clean = cleanBaseSKU(skuStr).trim();
-  // Filter out internal DOM pattern IDs (e.g. pat0, 00300)
+  // Filter out internal DOM pattern IDs (e.g. pat0, 00300) and common words
   if (/pat0|00300/i.test(clean)) return false;
+  if (COMMON_WORDS_FILTER.test(clean)) return false;
   return HPE_SKU_REGEX.test(clean);
 }
 

@@ -9,7 +9,7 @@
 const fs = require('fs');
 const path = require('path');
 const xlsx = require('xlsx');
-const { cleanBaseSKU, HPE_SKU_EXTRACT_REGEX } = require('./sku');
+const { cleanBaseSKU, isValidHpeSKU, HPE_SKU_EXTRACT_REGEX } = require('./sku');
 const { calculateConfidenceScore } = require('./feedback_loop');
 
 /**
@@ -60,26 +60,35 @@ function parseAndConsolidateBOQ(rawInput, filePath = '') {
     // Skip headers
     if (line.toLowerCase().includes('product #') && line.toLowerCase().includes('description')) continue;
 
-    // Detect chassis/node multiplier line (e.g. "2x HPE DL380 Gen12 Server Nodes")
-    const multMatch = line.match(/\b(\d+)\s*x\s*(?:node|server|chassis|system|unit|quote)\b/i) || line.match(/^(?:multiplier|qty|quantity)[:=\s]*(\d+)\b/i);
-    if (multMatch) {
+    // Detect chassis/node multiplier line (e.g. "2x HPE DL380 Gen12 Server Nodes" or "Multiplier: 2")
+    const multMatch = line.match(/^(\d+)\s*x\b/i) || line.match(/\b(\d+)\s*x\s*(?:node|server|chassis|system|unit|quote)\b/i) || line.match(/^(?:multiplier|qty|quantity)[:=\s]*(\d+)\b/i);
+    const lineSku = (line.match(HPE_SKU_EXTRACT_REGEX) || [])[1];
+    if (multMatch && (!lineSku || !isValidHpeSKU(lineSku))) {
       currentMultiplier = parseInt(multMatch[1], 10) || 1;
     }
 
-    // Normalize separators (/, |, ;, +, --)
-    const normalizedLine = line.replace(/[\/\|;\+\-\-]/g, ' ');
+    // Normalize separators (/, |, ;, +, -- double dash) without removing single SKU hyphens
+    const normalizedLine = line.replace(/[\/\|;\+]|--/g, ' ');
 
     const skuMatch = normalizedLine.match(HPE_SKU_EXTRACT_REGEX);
     if (!skuMatch) continue;
 
     const cleanSku = cleanBaseSKU(skuMatch[1]);
-    if (!cleanSku) continue;
+    if (!cleanSku || !isValidHpeSKU(cleanSku)) continue;
     
     // Parse line item quantity (default to 1)
     let lineQty = 1;
-    const qtyMatch = normalizedLine.match(/\b(?:qty|quantity|count)[:=\s]*(\d+)\b/i) || normalizedLine.match(/^(\d+)[\s,\t]+/) || normalizedLine.match(/[\s,\t]+(\d+)\s*$/);
-    if (qtyMatch) {
-      lineQty = parseInt(qtyMatch[1], 10) || 1;
+    const explicitQty = normalizedLine.match(/\b(?:qty|quantity|count)[:=\s]*(\d+)\b/i);
+    if (explicitQty) {
+      lineQty = parseInt(explicitQty[1], 10) || 1;
+    } else {
+      const leadingQty = normalizedLine.match(/^(\d+)[\s,\t]+/);
+      const trailingQty = normalizedLine.match(/[\s,\t]+(\d+)\s*$/);
+      if (leadingQty) {
+        lineQty = parseInt(leadingQty[1], 10) || 1;
+      } else if (trailingQty) {
+        lineQty = parseInt(trailingQty[1], 10) || 1;
+      }
     }
 
     const totalQty = lineQty * currentMultiplier;
