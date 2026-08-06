@@ -101,7 +101,27 @@ async function main() {
     // STEP 3: Full Page Section Expansion
     console.log('\n--- STEP 3: Expanding Page Sections & Show More Checkboxes ---');
     await expandSections(ws);
-    await sleep(4000);
+    await sleep(3000);
+
+    // STEP 3.5: Multi-Tab Support Services Check (Pointnext 3Y/4Y/5Y Tech Care)
+    console.log('\n--- STEP 3.5: Checking for Solution Services & Pointnext Tech Care Tab ---');
+    await sendCommand(ws, 'Runtime.evaluate', {
+      expression: `(() => {
+        const servicesTab = Array.from(document.querySelectorAll('a, button, div.tab_header')).find(el => 
+          /pointnext|services|support services|tech care/i.test(el.innerText || '') && 
+          !el.href?.includes('menu') && !el.classList.contains('active')
+        );
+        if (servicesTab) {
+          servicesTab.click();
+          return true;
+        }
+        return false;
+      })()`,
+      returnByValue: true
+    });
+    await sleep(2500);
+    await expandSections(ws);
+    await sleep(2000);
 
     const getMetrics = async () => {
       const res = await sendCommand(ws, 'Runtime.evaluate', {

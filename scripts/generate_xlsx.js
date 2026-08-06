@@ -210,6 +210,8 @@ if (diffRows.length > 0) {
 const REQUIRED_CATEGORIES = [
   'Processor', 'Memory', 'Smart Chassis', 'Storage Devices',
   'Networking', 'Power Supplies', 'Graphics Options',
+  'HPE Pointnext & Tech Care (3Y-5Y)', 'Support & Services',
+  'Supported Operating System', 'Server Management Software'
 ];
 
 const allCategoriesInData = [...new Set(
