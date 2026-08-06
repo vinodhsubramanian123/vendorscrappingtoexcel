@@ -381,7 +381,7 @@ graph TD
 
 35. **Strict HPE Part Number Regex Validation (`scripts/lib/sku.js`)**:
     - Hardware SKUs MUST pass `isValidHpeSKU()` matching hyphenated hardware SKUs (e.g. `P73282-B21`, `P69729-F21`, `804394-B21`) or standard 6-character hardware SKUs (e.g. `C0H28A`, `Q2R32A`, `BC002A`, `N9X06A`, `TC480A`).
-    - Service SKUs MUST match `/^[HURS][A-Z0-9]{4,7}$/i` (e.g. `H7J32A`, `HV1H3E`, `H06CDE`).
+    - Service SKUs MUST match `/^[HURS][A-Z0-9]{4,10}$/i` (e.g. `H7J32A`, `HV1H3E`, `H06CDE`, `HU4A6A50C4V`).
     - Internal DOM pattern IDs (`dl380pat001b94fb`) and arbitrary numeric strings (`0030031`) are strictly rejected.
 
 ---
@@ -409,7 +409,7 @@ graph TD
       4. **Storage Interconnect Math**: $\text{Tri-Mode Controller} + \text{Front Drive Box 1/2} \implies \text{Dedicated Cable Kit (e.g. P76453-B21) mandatory}$.
       5. **Power & Environmental Math**: $\text{-48VDC Power Supply} \implies \text{DC Lug Kit mandatory}$.
       6. **Support & Service Math**: $\text{Hardware SKUs} \implies \text{Mandatory Tech Care Support Tier}$.
-    - **Vendor-Agnostic Genericity**: All physical math functions use generic component roles (`Compute`, `Memory`, `Storage`, `Interconnect`, `Power`, `Support`) so the exact same evaluation logic applies across HPE, Dell PowerEdge, Cisco UCS, Lenovo ThinkSystem, Huawei, NetApp, and Aruba lines.
+    - **Component Role Taxonomy Genericity**: The physical math functions use generic component roles (`Compute`, `Memory`, `Storage`, `Interconnect`, `Power`, `Support`) which are designed to be extensible across vendor platforms (Dell PowerEdge, Cisco UCS, Lenovo ThinkSystem, etc.). **Note**: The current portal scrapers, CDP selectors, URL matching (`oca.ext.hpe.com`), and SKU regexes are HPE OCA-specific. Extending to other vendors would require implementing new scraper modules — the physical math evaluation layer and component role taxonomy do not need changes.
 
 ---
 
@@ -424,3 +424,23 @@ graph TD
       2. Outputs explicit reasoning: *"High TDP Processor (250W >= 240W) configured without High-Performance Fan Kit. Default Standard Fans replaced with High-Performance Fan Kit P48820-B21."*
       3. Dynamically injects mandatory missing dependencies into the BOM.
     - **Zero Hardcoding & Autonomous Learning**: All subcategory constraints `(max N)`, `(required)`, `(no max)` are parsed dynamically from the scraped catalog JSON and Excel summary sheet. Vendor portal rejections logged via `npm run eval:boq --simulate-portal-error` update the conflict resolution rules dynamically via `catalog_deltas.json` without modifying source code.
+
+---
+
+## Workload DNA Profiling & Multi-Metric 5-Tier Solution Ranking Engine (Rule #39)
+
+39. **Workload DNA Alignment & Multi-Path Tradeoff Resolution Engine**:
+    - **Customer Workload DNA Extraction**: Analysis of BOQ hardware items extracts workload characteristics:
+      - **CPU Core/Frequency Profile**: High Core Density (>= 48 cores) vs High Frequency HPC (>= 3.4GHz) vs Balanced.
+      - **Memory Density Ratio**: GB/Core ratio (e.g. >= 16 GB/core indicates In-Memory Database such as SAP HANA / Oracle).
+      - **GPU / Accelerator Profile**: VDI & AI Graphics Acceleration (NVIDIA GPUs / L4 / L40S / H200).
+      - **Storage I/O Profile**: Read Intensive (RI) vs Mixed Use (MU) vs Write Intensive (WI) NVMe/SAS SSDs.
+    - **Multi-Path Alternate Solution Branching**: When conflicting SKUs or layout blocks occur (e.g., Double-width GPU vs Tertiary Riser slot cap, or x4 vs x8 memory mixing), the system branches into alternate buildable candidate paths rather than returning a single rigid error.
+    - **Workload Intent-Preserved Ranking (Rank 1)**: Technical maxing-out is NOT automatically Rank 1. Rank 1 is strictly assigned to the solution that **best preserves the customer's true workload intent** without over- or under-provisioning.
+    - **5-Tier Strategic Resolution Matrix & Tradeoff Rationale**: Every BOQ evaluation outputs 5 ranked buildable candidate tiers:
+      - **Rank 1**: Customer Workload Intent Preserved (Optimal Match, zero over/under-provisioning).
+      - **Rank 2**: Standardized CTO Baseline & Maximum Factory Stability.
+      - **Rank 3**: High-IOPS & Storage Performance Optimized.
+      - **Rank 4**: Maximum Density & Future Scalability Expansion (Full PCIe/Riser & 1DPC Memory headroom).
+      - **Rank 5**: Budget & CapEx Minimized Buildable Tier.
+    - Every rank includes multi-metric tradeoff indicators (`Intent Alignment %`, `SKU Modifications Count`, `Cost Delta $`, `Capacity Expansion Headroom`) and explicit technical rationale for pre-flight alignment with customer sales teams.

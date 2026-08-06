@@ -26,6 +26,8 @@
     "inspect:clic": "node scripts/visual_clic_inspector.js",
     "parse:clic": "node scripts/parse_clic_modal.js",
     "test:aspects": "node scripts/test_all_aspects.js",
+    "test:offline": "node tests/test_offline_pipeline.js",
+    "test:all": "node tests/test_end_to_end_scenarios.js && node tests/test_conflict_graph.js && node tests/test_offline_pipeline.js && node scripts/test_all_aspects.js && node scripts/verify_all.js",
     "test:clic": "node scripts/test_live_clic.js",
     "demo:qs": "node scripts/demo_qs_vs_menu_cdp.js",
     "demo:live": "node scripts/live_visual_demo_cdp.js"

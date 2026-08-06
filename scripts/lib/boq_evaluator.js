@@ -70,46 +70,47 @@ function parseAndConsolidateBOQ(rawInput, filePath = '') {
     // Normalize separators (/, |, ;, +, -- double dash) without removing single SKU hyphens
     const normalizedLine = line.replace(/[\/\|;\+]|--/g, ' ');
 
-    const skuMatch = normalizedLine.match(HPE_SKU_EXTRACT_REGEX);
-    if (!skuMatch) continue;
+    // Extract all valid SKU matches on the line
+    const rawMatches = normalizedLine.match(new RegExp(HPE_SKU_EXTRACT_REGEX.source, 'gi')) || [];
+    const validMatches = rawMatches.map(m => cleanBaseSKU(m)).filter(s => s && isValidHpeSKU(s));
+    if (validMatches.length === 0) continue;
 
-    const cleanSku = cleanBaseSKU(skuMatch[1]);
-    if (!cleanSku || !isValidHpeSKU(cleanSku)) continue;
-    
-    // Parse line item quantity (default to 1)
-    let lineQty = 1;
-    const explicitQty = normalizedLine.match(/\b(?:qty|quantity|count)[:=\s]*(\d+)\b/i);
-    if (explicitQty) {
-      lineQty = parseInt(explicitQty[1], 10) || 1;
-    } else {
-      const leadingQty = normalizedLine.match(/^(\d+)[\s,\t]+/);
-      const trailingQty = normalizedLine.match(/[\s,\t]+(\d+)\s*$/);
-      if (leadingQty) {
-        lineQty = parseInt(leadingQty[1], 10) || 1;
-      } else if (trailingQty) {
-        lineQty = parseInt(trailingQty[1], 10) || 1;
+    for (const cleanSku of validMatches) {
+      // Parse line item quantity (default to 1)
+      let lineQty = 1;
+      const explicitQty = normalizedLine.match(/\b(?:qty|quantity|count)[:=\s]*(\d+)\b/i);
+      if (explicitQty) {
+        lineQty = parseInt(explicitQty[1], 10) || 1;
+      } else {
+        const leadingQty = normalizedLine.match(/^(\d+)[\s,\t]+/);
+        const trailingQty = normalizedLine.match(/[\s,\t]+(\d+)\s*$/);
+        if (leadingQty && validMatches.length === 1) {
+          lineQty = parseInt(leadingQty[1], 10) || 1;
+        } else if (trailingQty && validMatches.length === 1) {
+          lineQty = parseInt(trailingQty[1], 10) || 1;
+        }
       }
-    }
 
-    const totalQty = lineQty * currentMultiplier;
+      const totalQty = lineQty * currentMultiplier;
 
-    // Clean description
-    let description = normalizedLine
-      .replace(skuMatch[0], '')
-      .replace(/^[\d\s,\t\-"'\:\;]+/, '')
-      .replace(/[\d\s,\t\-"'\:\;]+$/, '')
-      .trim();
-    if (!description) description = cleanSku;
+      // Clean description
+      let description = normalizedLine
+        .replace(new RegExp(cleanSku.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '')
+        .replace(/^[\d\s,\t\-"'\:\;]+/, '')
+        .replace(/[\d\s,\t\-"'\:\;]+$/, '')
+        .trim();
+      if (!description) description = cleanSku;
 
-    if (itemMap.has(cleanSku)) {
-      const existing = itemMap.get(cleanSku);
-      existing.quantity += totalQty;
-    } else {
-      itemMap.set(cleanSku, {
-        sku: cleanSku,
-        description: description,
-        quantity: totalQty
-      });
+      if (itemMap.has(cleanSku)) {
+        const existing = itemMap.get(cleanSku);
+        existing.quantity += totalQty;
+      } else {
+        itemMap.set(cleanSku, {
+          sku: cleanSku,
+          description: description,
+          quantity: totalQty
+        });
+      }
     }
   }
 
@@ -379,16 +380,34 @@ function evaluatePhysicalMath(items) {
     maxCpuTdpWatts: compute.maxCpuTdpWatts,
     memoryCount: memory.memoryCount,
     totalMemoryGb: memory.totalMemoryGb,
+    isBalancedChannel: memory.isBalancedChannel,
     driveCount: storage.driveCount,
+    hasStorageController: storage.hasStorageController,
+    hasSmartBattery: storage.hasSmartBattery,
+    hasNoDriveKit: storage.hasNoDriveKit,
     hasHighPerfFans: compute.hasHighPerfFans,
+    hasHeatsinks: compute.hasHeatsinks,
     hasDcPowerSupply: power.hasDcPowerSupply,
     hasDcLugKit: power.hasDcLugKit,
     hasOcpAdapter: network.hasOcpAdapter,
+    networkPortsCount: network.networkPortsCount,
+    requiredPcieCards: pcie.requiredPcieCards,
+    totalPcieSlotsAvailable: pcie.totalSlotsAvailable,
     hasSupportService: support.hasSupportService,
     errors,
     warnings,
     missingDependencies
   };
+
+  // Step 2.5: Run 5-Level Dependency Conflict Graph Validation
+  const { validateConflictGraph } = require('./conflict_graph');
+  const graphResults = validateConflictGraph(items, missingDependencies, 'outputs/ProLiant/Gen12/DL380_Gen12_SFF');
+  evalSummary.conflictGraph = graphResults;
+
+  // Deduct score if whole solution has graph conflicts
+  if (!graphResults.isWholeSolutionValid) {
+    evalSummary.errors.push(`Whole-solution conflict graph validation failed: ${graphResults.conflicts.length} unresolved conflict(s).`);
+  }
 
   // Calculate quantitative confidence score & HITL trigger details
   const confidence = calculateConfidenceScore(items, evalSummary);
@@ -399,22 +418,27 @@ function evaluatePhysicalMath(items) {
 
 /**
  * Format prompt payload for Gemini Notebook RAG query.
- * Supports natural language attribute filters (e.g. Memory > 32GB).
+ * Prompts NotebookLM for whole-solution buildability validation across all 5 hierarchy levels.
  * @param {Array<object>} items 
  * @param {object} evalResults 
  * @returns {string} Formatted prompt string
  */
 function formatNotebookQueryPayload(items, evalResults) {
-  let prompt = `Perform grounded 5-tier technical validation and architectural analysis for the following HPE ProLiant Compute DL380 Gen12 BOQ:\n\n`;
+  const graph = evalResults.conflictGraph || {};
+  const chassis = graph.chassisInfo || { model: 'DL380 Gen12 SFF', formFactor: 'SFF' };
+
+  let prompt = `Perform grounded 5-tier whole-solution buildability analysis and architectural validation for the following ${chassis.model} BOQ:\n\n`;
   prompt += `CONSOLIDATED HARDWARE BOQ ITEMS:\n`;
   items.forEach(it => {
     prompt += `- SKU: ${it.sku} | Qty: ${it.quantity} | Description: ${it.description}\n`;
   });
-  prompt += `\nPRE-FLIGHT PHYSICAL MATH ASSERTIONS:\n`;
+  prompt += `\nPRE-FLIGHT PHYSICAL MATH & CONFLICT GRAPH ASSERTIONS:\n`;
+  prompt += `- Chassis Model & Form Factor: ${chassis.model} (${chassis.formFactor})\n`;
   prompt += `- Total Processors: ${evalResults.cpuCount} (Max TDP: ${evalResults.maxCpuTdpWatts}W)\n`;
   prompt += `- Total Memory: ${evalResults.memoryCount} DIMMs (${evalResults.totalMemoryGb} GB Total)\n`;
   prompt += `- Total Storage Drives: ${evalResults.driveCount}\n`;
-  prompt += `- High-Perf Fans Present: ${evalResults.hasHighPerfFans ? 'YES' : 'NO'}\n`;
+  prompt += `- Whole-Solution Buildability: ${graph.isWholeSolutionValid ? '✅ PASSED' : '❌ CONFLICTS DETECTED'}\n`;
+  prompt += `- Total Catalog Rules Evaluated: ${graph.totalRulesEvaluated || 33}\n`;
   prompt += `- Quantitative Confidence Score: ${evalResults.confidence ? evalResults.confidence.score : '1.0'}\n\n`;
 
   if (evalResults.missingDependencies.length > 0) {
@@ -425,10 +449,20 @@ function formatNotebookQueryPayload(items, evalResults) {
     prompt += `\n`;
   }
 
+  if (graph.resolvedFixes && graph.resolvedFixes.length > 0) {
+    prompt += `RESOLVED CASCADING FIXES & REASONING:\n`;
+    graph.resolvedFixes.forEach(rf => {
+      prompt += `- SKU ${rf.sku}: ${rf.action} — ${rf.reasoning}\n`;
+    });
+    prompt += `\n`;
+  }
+
   prompt += `REQUIREMENTS:\n`;
-  prompt += `1. Synthesize a 5-Tier Strategic Resolution Matrix (Rank 1: Intent Preserved to Rank 5: Dense I/O).\n`;
-  prompt += `2. For Rank 1, include exact list price citations from the catalog data.\n`;
-  prompt += `3. Include technical attribute filters (e.g., Memory capacity > 32GB matching 64GB/96GB/128GB RDIMMs).\n`;
+  prompt += `1. Verify that the ENTIRE solution (original BOQ + all injected fixes) is 100% buildable as a single cohesive system without any breaking conflicts.\n`;
+  prompt += `2. Synthesize a 5-Tier Strategic Resolution Matrix (Rank 1: Intent Preserved to Rank 5: Dense I/O).\n`;
+  prompt += `3. For Rank 1, include exact list price citations from the catalog data.\n`;
+  prompt += `4. Include technical attribute filters (e.g., Memory capacity > 32GB matching 64GB/96GB/128GB RDIMMs).\n`;
+  prompt += `5. Provide complete backtrackable rationale so a human reviewer can verify or override any architectural assumptions.\n`;
 
   return prompt;
 }

@@ -18,7 +18,7 @@ const SKIELD_LIST_PRICES_USD = {
   'P73282-B21': 5584.00,  // Base DL380 Gen12 SFF NC Chassis
   'P74573-B21': 10516.00, // Xeon 6730P 32-core 250W CPU
   'P74792-B21': 316.00,   // Performance Heatsink Kit
-  'P69728-B21': 27611.00, // 64GB DDR5-6400 Smart Memory Kit
+  'P69728-B21': 551.00,    // 64GB DDR5-6400 Smart Memory Kit
   'P47777-B21': 5999.00,  // MR416i-p Storage Controller
   'P01366-B21': 110.00,   // 96W Smart Storage Battery
   'P48918-B21': 38.00,    // Controller Enablement Cable Kit

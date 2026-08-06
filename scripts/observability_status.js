@@ -162,6 +162,22 @@ async function main() {
     console.log('  ℹ️  No KnowledgeDeltas recorded yet. (Simulate rejections via eval_boq --simulate-portal-error)');
   }
 
+  // 3.5 Telemetry & Audit Observability
+  console.log('\n--- 3.5 Telemetry & Observability Metrics ---');
+  try {
+    const { loadTelemetry } = require('./lib/telemetry');
+    const tel = loadTelemetry();
+    console.log(`  📊 Total Evaluations Run  : ${tel.evaluationsCount}`);
+    console.log(`  📊 Total Deltas Learned    : ${tel.totalDeltasLearned}`);
+    console.log(`  📊 Average Confidence Score: ${tel.avgConfidenceScore} / 1.00`);
+    if (tel.history && tel.history.length > 0) {
+      const last = tel.history[0];
+      console.log(`  ⏱️ Last BOQ Run (${last.boqFile}): ${last.chassisModel} | Score: ${last.confidenceScore} | Rules: ${last.graphRulesEvaluated} | Duration: ${last.durationMs}ms`);
+    }
+  } catch (_) {
+    console.log('  ℹ️  Telemetry log baseline initialized.');
+  }
+
   // 4. Script Wiring & package.json Registry
   console.log('\n--- 4. Script Registry & package.json Wiring Audit ---');
   if (fs.existsSync(PACKAGE_JSON)) {

@@ -82,11 +82,17 @@ function processPortalFeedback(portalError, outputDir = 'outputs/ProLiant/Gen12/
   // Auto-update Catalog Rules TSV / CSV if present
   updateCatalogRulesFile(outputDir, delta);
 
+  // Record Telemetry
+  try {
+    const { recordFeedbackTelemetry } = require('./telemetry');
+    recordFeedbackTelemetry(delta);
+  } catch (_) {}
+
   return delta;
 }
 
 /**
- * Helper to update catalog rules TSV/CSV with new feedback rule.
+ * Helper to update catalog rules TSV/CSV and _Catalog_Rules.json with new feedback rule.
  */
 function updateCatalogRulesFile(outputDir, delta) {
   const prefix = path.basename(outputDir);
@@ -94,6 +100,22 @@ function updateCatalogRulesFile(outputDir, delta) {
   if (fs.existsSync(rulesCsv)) {
     const newRow = `\n"Feedback Learned Rule","${delta.affectedSku}","${delta.ruleUpdate.replace(/"/g, '""')}","${delta.timestamp}"`;
     fs.appendFileSync(rulesCsv, newRow, 'utf-8');
+  }
+
+  const rulesJson = path.join(outputDir, `${prefix}_Catalog_Rules.json`);
+  if (fs.existsSync(rulesJson)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(rulesJson, 'utf-8'));
+      data.rules = data.rules || [];
+      data.rules.push({
+        parentCategory: 'Learned Feedback Rules',
+        subCategory: delta.affectedSku,
+        constraint: 'learned',
+        maxQty: 1,
+        rule: delta.ruleUpdate
+      });
+      fs.writeFileSync(rulesJson, JSON.stringify(data, null, 2), 'utf-8');
+    } catch (_) {}
   }
 }
 

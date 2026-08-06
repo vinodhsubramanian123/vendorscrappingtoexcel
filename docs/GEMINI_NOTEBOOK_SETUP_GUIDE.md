@@ -70,7 +70,7 @@ nlm skill install antigravity
 
 # Copy to workspace skills for local workspace activation:
 mkdir -p .agents/skills
-cp -R /Users/macbookaira1466/.gemini/antigravity/skills/nlm-skill .agents/skills/
+cp -R "$HOME/.gemini/antigravity/skills/nlm-skill" .agents/skills/
 ```
 
 ### Step 6: Verify Overall Health

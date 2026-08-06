@@ -32,10 +32,12 @@ function updateScrapedRegistry(info) {
   }
 
   const dateStr  = (info.timestamp || new Date().toISOString()).substring(0, 10);
-  const pdfPath  = info.pdfPath ? toForwardSlash(info.pdfPath) : null;
-  const xlsxPath = toForwardSlash(info.xlsxPath);
-  const jsonPath = toForwardSlash(info.jsonPath);
-  const pdfStr   = pdfPath ? `[PDF](${pdfPath})` : 'Advisory (No QS Link)';
+
+  // Convert all paths to clean repository-relative paths
+  const relXlsx = toForwardSlash(path.relative(PROJECT_ROOT, info.xlsxPath));
+  const relJson = toForwardSlash(path.relative(PROJECT_ROOT, info.jsonPath));
+  const relPdf  = info.pdfPath ? toForwardSlash(path.relative(PROJECT_ROOT, info.pdfPath)) : null;
+  const pdfStr  = relPdf ? `[PDF](${relPdf})` : 'Advisory (No QS Link)';
 
   const normOutputDir = toForwardSlash(info.outputDir);
   const relOutputDir  = normOutputDir.replace(/.*\/outputs\//, 'outputs/').replace(/\/+$/, '') + '/';
@@ -45,7 +47,7 @@ function updateScrapedRegistry(info) {
   const newRow =
     `| ${dateStr} | ${info.solutionName || 'OCA Solution'} | ${info.family} | ` +
     `${info.gen} | \`${info.chassisName}\` | **${skuDisplayCount}** | ` +
-    `[${path.basename(xlsxPath)}](${xlsxPath}) | [${path.basename(jsonPath)}](${jsonPath}) | ` +
+    `[${path.basename(relXlsx)}](${relXlsx}) | [${path.basename(relJson)}](${relJson}) | ` +
     `${pdfStr} | \`${relOutputDir}\` |\n`;
 
   // Check if an existing row matches this output folder

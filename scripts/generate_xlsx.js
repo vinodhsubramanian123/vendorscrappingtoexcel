@@ -14,6 +14,34 @@ const fs   = require('fs');
 const XLSX = require('xlsx-js-style');
 const path = require('path');
 
+/**
+ * Sanitize a string for use as an Excel sheet name.
+ * - Strips illegal characters: : \ / ? * [ ]
+ * - Truncates to 31 characters (Excel limit)
+ * - Deduplicates collisions by appending _2, _3, etc.
+ * @param {string} name - Raw category name
+ * @param {string[]} existingNames - Already-used sheet names for collision detection
+ * @returns {string} Safe, unique sheet name
+ */
+function sanitizeSheetName(name, existingNames) {
+  let safe = String(name)
+    .replace(/[:\\/?*\[\]]/g, '')  // Strip Excel-illegal characters
+    .replace(/^'+|'+$/g, '')       // Strip leading/trailing single quotes
+    .trim();
+  if (safe.length === 0) safe = 'Sheet';
+  safe = safe.substring(0, 31);
+
+  // Deduplicate: if collision, append _2, _3, etc.
+  let candidate = safe;
+  let counter = 2;
+  while (existingNames.includes(candidate)) {
+    const suffix = `_${counter}`;
+    candidate = safe.substring(0, 31 - suffix.length) + suffix;
+    counter++;
+  }
+  return candidate;
+}
+
 // ── Argument handling ─────────────────────────────────────────────────────────
 const xlsxPath = process.argv[2];
 if (!xlsxPath) {
@@ -193,6 +221,8 @@ const orderedCategories = [
   ...allCategoriesInData.filter(c => !REQUIRED_CATEGORIES.includes(c))
 ];
 
+const usedSheetNames = wb.SheetNames.slice(); // Track names already in use
+
 for (const cat of orderedCategories) {
   const catSKUs = skuData.data.filter(r => r['Main Category'] === cat);
   if (catSKUs.length === 0) continue;   // Skip categories with no SKUs
@@ -200,7 +230,8 @@ for (const cat of orderedCategories) {
   ws['!cols']    = SKU_COL_WIDTHS;
   applyDiffStyles(ws, catSKUs);
   enableSheetUsability(ws);
-  const sheetName = cat.length > 31 ? cat.substring(0, 31) : cat;
+  const sheetName = sanitizeSheetName(cat, usedSheetNames);
+  usedSheetNames.push(sheetName);
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
 }
 

@@ -1,57 +1,95 @@
 ---
 name: orchestrator-workflow-skill
-description: "Macro-architecture skill orchestrating the 6-stage Continuous Learning Loop: Ingestion, Sync, BOQ Eval, Notebook RAG, HITL Trial, and KnowledgeDelta learning. Use this skill to understand the end-to-end flow of the project and delegate tasks to sub-skills."
+description: Macro-orchestration skill managing the 6-stage continuous learning lifecycle across scraping, knowledge sync, BOQ evaluation, Notebook RAG, HITL trial, and feedback learning.
 ---
 
-# Orchestrator Workflow Skill — End-to-End Autonomous Lifecycle
+# Orchestrator Workflow Skill — End-to-End Autonomous Lifecycle (`orchestrator-workflow-skill`)
 
-This skill defines the macro-architecture that ties all individual tools (`oca-catalog-scraper`, `boq-eval-skill`, `nlm-skill`) into a single **Continuous Learning Loop**. Whenever you are managing a complex task in this workspace, refer to this 6-stage lifecycle to understand your exact role and responsibilities.
+This skill defines the macro-architecture that ties all individual agentic skills into a single **Continuous Learning Loop**. Whenever you are managing a complex task in this workspace, refer to this 6-stage lifecycle to understand your exact role, execution boundaries, and sub-skill delegation pathways.
 
 ---
 
-## The 6-Stage Continuous Learning Loop
+## 🏛️ Macro Architecture & Continuous Learning Loop (Mermaid Visual)
+
+```mermaid
+graph TD
+    subgraph "Stage 1: Ingestion (CDP Scraper)"
+        A["HPE Partner Portal / OCA Session (Port 9222)"] --> B["oca-catalog-scraper"]
+        B --> C["scripts/build_catalog.js"]
+    end
+
+    subgraph "Stage 2: Knowledge Sync & Dual Safety Net"
+        C --> D["scripts/lib/diff_catalog.js (Price Trails)"]
+        C --> E["*_Catalog_Rules.json (Dual Safety Net)"]
+        D --> F["outputs/SCRAPED_CATALOGS.md (Master Registry)"]
+        D --> G["nlm-skill (Sync to Gemini NotebookLM)"]
+    end
+
+    subgraph "Stage 3 & 4: BOQ Eval, Workload DNA & Conflict Graph"
+        H["Customer BOQ / Quote"] --> I["boq-eval-skill"]
+        I --> J["scripts/lib/boq_evaluator.js (6-Aspect Physical Math)"]
+        J --> K["scripts/lib/conflict_graph.js (5-Level Conflict Graph & Workload DNA)"]
+        K --> L["5-Tier Strategic Resolution Matrix (Rank 1: Intent Match)"]
+        L --> M["Grounded Gemini Notebook RAG (nlm-skill)"]
+    end
+
+    subgraph "Stage 5 & 6: HITL Trial, Telemetry & Closed-Loop Learning"
+        M --> N["outputs/{Family}/{Gen}/{Model}/reports/ (BOQ Report)"]
+        N --> O["Human-in-the-Loop (HITL) Portal Build"]
+        O -- "Portal Error Rejection" --> P["scripts/lib/feedback_loop.js"]
+        P --> Q["outputs/history/catalog_deltas.json (KnowledgeDelta)"]
+        Q --> J
+        N --> R["scripts/lib/telemetry.js (outputs/history/pipeline_telemetry.json)"]
+    end
+```
+
+---
+
+## 🔁 The 6-Stage Continuous Learning Lifecycle
 
 ### 1. Ingestion (Live Scraping)
-- **Actor**: `oca-catalog-scraper`
-- **Action**: Live scrape the HPE OCA vendor portal using the CDP protocol over port 9222.
-- **Output**: Generates classified JSON catalogs and multi-sheet Excel workbooks (`*_OCA_Catalog.xlsx`) containing comprehensive part configurations, quantity constraints, and configuration rules.
-- **Goal**: Maintain up-to-date, structured intelligence of vendor hardware logic.
+- **Actor**: [`oca-catalog-scraper`](file:///Users/macbookaira1466/Downloads/booktoSkill/.agents/skills/oca-catalog-scraper/SKILL.md)
+- **Action**: Scrapes the live HPE OCA vendor portal via Chrome DevTools Protocol (`scripts/lib/cdp.js`) over port 9222.
+- **Output**: Generates classified JSON catalogs, standalone rules files (`*_Catalog_Rules.json`), and multi-sheet Excel workbooks (`*_OCA_Catalog.xlsx`).
 
-### 2. Knowledge Sync & Delta Tracking
-- **Actor**: `diff_catalog.js` & `nlm-skill`
+### 2. Knowledge Sync & Dual Safety Net
+- **Actor**: [`diff_catalog.js`](file:///Users/macbookaira1466/Downloads/booktoSkill/scripts/lib/diff_catalog.js) & [`nlm-skill`](file:///Users/macbookaira1466/Downloads/booktoSkill/.agents/skills/nlm-skill/SKILL.md)
 - **Action**: 
-  - Compare newly scraped JSON against historical snapshots to determine additions, removals (tombstones), and price variations.
-  - Sync the generated `*_OCA_Catalog.xlsx` to Google Drive as a source for Gemini NotebookLM using `nlm-skill`.
-- **Goal**: Provide the AI brain (NotebookLM) with the latest, historically-tracked catalog rules and pricing logic without losing past data.
+  - Compares newly scraped JSON against historical snapshots to log SKU additions, removals, and cumulative price trails.
+  - Emits standalone `*_Catalog_Rules.json` for fast dual safety net loading.
+  - Auto-synchronizes `outputs/SCRAPED_CATALOGS.md` master registry (`npm run registry:sync`).
 
-### 3. BOQ Upload & Pre-Flight Parsing
-- **Actor**: `boq-eval-skill` (`npm run eval:boq <file>`)
-- **Action**: Ingest a customer-provided Bill of Quantities (BOQ), multi-sheet proposal, or hardware list. Parse it into a structured format and run 6-aspect physical pre-checks (Compute, Memory, Storage, Networking, Power, Services).
-- **Ambiguity Protocol**: If the user's workload intent is ambiguous (e.g., VDI vs DB), **do not block execution**. Proceed with evaluation, make educated assumptions based on the components, and output a Ranked Solution while explicitly stating your assumptions for the user to adjust later.
-- **Goal**: Identify missing dependencies and physical layout violations before manual portal entry.
+### 3. BOQ Ingestion, Workload DNA & 5-Level Conflict Graph
+- **Actor**: [`boq-eval-skill`](file:///Users/macbookaira1466/Downloads/booktoSkill/.agents/skills/boq-eval-skill/SKILL.md) (`npm run eval:boq <file>`)
+- **Action**:
+  - Ingests customer BOQs, multi-sheet proposals, or obfuscated SKU text.
+  - Extracts **Workload DNA Profile** (CPU core/freq density, RAM per core ratio, GPU VDI class, NVMe RI vs MU vs WI SSDs).
+  - Evaluates deterministic 6-aspect physical math assertions (Compute, Memory, Storage, Networking, Power, Support).
+  - Validates full BOM + fixes across 5 rule hierarchy levels (`VENDOR`, `CHASSIS`, `CATEGORY`, `SUBCATEGORY`, `SKU`) using `conflict_graph.js`.
+  - Outputs a **5-Tier Strategic Resolution Matrix** where **Rank 1 strictly matches customer workload intent** (neither over- nor under-provisioned).
 
-### 4. Notebook Validation (RAG)
-- **Actor**: `nlm-skill`
-- **Action**: Programmatically query Gemini NotebookLM to cross-reference identified constraints against the synced catalog documentation. Ask NotebookLM to solve complex mixing rules or identify substitute parts.
-- **Goal**: Enhance the BOQ Evaluation report with intelligent, context-aware remediation steps based on vendor documentation.
+### 4. Grounded Gemini Notebook Validation (RAG)
+- **Actor**: [`nlm-skill`](file:///Users/macbookaira1466/Downloads/booktoSkill/.agents/skills/nlm-skill/SKILL.md)
+- **Action**: Programmatically queries Gemini NotebookLM (`Dl 380 Spec Gen 12` - ID: `1d190853-4e9c-48df-aa70-eae66c6f2c1f`) to cross-reference identified constraints against synced spec sheet documentation.
 
 ### 5. Human-in-the-Loop (HITL) Portal Trial
-- **Actor**: Human User
-- **Action**: The system outputs a structured 5-Tier Strategic Resolution Report with ranked BOM solutions. The user takes the top-ranked solution and manually attempts to build it in the live vendor OCA portal.
-- **Goal**: Serve as a live test to verify the AI's logic against the vendor's closed configuration engine (before full end-to-end automation is achieved).
+- **Actor**: Human Sales Engineer / User
+- **Action**: Takes the top-ranked solution from Section 2.6 of the generated report (`outputs/{Family}/{Gen}/{Model}_{FormFactor}/reports/BOQ_Evaluation_{name}.md`) and verifies or builds it in the live vendor OCA portal.
 
-### 6. Feedback & Automation Learning
-- **Actor**: Human User & `boq-eval-skill`
-- **Action**: If the vendor portal rejects the BOM (e.g., "Controller MR416i-p requires Cable Kit X"), the user provides this feedback to the agent.
-- **Execution**: The agent runs `npm run eval:boq <boq> --simulate-portal-error "<error text>"` to permanently log a `KnowledgeDelta` in `outputs/history/catalog_deltas.json`.
-- **Goal**: The system structurally learns from every portal rejection. Future evaluations automatically apply this learned rule, increasing confidence and closing the gap toward 100% autonomous quote generation.
+### 6. Closed-Loop Feedback & Telemetry Learning
+- **Actor**: [`feedback_loop.js`](file:///Users/macbookaira1466/Downloads/booktoSkill/scripts/lib/feedback_loop.js) & [`telemetry.js`](file:///Users/macbookaira1466/Downloads/booktoSkill/scripts/lib/telemetry.js)
+- **Action**:
+  - Log vendor rejections via `npm run eval:boq <boq> --simulate-portal-error "<error>"`.
+  - Permanently appends `KnowledgeDeltas` to `history/catalog_deltas.json` and updates `_Catalog_Rules.json`.
+  - Records execution metrics in `outputs/history/pipeline_telemetry.json` for observability (`npm run status`).
 
 ---
 
-## Agent Coordination Guidelines
+## 🎯 Sub-Skill Routing & Execution Directory
 
-When operating in this workspace, follow these delegation rules:
-- If asked to extract or update product intelligence ➔ Switch to `oca-catalog-scraper`.
-- If asked to validate a BOM, BOQ, or Excel quote ➔ Switch to `boq-eval-skill`.
-- If asked to research constraints, query documentation, or sync files to Drive ➔ Switch to `nlm-skill`.
-- If asked to track the overall health of the pipeline ➔ Run `npm run status`.
+| Task / Intent | Active Sub-Skill | Command Target |
+|---|---|---|
+| Live scrape chassis/storage solution | [`oca-catalog-scraper`](file:///Users/macbookaira1466/Downloads/booktoSkill/.agents/skills/oca-catalog-scraper/SKILL.md) | `npm run scrape` / `npm run scrape:storage` |
+| Ingest & evaluate customer BOQ / BOM | [`boq-eval-skill`](file:///Users/macbookaira1466/Downloads/booktoSkill/.agents/skills/boq-eval-skill/SKILL.md) | `npm run eval:boq <boq_file>` |
+| Query Gemini NotebookLM RAG | [`nlm-skill`](file:///Users/macbookaira1466/Downloads/booktoSkill/.agents/skills/nlm-skill/SKILL.md) | `nlm notebook query <id> "<prompt>"` |
+| Portfolio health & telemetry audit | Dashboard | `npm run status` |

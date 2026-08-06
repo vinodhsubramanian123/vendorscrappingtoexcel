@@ -102,13 +102,11 @@ console.log('\n--- Step 2: Mapping Parent Categories ---');
 
 const configPath = path.join(__dirname, 'config', 'categories.json');
 let KNOWN_MAIN_CATEGORIES = [];
-let COMPONENT_ROLES_CONFIG = [];
 
 if (fs.existsSync(configPath)) {
   try {
     const parsedConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
     KNOWN_MAIN_CATEGORIES = parsedConfig.mainCategories || [];
-    COMPONENT_ROLES_CONFIG = parsedConfig.componentRoles || [];
   } catch (err) {
     console.warn(`  ⚠️ Failed to parse config/categories.json: ${err.message}`);
   }
@@ -401,26 +399,8 @@ for (const entry of orderedEntries) {
 
 console.log(`Merged ${mergedSubtableCount} sub-tables into preceding parent subcategories (DOM index order).`);
 
-function getComponentRole(sku, subCat, parentCat) {
-  const desc   = (sku['Description'] || '').toLowerCase();
-  const sub    = (subCat || '').toLowerCase();
-  const parent = (parentCat || '').toLowerCase();
-  const pn     = (sku['Product #'] || '').toLowerCase();
-
-  for (const item of COMPONENT_ROLES_CONFIG) {
-    if (item.patterns && item.patterns.some(p => desc.includes(p) || pn.includes(p))) {
-      return item.role;
-    }
-    if (item.subcatPatterns && item.subcatPatterns.some(p => sub.includes(p))) {
-      return item.role;
-    }
-    if (item.parentPatterns && item.parentPatterns.some(p => parent.includes(p))) {
-      return item.role;
-    }
-  }
-
-  return 'Hardware Component';
-}
+// NOTE: Component role classification is handled by classifyComponentRole() in scripts/lib/product_meta.js
+// which is called by catalog_formatter.js during SKU row generation.
 
 // ============================================================
 // Step 5: Process Catalog Diffs & History Snapshots
@@ -469,12 +449,28 @@ fs.writeFileSync(path.join(scrapsDir, `${filePrefix}_Catalog_SKUs.tsv`),    main
 fs.writeFileSync(path.join(scrapsDir, `${filePrefix}_Catalog_Rules.tsv`),   rulesTSV);
 fs.writeFileSync(path.join(scrapsDir, `${filePrefix}_Catalog_Summary.tsv`), summaryTSV);
 
+// Standalone Rules JSON (Dual Safety Net)
+const rulesJsonPath = path.join(targetDir, `${filePrefix}_Catalog_Rules.json`);
+const rulesJsonData = {
+  metadata: enrichedCatalog.metadata,
+  subcategories: enrichedCatalog.subcategories,
+  rules: (enrichedCatalog.entries || []).flatMap(e => (e.rules || []).map(r => ({
+    parentCategory: e.parentCategory,
+    subCategory: e.subCategory,
+    constraint: e.constraint,
+    maxQty: e.maxQty,
+    rule: r
+  })))
+};
+fs.writeFileSync(rulesJsonPath, JSON.stringify(rulesJsonData, null, 2));
+
 fs.writeFileSync(jsonOutputPath, JSON.stringify(enrichedCatalog, null, 2));
 
 console.log('=== FILES SAVED ===');
 console.log(`  📄 ${filePrefix}_Catalog_SKUs.tsv    (${mainTSV.split('\n').length} rows)`);
 console.log(`  📄 ${filePrefix}_Catalog_Rules.tsv   (${rulesTSV.split('\n').length} rows)`);
 console.log(`  📄 ${filePrefix}_Catalog_Summary.tsv (${summaryTSV.split('\n').length} rows)`);
+console.log(`  📄 ${filePrefix}_Catalog_Rules.json  (${rulesJsonData.rules.length} rules, dual safety net)`);
 console.log(`  📄 ${catalogBaseName}.json        (structured companion JSON)`);
 
 console.log('\n=== CATEGORY BREAKDOWN ===');

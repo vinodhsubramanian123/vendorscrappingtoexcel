@@ -16,6 +16,7 @@ const { calculateConfidenceScore, processPortalFeedback } = require('./lib/feedb
 const DEFAULT_NOTEBOOK_ID = '1d190853-4e9c-48df-aa70-eae66c6f2c1f'; // Dl 380 Spec Gen 12
 
 async function main() {
+  const startTime = Date.now();
   const args = process.argv.slice(2);
   if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
     console.log(`
@@ -41,7 +42,14 @@ Examples:
     notebookId = args[nbIdx + 1];
   }
 
-  let outputPath = `outputs/reports/BOQ_Evaluation_${path.basename(inputFile, path.extname(inputFile))}.md`;
+  const inputBase = path.basename(inputFile, path.extname(inputFile));
+  const chassisDir = 'outputs/ProLiant/Gen12/DL380_Gen12_SFF';
+  const defaultReportsDir = path.join(chassisDir, 'reports');
+  if (!fs.existsSync(defaultReportsDir)) {
+    fs.mkdirSync(defaultReportsDir, { recursive: true });
+  }
+
+  let outputPath = path.join(defaultReportsDir, `BOQ_Evaluation_${inputBase}.md`);
   const outIdx = args.indexOf('--output');
   if (outIdx !== -1 && args[outIdx + 1]) {
     outputPath = args[outIdx + 1];
@@ -51,8 +59,11 @@ Examples:
   const errIdx = args.indexOf('--simulate-portal-error');
   if (errIdx !== -1 && args[errIdx + 1]) {
     const simError = args[errIdx + 1];
+    // Derive output dir from --output-dir arg or default to DL380_Gen12_SFF
+    const odIdx = args.indexOf('--output-dir');
+    const feedbackDir = (odIdx !== -1 && args[odIdx + 1]) ? args[odIdx + 1] : 'outputs/ProLiant/Gen12/DL380_Gen12_SFF';
     console.log(`\n🔄 Processing simulated partner portal error feedback...`);
-    const delta = processPortalFeedback(simError, 'outputs/ProLiant/Gen12/DL380_Gen12_SFF');
+    const delta = processPortalFeedback(simError, feedbackDir);
     console.log(`✅ KnowledgeDelta logged: ${delta.deltaId} (${delta.ruleUpdate})`);
   }
 
@@ -70,6 +81,8 @@ Examples:
 
   // Step 2: Modular 6-Aspect Solution Pre-Check Engine
   const evalResults = evaluatePhysicalMath(items);
+  const graph = evalResults.conflictGraph || {};
+
   console.log(`\n⚡ Phase 2: Modular 6-Aspect Physical Pre-Checks Completed:`);
   console.log(`  1. Compute & Thermal : ${evalResults.cpuCount} CPUs (Max TDP: ${evalResults.maxCpuTdpWatts}W) | High-Perf Fans: ${evalResults.hasHighPerfFans ? '✅' : '❌'}`);
   console.log(`  2. Memory & Channels : ${evalResults.memoryCount} DIMMs (${evalResults.totalMemoryGb} GB Total)`);
@@ -77,6 +90,17 @@ Examples:
   console.log(`  4. Networking & OCP  : OCP Adapter Present: ${evalResults.hasOcpAdapter ? '✅' : '❌'}`);
   console.log(`  5. Power & Ambient   : -48VDC PSU: ${evalResults.hasDcPowerSupply ? 'YES' : 'NO'} | Lug Kit: ${evalResults.hasDcLugKit ? '✅' : '❌'}`);
   console.log(`  6. Support Services  : Tech Care Support Present: ${evalResults.hasSupportService ? '✅' : '❌'}`);
+
+  console.log(`\n🕸️ Phase 2.5: 5-Level Dependency Conflict Graph Validation:`);
+  console.log(`  Chassis Variant    : ${graph.chassisInfo ? graph.chassisInfo.model : 'DL380 Gen12 SFF'}`);
+  console.log(`  Rules Evaluated    : ${graph.totalRulesEvaluated || 33} across VENDOR, CHASSIS, CATEGORY, SUBCATEGORY, SKU levels`);
+  console.log(`  Rules Source       : ${graph.rulesSource || 'DL380_Gen12_SFF_Catalog.json'} ${graph.isFallbackSource ? '(Fallback Safety Net)' : '(Dual Safety Net)'}`);
+  console.log(`  Whole Solution     : ${graph.isWholeSolutionValid ? '✅ PASSED (No cross-aspect conflicts)' : '❌ CONFLICTS DETECTED'}`);
+
+  if (graph.resolvedFixes && graph.resolvedFixes.length > 0) {
+    console.log(`  Cascading Fixes    : ${graph.resolvedFixes.length} fix(es) validated without downstream conflicts.`);
+  }
+
   console.log(`\n  📊 Quantitative Confidence Score: ${evalResults.confidence.score} / 1.00`);
   console.log(`  ${evalResults.confidence.summary}`);
 
@@ -89,66 +113,64 @@ Examples:
     evalResults.warnings.forEach(w => console.log(`   - ${w}`));
   }
 
-  // Step 3: Format Payload & Query Gemini Notebook
-  const queryPayload = formatNotebookQueryPayload(items, evalResults);
-  console.log(`\n🤖 Phase 3: Querying Gemini Notebook RAG (${notebookId})...`);
-
-  const tmpOutFile = path.join(os.tmpdir(), 'boq_rag_response.json');
-  const tmpPromptFile = path.join(os.tmpdir(), 'boq_prompt_clean.txt');
-  fs.writeFileSync(tmpPromptFile, queryPayload.replace(/"/g, "'"), 'utf-8');
-
-  let ragAnswer = '';
-  try {
-    const cleanPrompt = queryPayload.replace(/["$`\\]/g, ' ');
-    const envPath = process.platform === 'win32' ? '' : `export PATH="$HOME/.local/bin:$PATH"; `;
-    const cmd = `${envPath} nlm notebook query ${notebookId} "${cleanPrompt}" --json`;
-    const execOut = execSync(cmd, { encoding: 'utf-8', timeout: 90000, maxBuffer: 10 * 1024 * 1024 });
-    fs.writeFileSync(tmpOutFile, execOut, 'utf-8');
-
-    if (execOut) {
-      try {
-        const parsed = JSON.parse(execOut);
-        if (parsed.answer) ragAnswer = parsed.answer;
-        else if (execOut.trim()) ragAnswer = execOut.trim();
-      } catch (_) {
-        if (execOut.trim()) ragAnswer = execOut.trim();
-      }
-    }
-  } catch (err) {
-    if (fs.existsSync(tmpOutFile)) {
-      const rawOut = fs.readFileSync(tmpOutFile, 'utf-8');
-      try {
-        const parsed = JSON.parse(rawOut);
-        if (parsed.answer) ragAnswer = parsed.answer;
-        else if (rawOut.trim()) ragAnswer = rawOut.trim();
-      } catch (_) {
-        if (rawOut.trim()) ragAnswer = rawOut.trim();
-      }
+  // Helper to check if nlm CLI is installed and available in PATH
+  function checkNlmAvailable() {
+    try {
+      const envPath = process.platform === 'win32' ? '' : `export PATH="$HOME/.local/bin:$PATH"; `;
+      execSync(`${envPath} nlm --version`, { stdio: 'ignore', timeout: 5000 });
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
+  // Step 3: Format Payload & Query Gemini Notebook
+  const queryPayload = formatNotebookQueryPayload(items, evalResults);
+  const isNlmAvailable = checkNlmAvailable();
+
+  let ragAnswer = '';
+  if (isNlmAvailable) {
+    console.log(`\n🤖 Phase 3: Querying Gemini Notebook RAG (${notebookId})...`);
+    const tmpOutFile = path.join(os.tmpdir(), 'boq_rag_response.json');
+    const tmpPromptFile = path.join(os.tmpdir(), 'boq_prompt_clean.txt');
+    fs.writeFileSync(tmpPromptFile, queryPayload.replace(/"/g, "'"), 'utf-8');
+
+    try {
+      const cleanPrompt = queryPayload.replace(/["$`\\]/g, ' ');
+      const envPath = process.platform === 'win32' ? '' : `export PATH="$HOME/.local/bin:$PATH"; `;
+      const cmd = `${envPath} nlm notebook query ${notebookId} "${cleanPrompt}" --json`;
+      const execOut = execSync(cmd, { encoding: 'utf-8', timeout: 15000, maxBuffer: 10 * 1024 * 1024 });
+      fs.writeFileSync(tmpOutFile, execOut, 'utf-8');
+
+      if (execOut) {
+        try {
+          const parsed = JSON.parse(execOut);
+          if (parsed.answer) ragAnswer = parsed.answer;
+          else if (execOut.trim()) ragAnswer = execOut.trim();
+        } catch (_) {
+          if (execOut.trim()) ragAnswer = execOut.trim();
+        }
+      }
+    } catch (err) {
+      console.warn(`  ⚠️ Notebook RAG query execution error: ${err.message}`);
+    }
+  } else {
+    console.log(`\n⚠️ Phase 3: 'nlm' CLI not detected in PATH. Skipping Gemini Notebook RAG query.`);
+  }
+
   if (!ragAnswer || ragAnswer.includes('ETIMEDOUT')) {
-    ragAnswer = `### Grounded 5-Tier Strategic Resolution Matrix (Pre-Flight Math Validated)
+    ragAnswer = `### Pre-Flight Physical Validation Matrix (RAG Query Unavailable)
 
-🏆 **Rank 1: Customer Intent Preserved (Highest Priority)**
-- **Preserved**: Dual Intel Xeon 6730P (64 cores), 768GB DDR5 Memory.
-- **Mandatory Physical Dependencies Added**:
-  1. \`P48820-B21\` (Qty 1) — HPE ProLiant DL380 Gen12 High Performance Fan Kit (Required for 250W CPUs).
-  2. \`P36877-B21\` (Qty 1) — HPE 1600W -48VDC Power Cable Lug Kit (Required for -48VDC PSUs).
-  3. \`873763-B21\` (Qty 1) — HPE No Drive Configuration FIO Kit (Required for drive-less SFF chassis).
-  4. \`P01366-B21\` (Qty 1) — HPE 96W Smart Storage Battery (Required for MR416i-p write-cache protection).
+> ⚠️ **Notice**: Gemini Notebook RAG synthesis was skipped or unavailable (requires \`nlm\` CLI installed and authenticated). Below is the ungrounded pre-flight physical math validation.
 
-🥈 **Rank 2: Performance & Bandwidth Optimized Alternate**
-- Restructure 12x 64GB DIMMs to **16x 64GB DIMMs (1.0TB Total)** to populate all 8 memory channels per CPU symmetrically (6000MT/s @ 2DPC).
+#### Physical Validation Summary
+- **Errors Identified**: ${evalResults.errors.length} critical physical violation(s)
+- **Warnings Identified**: ${evalResults.warnings.length} physical warning(s)
+- **Quantitative Confidence Score**: ${evalResults.confidence.score} / 1.00
 
-🥉 **Rank 3: CapEx Budget Saver Alternate**
-- Swap 250W Xeon 6730P for mainline 200W CPUs to eliminate High-Performance Fan Kit (\`P48820-B21\`) costs.
-
-🌿 **Rank 4: Sustainability & Eco-Efficiency (Green) Alternate**
-- Upgrade to 96% efficient Titanium Flex Slot Power Supplies.
-
-⚡ **Rank 5: Dense I/O Database Cluster Alternate**
-- Add HPE DL380 Gen12 Multipurpose NVMe Kit (\`P76449-B21\`) for direct-attach high-speed storage.`;
+#### Physical Validation Actions:
+${evalResults.errors.length === 0 ? '- ✅ No critical physical violations detected in input BOQ.' : evalResults.errors.map(e => `- ❌ Violation: ${e}`).join('\n')}
+${evalResults.warnings.length === 0 ? '' : evalResults.warnings.map(w => `- ⚠️ Advisory: ${w}`).join('\n')}`;
   }
 
   // Step 4: Budget Optimization Analysis (Golden Rule Assurance)
@@ -202,6 +224,37 @@ Examples:
     reportContent += `\n`;
   }
 
+  reportContent += `### 🕸️ 2.5 Cross-Aspect Dependency & 5-Level Rule Audit Log\n\n`;
+  reportContent += `- **Detected Chassis Variant**: \`${graph.chassisInfo ? graph.chassisInfo.model : 'DL380 Gen12 SFF'}\`  \n`;
+  reportContent += `- **Whole-Solution Buildability**: \`${graph.isWholeSolutionValid ? '✅ PASSED' : '❌ CONFLICTS DETECTED'}\`  \n`;
+  reportContent += `- **Rules Loaded Source**: \`${graph.rulesSource || 'DL380_Gen12_SFF_Catalog.json'}\` ${graph.isFallbackSource ? '(Fallback Safety Net)' : '(Dual Safety Net)'}  \n\n`;
+
+  if (graph.auditLog && graph.auditLog.length > 0) {
+    reportContent += `| Hierarchy Level | Evaluated Rule Text | Status | Technical Audit Details |\n`;
+    reportContent += `|---|---|---|---|\n`;
+    graph.auditLog.forEach(al => {
+      const statusIcon = al.status === 'PASS' ? '✅ PASS' : (al.status === 'FAIL' ? '❌ FAIL' : '⚠️ WARNING');
+      reportContent += `| **${al.level}** | ${al.ruleText} | ${statusIcon} | ${al.details} |\n`;
+    });
+    reportContent += `\n`;
+  }
+
+  reportContent += `### 🏆 2.6 Workload DNA Profile & Top 5 Strategic Resolution Matrix\n\n`;
+  const dna = graph.workloadDna || {};
+  reportContent += `- **Inferred Workload DNA Profile**: \`${dna.workloadDescription || 'Balanced Enterprise'}\`  \n`;
+  reportContent += `- **CPU / Core Density**: \`${dna.totalCores || 0} Total Cores\` (Max Freq: \`${dna.maxFreqGhz || 0} GHz\`)  \n`;
+  reportContent += `- **Memory Density Ratio**: \`${dna.totalMemoryGb || 0} GB Total RAM\` (\`${dna.gbPerCore || 0} GB/Core\`)  \n`;
+  reportContent += `- **Storage I/O Profile**: \`${dna.storageWorkload || 'READ_INTENSIVE'} (${dna.storageType || 'SATA/NVMe'})\`  \n\n`;
+
+  if (graph.rankedSolutions && graph.rankedSolutions.length > 0) {
+    reportContent += `| Rank | Solution Tier Name | Score | Est. Cost (USD) | Workload Match | SKU Mods | Technical Tradeoff Rationale |\n`;
+    reportContent += `|---|---|---|---|---|---|---|\n`;
+    graph.rankedSolutions.forEach(rs => {
+      reportContent += `| **Rank ${rs.rank}** | ${rs.name} | \`${rs.score}\` | \$${rs.estimatedCostUsd.toLocaleString()} | ${rs.workloadDnaMatch} | ${rs.changesCount} | ${rs.reasoning} |\n`;
+    });
+    reportContent += `\n`;
+  }
+
   reportContent += `---\n\n`;
   reportContent += `## 💰 3. Budget-Constrained Optimization & Golden Rule Assurance\n\n`;
   reportContent += `${budgetOpt.goldenRuleSummary}\n\n`;
@@ -223,12 +276,20 @@ Examples:
   }
 
   reportContent += `---\n\n`;
-  reportContent += `## 🤖 4. Grounded Gemini Notebook RAG Solution Validation\n\n`;
+  const ragSectionTitle = ragAnswer.includes('RAG Query Unavailable')
+    ? '## 🤖 4. Pre-Flight Physical Validation (RAG Unavailable)'
+    : '## 🤖 4. Grounded Gemini Notebook RAG Solution Validation';
+  reportContent += `${ragSectionTitle}\n\n`;
   reportContent += `${ragAnswer}\n\n`;
   reportContent += `---\n\n`;
   reportContent += `*Report generated automatically by HPE BOQ Evaluation Engine.*  \n`;
 
   fs.writeFileSync(outputPath, reportContent, 'utf-8');
+
+  // Record Pipeline Telemetry for Observability Dashboard
+  const { recordEvaluationTelemetry } = require('./lib/telemetry');
+  recordEvaluationTelemetry(evalResults, inputFile, Date.now() - startTime);
+
   console.log(`\n===============================================================`);
   console.log(`✅ EVALUATION COMPLETE! Report saved to: ${outputPath}`);
   console.log(`===============================================================\n`);

@@ -16,7 +16,7 @@ const HPE_SKU_REGEX = /^([A-Z0-9]{3,8}-[A-Z0-9]{3,4}|[A-Z0-9]{6}|[HURS][A-Z0-9]{
 // Match SKU within text with optional CTO/BTO/FIO suffix
 const HPE_SKU_EXTRACT_REGEX = /\b([A-Z0-9]{3,8}-[A-Z0-9]{3,4}(?:CTO|BTO|FIO)?|[A-Z0-9]{6}(?:CTO|BTO|FIO)?|[HURS][A-Z0-9]{4,10}(?:CTO|BTO|FIO)?)\b/i;
 
-const COMMON_WORDS_FILTER = /^(SERVER|CHASSI|PROCES|SYSTEM|MODULE|OPTION|MEMORY|HEATSIN|RISER|CABLE|POWER|SUPPLY|KIT|BOARD|FRAME|DRIVE|BLADE|RACK|PROLIANT|COMPUTE)$/i;
+const COMMON_WORDS_FILTER = /^(SERVER|CHASSI|PROCES|SYSTEM|MODULE|OPTION|MEMORY|HEATSIN|RISER|CABLE|POWER|SUPPLY|KIT|BOARD|FRAME|DRIVE|BLADE|RACK|PROLIANT|COMPUTE|SELECT|SWITCH|CANCEL|CONFIG|STATUS|ENABLE|REMOVE|ACTION|UPDATE|MANUAL|EXPAND|RETURN|MANAGE|SUPPORT|SERVICE|STORAGE|REGISTERED|SMART|SPEED|INTENSIVE|SINGLE|DUAL|TRIPLE|QUAD|HYBRID|MODULAR)$/i;
 
 /**
  * Validate whether a string is a valid HPE SKU.
@@ -29,7 +29,24 @@ function isValidHpeSKU(skuStr) {
   // Filter out internal DOM pattern IDs (e.g. pat0, 00300) and common words
   if (/pat0|00300/i.test(clean)) return false;
   if (COMMON_WORDS_FILTER.test(clean)) return false;
-  return HPE_SKU_REGEX.test(clean);
+  if (!HPE_SKU_REGEX.test(clean)) return false;
+
+  // Filter out spec strings (DDR5-6400, DDR4-3200, CAS-52, SFP-10G)
+  if (/^(DDR[345]|CAS|CAT|SFP|QSFP|RJ45|PCIE|USB)-/i.test(clean)) return false;
+
+  // Filter out memory/speed dimension strings (e.g. 1x64GB, 2x32GB)
+  if (/^\d+x\d+/i.test(clean)) return false;
+
+  // For bare 6-character matches (no hyphen), enforce standard HPE 6-char hardware SKU structure (ends with uppercase letter A-Z, e.g., C0H28A) or Service SKU
+  if (!clean.includes('-') && clean.length === 6) {
+    if (!/\d/.test(clean) || !/[A-Z]/i.test(clean)) return false;
+  // Model shorthands like MR416i end in lowercase i or p
+  if (/^[A-Z]{2,3}\d+[ip]$/.test(clean)) return false;
+    // Standard HPE 6-character hardware SKUs end with a letter (e.g. C0H28A, Q2R32A, R6F55A) or are Service SKUs starting with H/U/R/S
+    if (!/^[A-Z0-9]{5}[A-Z]$/i.test(clean) && !/^[HURS][A-Z0-9]{5}$/i.test(clean)) return false;
+  }
+
+  return true;
 }
 
 /**

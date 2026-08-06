@@ -1,0 +1,54 @@
+{
+  "metadata": {
+    "chassis": "Sample DL380 Gen12 SFF (Offline Test Fixture)",
+    "scrapeDate": "2026-01-01T00:00:00.000Z",
+    "source": "Offline Test Fixture",
+    "totalSubcategories": 4,
+    "totalTables": 6,
+    "totalUniqueSKUs": 8,
+    "baseSKU": "P73282-B21"
+  },
+  "pageTitle": "HPE ProLiant DL380 Gen12 SFF Test Fixture",
+  "sections": [
+    { "tagName": "H3", "text": "Processor", "className": "" },
+    { "tagName": "H3", "text": "Memory", "className": "" },
+    { "tagName": "H3", "text": "Power Supplies", "className": "" },
+    { "tagName": "H3", "text": "Services", "className": "" }
+  ],
+  "bodyText": "\n Processor\n Intel Xeon 6730P Processors  (max 2)\n Product #\tDescription\tList Price\tQty\tStart Date\n P74573-B21\tIntel Xeon 6730P 2.5GHz 32-core 250W Processor for HPE\t$10,516.00\t0\t2025-06-01\n P74574-B21\tIntel Xeon 6767P 2.4GHz 50-core 350W Processor for HPE\t$22,485.00\t0\t2025-06-01\n\n Memory\n Smart Memory Kits  (max 32)\n Product #\tDescription\tList Price\tQty\tStart Date\n P69728-B21\tHPE 64GB (1x64GB) Dual Rank x4 DDR5-6400 CAS-52-52-52 EC8 Registered Smart Memory Kit\t$551.00\t0\t2025-06-01\n P69729-B21\tHPE 32GB (1x32GB) Single Rank x4 DDR5-6400 CAS-52-52-52 EC8 Registered Smart Memory Kit\t$271.00\t0\t2025-06-01\n\n Power Supplies\n Flex Slot Power Supplies  (max 2)\n Mixing different power supply types is not supported.\n Product #\tDescription\tList Price\tQty\tStart Date\n P47777-B21\tHPE 800W Flex Slot Platinum Hot Plug Power Supply Kit\t$249.00\t0\t2025-06-01\n P17023-B21\tHPE 1600W Flex Slot -48VDC Hot Plug Power Supply Kit\t$780.50\t0\t2025-06-01\n\n Services\n Support Services  (required)\n Product #\tDescription\tList Price\tQty\tStart Date\n H7J34A3\tHPE 3Y Tech Care Essential Hardware Only Support DL380 Gen12\t$1,200.00\t0\t2025-06-01\n HA114A1\tHPE Installation Startup ProLiant DL Service\t$600.00\t0\t2025-06-01\n",
+  "tables": [
+    {
+      "tableIndex": 0,
+      "rows": [
+        ["Product #", "Description", "List Price", "Qty", "Start Date"],
+        ["P74573-B21", "Intel Xeon 6730P 2.5GHz 32-core 250W Processor for HPE", "$10,516.00", "0", "2025-06-01"],
+        ["P74574-B21", "Intel Xeon 6767P 2.4GHz 50-core 350W Processor for HPE", "$22,485.00", "0", "2025-06-01"]
+      ]
+    },
+    {
+      "tableIndex": 1,
+      "rows": [
+        ["Product #", "Description", "List Price", "Qty", "Start Date"],
+        ["P69728-B21", "HPE 64GB (1x64GB) Dual Rank x4 DDR5-6400 CAS-52-52-52 EC8 Registered Smart Memory Kit", "$551.00", "0", "2025-06-01"],
+        ["P69729-B21", "HPE 32GB (1x32GB) Single Rank x4 DDR5-6400 CAS-52-52-52 EC8 Registered Smart Memory Kit", "$271.00", "0", "2025-06-01"]
+      ]
+    },
+    {
+      "tableIndex": 2,
+      "rows": [
+        ["Mixing different power supply types is not supported."],
+        ["Product #", "Description", "List Price", "Qty", "Start Date"],
+        ["P47777-B21", "HPE 800W Flex Slot Platinum Hot Plug Power Supply Kit", "$249.00", "0", "2025-06-01"],
+        ["P17023-B21", "HPE 1600W Flex Slot -48VDC Hot Plug Power Supply Kit", "$780.50", "0", "2025-06-01"]
+      ]
+    },
+    {
+      "tableIndex": 3,
+      "rows": [
+        ["Product #", "Description", "List Price", "Qty", "Start Date"],
+        ["H7J34A3", "HPE 3Y Tech Care Essential Hardware Only Support DL380 Gen12", "$1,200.00", "0", "2025-06-01"],
+        ["HA114A1", "HPE Installation Startup ProLiant DL Service", "$600.00", "0", "2025-06-01"]
+      ]
+    }
+  ]
+}

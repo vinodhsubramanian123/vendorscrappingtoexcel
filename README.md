@@ -210,11 +210,35 @@ outputs/{Family}/{Gen}/{Model}_{FormFactor}/
 
 ---
 
+## 🧪 Test Suite & Observability Dashboard Commands
+
+```bash
+# 1. Comprehensive End-to-End Scenarios & Workload DNA Test (19/19)
+node tests/test_end_to_end_scenarios.js
+
+# 2. 5-Level Dependency Conflict Graph & Rules Engine Test (14/14)
+node tests/test_conflict_graph.js
+
+# 3. Offline Pipeline Regression Test (8/8)
+npm run test:offline
+
+# 4. Modular 6-Aspect Physical Math & Feedback Test (34/34)
+npm run test:aspects
+
+# 5. Master Portfolio Audit across all 6 chassis catalogs (6/6)
+npm test
+
+# 6. Unified Pipeline Telemetry & Health Dashboard
+npm run status
+```
+
+---
+
 ## 🛡️ Data Quality Guardrails & Audit Assertions
 
 Run `node scripts/verify_excel_tally.js <output_xlsx_path>` to verify all post-flight assertions:
 
-1. ✅ Excel workbook, JSON companion, and QuickSpecs PDF exist.
+1. ✅ Excel workbook, JSON companion, `*_Catalog_Rules.json` (Dual Safety Net), and QuickSpecs PDF exist.
 2. ✅ QuickSpecs PDF size > 500 KB with valid MD5 fingerprint (advisory when absent).
 3. ✅ All core Excel sheets present (`Category Summary`, `All SKUs`, `Rules & Constraints`, `Metadata`).
 4. ✅ `All SKUs` row count in Excel ≥ JSON `metadata.totalUniqueSKUs`.
