@@ -1,0 +1,121 @@
+Main Category,Sub-Category,Constraint,Rule Type,Rule Text
+Energy Star,Energy Star,max 1,Quantity Constraint,Max quantity: max 1
+Processor,Processor,max 2,Quantity Constraint,Max quantity: max 2
+Processor,Heatsink Kit,max 2,Quantity Constraint,Max quantity: max 2
+Memory,Memory,max 32,Quantity Constraint,Max quantity: max 32
+Memory,Memory Blank Kit,max 1,Quantity Constraint,Max quantity: max 1
+Smart Chassis,Top Selling Smart Chassis Combinations,Unlimited,Quantity Constraint,Max quantity: Unlimited
+Smart Chassis,Drive Cage,max 9,Quantity Constraint,Max quantity: max 9
+Smart Chassis,Riser Cards (required),max 3,Quantity Constraint,Max quantity: max 3
+Smart Chassis,Riser Accessories,max 6,Quantity Constraint,Max quantity: max 6
+Smart Chassis,SAS Controller,max 5,Quantity Constraint,Max quantity: max 5
+Smart Chassis,Smart Chassis Configuration,Required,Quantity Constraint,Max quantity: Required
+Ambient Temperature,AmbientTemperature,Required,Quantity Constraint,Max quantity: Required
+Storage Devices,Smart Storage Battery,max 2,Quantity Constraint,Max quantity: max 2
+Storage Devices,Internal Storage Controller Cables,max 3,Quantity Constraint,Max quantity: max 3
+Storage Devices,RAID Settings,max 1,Quantity Constraint,Max quantity: max 1
+Storage Devices,Optical Drive,max 1,Quantity Constraint,Max quantity: max 1
+Storage Devices,Optical Drive Accessories,max 2,Quantity Constraint,Max quantity: max 2
+Security Options,Security Hardware,max 3,Quantity Constraint,Max quantity: max 3
+Factory Configuration Settings,Factory Configuration Settings,max 1,Quantity Constraint,Max quantity: max 1
+Factory Configuration Settings,Trusted Supply Chain,max 1,Quantity Constraint,Max quantity: max 1
+Factory Configuration Settings,Drive Configuration Settings,max 1,Quantity Constraint,Max quantity: max 1
+Factory Configuration Settings,Complex Configuration,max 1,Quantity Constraint,Max quantity: max 1
+Factory Configuration Settings,Identifier/Tracking SKUs,max 1,Quantity Constraint,Max quantity: max 1
+Factory Configuration Settings,vSAN Tracking SKUs,max 1,Quantity Constraint,Max quantity: max 1
+Factory Configuration Settings,iLO Common Password,max 1,Quantity Constraint,Max quantity: max 1
+Networking,Ethernet PCIe,max 5,Quantity Constraint,Max quantity: max 5
+Networking,InfiniBand PCIe,max 3,Quantity Constraint,Max quantity: max 3
+Networking,Transceivers,max 16,Quantity Constraint,Max quantity: max 16
+Networking,Fibre Channel HBA,max 3,Quantity Constraint,Max quantity: max 3
+Networking,OCP Ethernet,max 2,Quantity Constraint,Max quantity: max 2
+Networking,Fibre Channel Cables and SFP,max 1,Quantity Constraint,Max quantity: max 1
+Networking,Upgrades,max 2,Quantity Constraint,Max quantity: max 2
+Networking,Management Hardware,max 1,Quantity Constraint,Max quantity: max 1
+Networking,Memory Setting,max 1,Quantity Constraint,Max quantity: max 1
+OS Boot Device,OS Boot Device,max 3,Quantity Constraint,Max quantity: max 3
+Manufacturing Services,Manufacturing Services,max 3,Quantity Constraint,Max quantity: max 3
+Rack Options,Rack Options,max 3,Quantity Constraint,Max quantity: max 3
+Graphics Options,Graphics,max 5,Quantity Constraint,Max quantity: max 5
+Graphics Options,Graphics Accessories,max 3,Quantity Constraint,Max quantity: max 3
+Power Supplies,Power Supplies,max 2,Quantity Constraint,Max quantity: max 2
+Power Supplies,Power Cooling Options,max 3,Quantity Constraint,Max quantity: max 3
+Accessories,Power Cords,max 2,Quantity Constraint,Max quantity: max 2
+AI-at-Scale,AI-at-Scale,Unlimited,Quantity Constraint,Max quantity: Unlimited
+HPC Software Products,HPC Software Products,Unlimited,Quantity Constraint,Max quantity: Unlimited
+HPC Software Products,High Availability Computing - Cluster Software,Unlimited,Quantity Constraint,Max quantity: Unlimited
+HPC Software Products,Partner Software - Interconnect Management Array,Unlimited,Quantity Constraint,Max quantity: Unlimited
+HPC Software Products,NVIDIA GPU SW,Unlimited,Quantity Constraint,Max quantity: Unlimited
+HPC Software Products,Partner Software - Operating System,Unlimited,Quantity Constraint,Max quantity: Unlimited
+HPE Compute Ops Management,Compute Ops Management SKUs (required),max 1,Quantity Constraint,Max quantity: max 1
+HPE Compute Ops Management,Compute Ops Management Enablement SKUs,max 1,Quantity Constraint,Max quantity: max 1
+OEM Software,OEM Software,Unlimited,Quantity Constraint,Max quantity: Unlimited
+ProLiant Media Kits and License,Proliant Software Media Kits,Unlimited,Quantity Constraint,Max quantity: Unlimited
+ProLiant Media Kits and License,Red Hat (add-ons),Unlimited,Quantity Constraint,Max quantity: Unlimited
+ProLiant Media Kits and License,SUSE Add-ons,Unlimited,Quantity Constraint,Max quantity: Unlimited
+Server Management Software,iLO,Unlimited,Quantity Constraint,Max quantity: Unlimited
+Server Management Software,OneView Management Software,max 1,Quantity Constraint,Max quantity: max 1
+SGI Software,Data Management Framework (SGI DMF),Unlimited,Quantity Constraint,Max quantity: Unlimited
+Hybrid RAID,INTEL VROC Products,max 1,Quantity Constraint,Max quantity: max 1
+Supported Operating System,Supported Operating System,Unlimited,Quantity Constraint,Max quantity: Unlimited
+Supported Operating System,MS Windows Server,Unlimited,Quantity Constraint,Max quantity: Unlimited
+Supported Operating System,Red Hat OpenShift Platform Container,Unlimited,Quantity Constraint,Max quantity: Unlimited
+Supported Operating System,Resale Option Kit,Unlimited,Quantity Constraint,Max quantity: Unlimited
+Supported Operating System,SUSE containers,Unlimited,Quantity Constraint,Max quantity: Unlimited
+Supported Operating System,SUSE Linux Enterprise Server,Unlimited,Quantity Constraint,Max quantity: Unlimited
+Supported OS License Pack,Microsoft Windows CAL Packs,Unlimited,Quantity Constraint,Max quantity: Unlimited
+Virtualization,HPE Virtualization,Unlimited,Quantity Constraint,Max quantity: Unlimited
+Virtualization,Red Hat Enterprise Linux Server-Virtualization,Unlimited,Quantity Constraint,Max quantity: Unlimited
+Virtualization,VMware vCloud Products,Unlimited,Quantity Constraint,Max quantity: Unlimited
+Processor,Heatsink Kit,max 2,Configuration Rule,Mixing of Heat sink is not allowed.
+Memory,Memory,max 32,Configuration Rule,These products are hidden due to Supply constraints
+Memory,Memory Blank Kit,max 1,Configuration Rule,Mixing of x4 and x8 memory is not allowed
+Smart Chassis,Top Selling Smart Chassis Combinations,no max,Configuration Rule,96GB Memory cannot be mixed with any other Memory.
+Smart Chassis,Top Selling Smart Chassis Combinations,no max,Configuration Rule,128GB Memory cannot be mixed with any other Memory.
+Smart Chassis,Drive Cage,max 9,Configuration Rule,Mixing of 3DS and non 3DS memory is not allowed.
+Smart Chassis,SAS Controller,max 5,Configuration Rule,Supported with EDSFF CTO Server only.
+Smart Chassis,SAS Controller,max 5,Configuration Rule,Supported with 8LFF and 12LFF CTO Server only.
+Smart Chassis,Smart Chassis Configuration,required,Configuration Rule,Supported with 8LFF CTO Server only.
+Ambient Temperature,AmbientTemperature,required,Configuration Rule,Define connection for 8SFF x4 Cage only needed if cage is selected.
+Storage Devices,Smart Storage Battery,max 2,Configuration Rule,Tertiary x8x16 Riser and OCPA x16/ CPU1 OCPB x8 cannot be selected together.
+Storage Devices,Internal Storage Controller Cables,max 3,Configuration Rule,Supported with EDSFF CTO Server only.
+Storage Devices,Optical Drive,max 1,Configuration Rule,These products are hidden due to Supply constraints
+Factory Configuration Settings,Factory Configuration Settings,max 1,Configuration Rule,Supported with 8LFF and 12LFF CTO Server only.
+Factory Configuration Settings,Trusted Supply Chain,max 1,Configuration Rule,Supported with 8LFF CTO Server only and requires 2SFF SBS Cage.
+Factory Configuration Settings,Drive Configuration Settings,max 1,Configuration Rule,Supported with 12EDSFF CTO Server only.
+Factory Configuration Settings,Identifier/Tracking SKUs,max 1,Configuration Rule,BTO products are not allowed in CTO Base Model.
+Factory Configuration Settings,vSAN Tracking SKUs,max 1,Configuration Rule,Supported with 8LFF CTO Server only.
+Factory Configuration Settings,vSAN Tracking SKUs,max 1,Configuration Rule,BTO products are not allowed in CTO Base Model.
+Networking,Transceivers,max 16,Configuration Rule,Supported with 12EDSFF CTO Server only.
+Networking,Memory Setting,max 1,Configuration Rule,These products are hidden due to Supply constraints
+Manufacturing Services,Manufacturing Services,max 3,Configuration Rule,Private Product is not valid for current customer account
+Rack Options,Rack Options,max 3,Configuration Rule,BTO products are not allowed in CTO Base Model.
+Accessories,Power Cords,max 2,Configuration Rule,RTX Pro 6000/ RTX Pro 6000D/ H200 NVL GPU and 30C Ambient Temperature cannot be selected together.
+AI-at-Scale,AI-at-Scale,no max,Configuration Rule,Private Product is not valid for current customer account
+HPC Software Products,High Availability Computing - Cluster Software,no max,Configuration Rule,Mixing of Power supplies are not allowed.
+HPC Software Products,High Availability Computing - Cluster Software,no max,Configuration Rule,If AC Power Supply is selected then only AC Power Cords should be in the drop-down.
+HPC Software Products,Partner Software - Interconnect Management Array,no max,Configuration Rule,HPE 1600W -48VDC Pwr Cbl Lug Kit(P36877-B21) Supported only with HPE 1600W FS -48VDC Ht Plg PS Kit (P17023-B21).
+HPC Software Products,Partner Software - Operating System,no max,Configuration Rule,BTO products are not allowed in CTO Base Model.
+HPC Software Products,Partner Software - Operating System,no max,Configuration Rule,Max quantity of product limited by space available.
+HPE Compute Ops Management,Compute Ops Management SKUs (required),max 1,Configuration Rule,If AC Power Supply is selected then only AC Power Cords should be in the drop-down.
+HPE Compute Ops Management,Compute Ops Management Enablement SKUs,max 1,Configuration Rule,Not Supported ProStack Server Software
+Virtualization,VMware vCloud Products,no max,Configuration Rule,Private Product is not valid for current customer account
+Networking,Ethernet PCIe,,Reference Link,"For More details on Adapter - Transceiver support, please refer to: https://www.hpe.com/psnow/doc/A00002507ENW?jumpid=in_lit-psnow-red (Transceivers, Ethernet PCIe, InfiniBand PCIe, OCP Ethernet)"
+Networking,InfiniBand PCIe,,Reference Link,"For More details on Adapter - Transceiver support, please refer to: https://www.hpe.com/psnow/doc/A00002507ENW?jumpid=in_lit-psnow-red (Transceivers, Ethernet PCIe, InfiniBand PCIe, OCP Ethernet)"
+Networking,Transceivers,,Reference Link,"For More details on Adapter - Transceiver support, please refer to: https://www.hpe.com/psnow/doc/A00002507ENW?jumpid=in_lit-psnow-red (Transceivers, Ethernet PCIe, InfiniBand PCIe, OCP Ethernet)"
+Networking,OCP Ethernet,,Reference Link,"For More details on Adapter - Transceiver support, please refer to: https://www.hpe.com/psnow/doc/A00002507ENW?jumpid=in_lit-psnow-red (Transceivers, Ethernet PCIe, InfiniBand PCIe, OCP Ethernet)"
+HPC Software Products,Partner Software - Operating System,,Minimum Requirement,Minimum 1 of any of the OS SKUs must be selected.
+Supported Operating System,Supported Operating System,,Minimum Requirement,Minimum 1 of any of the OS SKUs must be selected.
+Supported Operating System,MS Windows Server,,Minimum Requirement,Minimum 1 of any of the OS SKUs must be selected.
+Supported Operating System,Resale Option Kit,,Minimum Requirement,Minimum 1 of any of the OS SKUs must be selected.
+Supported Operating System,SUSE containers,,Minimum Requirement,Minimum 1 of any of the OS SKUs must be selected.
+Supported Operating System,SUSE Linux Enterprise Server,,Minimum Requirement,Minimum 1 of any of the OS SKUs must be selected.
+Virtualization,Red Hat Enterprise Linux Server-Virtualization,,Minimum Requirement,Minimum 1 of any of the OS SKUs must be selected.
+HPC Software Products,Partner Software - Operating System,,Recommendation,"It is recommended to select an Operating System (Partner Software - Operating System, Supported Operating System, MS Windows Server, Resale Option Kit, SUSE containers, SUSE Linux Enterprise Server, Red Hat Enterprise Linux Server-Virtualization)"
+Supported Operating System,Supported Operating System,,Recommendation,"It is recommended to select an Operating System (Partner Software - Operating System, Supported Operating System, MS Windows Server, Resale Option Kit, SUSE containers, SUSE Linux Enterprise Server, Red Hat Enterprise Linux Server-Virtualization)"
+Supported Operating System,MS Windows Server,,Recommendation,"It is recommended to select an Operating System (Partner Software - Operating System, Supported Operating System, MS Windows Server, Resale Option Kit, SUSE containers, SUSE Linux Enterprise Server, Red Hat Enterprise Linux Server-Virtualization)"
+Supported Operating System,Resale Option Kit,,Recommendation,"It is recommended to select an Operating System (Partner Software - Operating System, Supported Operating System, MS Windows Server, Resale Option Kit, SUSE containers, SUSE Linux Enterprise Server, Red Hat Enterprise Linux Server-Virtualization)"
+Supported Operating System,SUSE containers,,Recommendation,"It is recommended to select an Operating System (Partner Software - Operating System, Supported Operating System, MS Windows Server, Resale Option Kit, SUSE containers, SUSE Linux Enterprise Server, Red Hat Enterprise Linux Server-Virtualization)"
+Supported Operating System,SUSE Linux Enterprise Server,,Recommendation,"It is recommended to select an Operating System (Partner Software - Operating System, Supported Operating System, MS Windows Server, Resale Option Kit, SUSE containers, SUSE Linux Enterprise Server, Red Hat Enterprise Linux Server-Virtualization)"
+Virtualization,Red Hat Enterprise Linux Server-Virtualization,,Recommendation,"It is recommended to select an Operating System (Partner Software - Operating System, Supported Operating System, MS Windows Server, Resale Option Kit, SUSE containers, SUSE Linux Enterprise Server, Red Hat Enterprise Linux Server-Virtualization)"
+Power Supplies,Power Supplies,,Selection Guide,In order to select the right size power supply for your ProLiant Server it is highly recommended to use 'HPE Power Advisor' located at https://poweradvisorext.it.hpe.com. (Power Supplies)

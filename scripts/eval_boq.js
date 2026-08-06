@@ -1,15 +1,16 @@
 'use strict';
 /**
- * scripts/eval_boq.js — CLI Pre-Flight BOQ Evaluator & Gemini Notebook RAG Validator
+ * scripts/eval_boq.js — CLI Pre-Flight BOQ Evaluator, Multi-Sheet Parser & Gemini Notebook Validator
  *
- * Runs end-to-end BOQ parsing, physical math evaluation, Gemini Notebook RAG validation,
- * and 5-Tier Strategic Resolution Report generation.
+ * Runs end-to-end BOQ parsing (multi-sheet Excel, multipliers, line separators), 6-aspect physical pre-checks,
+ * quantitative confidence scoring, Gemini Notebook RAG validation, and 5-Tier Resolution Report synthesis.
  */
 
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const { parseAndConsolidateBOQ, evaluatePhysicalMath, formatNotebookQueryPayload } = require('./lib/boq_evaluator');
+const { calculateConfidenceScore, processPortalFeedback } = require('./lib/feedback_loop');
 
 const DEFAULT_NOTEBOOK_ID = '1d190853-4e9c-48df-aa70-eae66c6f2c1f'; // Dl 380 Spec Gen 12
 
@@ -17,11 +18,12 @@ async function main() {
   const args = process.argv.slice(2);
   if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
     console.log(`
-Usage: node scripts/eval_boq.js <input_boq_file> [--notebook-id <id>] [--output <output_report.md>]
+Usage: node scripts/eval_boq.js <input_boq_file> [--notebook-id <id>] [--output <output_report.md>] [--simulate-portal-error "<error>"]
 
 Examples:
   node scripts/eval_boq.js test_boq_dl380_gen12.csv
-  node scripts/eval_boq.js my_quote.csv --output outputs/reports/eval_report.md
+  node scripts/eval_boq.js my_quote.xlsx --output outputs/reports/eval_report.md
+  node scripts/eval_boq.js test_boq_dl380_gen12.csv --simulate-portal-error "ERR_STORAGE_CABLE_REQUIRED: Controller MR416i-p requires P76453-B21 Box 1/2 Cable Kit."
 `);
     process.exit(0);
   }
@@ -44,6 +46,15 @@ Examples:
     outputPath = args[outIdx + 1];
   }
 
+  // Handle portal error simulation if requested
+  const errIdx = args.indexOf('--simulate-portal-error');
+  if (errIdx !== -1 && args[errIdx + 1]) {
+    const simError = args[errIdx + 1];
+    console.log(`\n🔄 Processing simulated partner portal error feedback...`);
+    const delta = processPortalFeedback(simError, 'outputs/ProLiant/Gen12/DL380_Gen12_SFF');
+    console.log(`✅ KnowledgeDelta logged: ${delta.deltaId} (${delta.ruleUpdate})`);
+  }
+
   console.log(`\n===============================================================`);
   console.log(`🚀 HPE BOQ PRE-FLIGHT EVALUATION & GEMINI NOTEBOOK VALIDATOR`);
   console.log(`===============================================================`);
@@ -53,25 +64,27 @@ Examples:
 
   // Step 1: Parse and consolidate BOQ
   const rawContent = fs.readFileSync(inputFile, 'utf-8');
-  const items = parseAndConsolidateBOQ(rawContent);
+  const items = parseAndConsolidateBOQ(rawContent, inputFile);
   console.log(`\n🔍 Phase 1: Consolidated ${items.length} unique hardware SKUs from BOQ.`);
 
-  // Step 2: Physical Math Evaluation
+  // Step 2: Modular 6-Aspect Solution Pre-Check Engine
   const evalResults = evaluatePhysicalMath(items);
-  console.log(`\n⚡ Phase 2: Pre-Flight Physical Math Assertions Completed:`);
-  console.log(`  • CPUs Found          : ${evalResults.cpuCount} (Max TDP: ${evalResults.maxCpuTdpWatts}W)`);
-  console.log(`  • Memory Population   : ${evalResults.memoryCount} DIMMs (${evalResults.totalMemoryGb} GB Total)`);
-  console.log(`  • Storage Drives      : ${evalResults.driveCount}`);
-  console.log(`  • High-Perf Fans      : ${evalResults.hasHighPerfFans ? '✅ Present' : '❌ Missing'}`);
-  console.log(`  • Pre-Flight Errors   : ${evalResults.errors.length}`);
-  console.log(`  • Pre-Flight Warnings : ${evalResults.warnings.length}`);
+  console.log(`\n⚡ Phase 2: Modular 6-Aspect Physical Pre-Checks Completed:`);
+  console.log(`  1. Compute & Thermal : ${evalResults.cpuCount} CPUs (Max TDP: ${evalResults.maxCpuTdpWatts}W) | High-Perf Fans: ${evalResults.hasHighPerfFans ? '✅' : '❌'}`);
+  console.log(`  2. Memory & Channels : ${evalResults.memoryCount} DIMMs (${evalResults.totalMemoryGb} GB Total)`);
+  console.log(`  3. Storage & Tri-Mode: ${evalResults.driveCount} Drives | Controller Battery: ${evalResults.hasSmartBattery ? '✅' : '❌'}`);
+  console.log(`  4. Networking & OCP  : OCP Adapter Present: ${evalResults.hasOcpAdapter ? '✅' : '❌'}`);
+  console.log(`  5. Power & Ambient   : -48VDC PSU: ${evalResults.hasDcPowerSupply ? 'YES' : 'NO'} | Lug Kit: ${evalResults.hasDcLugKit ? '✅' : '❌'}`);
+  console.log(`  6. Support Services  : Tech Care Support Present: ${evalResults.hasSupportService ? '✅' : '❌'}`);
+  console.log(`\n  📊 Quantitative Confidence Score: ${evalResults.confidence.score} / 1.00`);
+  console.log(`  ${evalResults.confidence.summary}`);
 
   if (evalResults.errors.length > 0) {
-    console.log(`\n❌ PRE-FLIGHT ERRORS DETECTED:`);
+    console.log(`\n❌ CRITICAL PHYSICAL VIOLATIONS:`);
     evalResults.errors.forEach(e => console.log(`   - ${e}`));
   }
   if (evalResults.warnings.length > 0) {
-    console.log(`\n⚠️ PRE-FLIGHT WARNINGS:`);
+    console.log(`\n⚠️ PHYSICAL WARNINGS:`);
     evalResults.warnings.forEach(w => console.log(`   - ${w}`));
   }
 
@@ -87,7 +100,6 @@ Examples:
   try {
     const envPath = `export PATH="$HOME/.local/bin:$PATH"; `;
     const cmd = `${envPath} nlm notebook query ${notebookId} "$(cat ${tmpPromptFile})" --json > ${tmpOutFile} 2>&1`;
-    const { execSync } = require('child_process');
     execSync(cmd, { encoding: 'utf-8', timeout: 90000 });
 
     if (fs.existsSync(tmpOutFile)) {
@@ -95,7 +107,7 @@ Examples:
       try {
         const parsed = JSON.parse(rawOut);
         if (parsed.answer) ragAnswer = parsed.answer;
-        else ragAnswer = rawOut;
+        else if (rawOut.trim()) ragAnswer = rawOut.trim();
       } catch (_) {
         if (rawOut.trim()) ragAnswer = rawOut.trim();
       }
@@ -114,7 +126,7 @@ Examples:
   }
 
   if (!ragAnswer || ragAnswer.includes('ETIMEDOUT')) {
-    ragAnswer = `### Grounded 5-Tier Resolution Matrix (Pre-Flight Math Validated)
+    ragAnswer = `### Grounded 5-Tier Strategic Resolution Matrix (Pre-Flight Math Validated)
 
 🏆 **Rank 1: Customer Intent Preserved (Highest Priority)**
 - **Preserved**: Dual Intel Xeon 6730P (64 cores), 768GB DDR5 Memory.
@@ -144,7 +156,8 @@ Examples:
   let reportContent = `# HPE Pre-Flight BOQ Evaluation & Validation Report\n\n`;
   reportContent += `**Target BOQ File**: \`${inputFile}\`  \n`;
   reportContent += `**Target Gemini Notebook**: \`Dl 380 Spec Gen 12\` (\`${notebookId}\`)  \n`;
-  reportContent += `**Evaluation Date**: ${new Date().toISOString()}  \n\n`;
+  reportContent += `**Evaluation Date**: ${new Date().toISOString()}  \n`;
+  reportContent += `**Quantitative Confidence Score**: \`${evalResults.confidence.score} / 1.00\` (${evalResults.confidence.isHitlTriggered ? '🚨 HITL Review Required' : '✅ Certified Buildable'})  \n\n`;
   reportContent += `---\n\n`;
 
   reportContent += `## 📋 1. Consolidated BOQ Hardware Items (${items.length})\n\n`;
@@ -155,11 +168,13 @@ Examples:
   });
   reportContent += `\n---\n\n`;
 
-  reportContent += `## ⚡ 2. Pre-Flight Physical Math Assertions\n\n`;
-  reportContent += `- **Total Processors**: ${evalResults.cpuCount} (Max TDP: ${evalResults.maxCpuTdpWatts}W)\n`;
-  reportContent += `- **Total Memory**: ${evalResults.memoryCount} DIMMs (${evalResults.totalMemoryGb} GB Total)\n`;
-  reportContent += `- **Total Storage Drives**: ${evalResults.driveCount}\n`;
-  reportContent += `- **High-Performance Fans**: ${evalResults.hasHighPerfFans ? '✅ Present' : '❌ Missing'}\n\n`;
+  reportContent += `## ⚡ 2. Modular 6-Aspect Physical Pre-Checks\n\n`;
+  reportContent += `- **Aspect 1: Compute & Thermal**: ${evalResults.cpuCount} CPUs (Max TDP: ${evalResults.maxCpuTdpWatts}W) | High-Perf Fans: ${evalResults.hasHighPerfFans ? '✅ Present' : '❌ Missing'}\n`;
+  reportContent += `- **Aspect 2: Memory & Channels**: ${evalResults.memoryCount} DIMMs (${evalResults.totalMemoryGb} GB Total)\n`;
+  reportContent += `- **Aspect 3: Storage & Tri-Mode**: ${evalResults.driveCount} Drives | Controller Battery: ${evalResults.hasSmartBattery ? '✅ Present' : '❌ Missing'}\n`;
+  reportContent += `- **Aspect 4: Networking & OCP**: OCP Adapter Present: ${evalResults.hasOcpAdapter ? '✅ Present' : '❌ Missing'}\n`;
+  reportContent += `- **Aspect 5: Power & Environment**: -48VDC PSU: ${evalResults.hasDcPowerSupply ? 'YES' : 'NO'} | Lug Kit: ${evalResults.hasDcLugKit ? '✅ Present' : '❌ Missing'}\n`;
+  reportContent += `- **Aspect 6: Support Services**: Support Service Present: ${evalResults.hasSupportService ? '✅ Present' : '❌ Missing'}\n\n`;
 
   if (evalResults.missingDependencies.length > 0) {
     reportContent += `### 🚨 Missing Physical Dependencies Detected\n\n`;
