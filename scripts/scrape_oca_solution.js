@@ -103,19 +103,16 @@ async function main() {
     await expandSections(ws);
     await sleep(3000);
 
-    // STEP 3.5: Multi-Tab Support Services Check (Pointnext 3Y/4Y/5Y Tech Care)
-    console.log('\n--- STEP 3.5: Checking for Solution Services & Pointnext Tech Care Tab ---');
+    // STEP 3.5: Multi-Tab Support Services & Configured BOM Check (Pointnext 3Y/4Y/5Y Tech Care)
+    console.log('\n--- STEP 3.5: Checking for Solution Services & Configured BOM Tab ---');
     await sendCommand(ws, 'Runtime.evaluate', {
       expression: `(() => {
-        const servicesTab = Array.from(document.querySelectorAll('a, button, div.tab_header')).find(el => 
-          /pointnext|services|support services|tech care/i.test(el.innerText || '') && 
+        const tabsToClick = Array.from(document.querySelectorAll('a, button, div.tab_header')).filter(el => 
+          /pointnext|services|support services|tech care|^bom$/i.test((el.innerText || '').trim()) && 
           !el.href?.includes('menu') && !el.classList.contains('active')
         );
-        if (servicesTab) {
-          servicesTab.click();
-          return true;
-        }
-        return false;
+        tabsToClick.forEach(tab => tab.click());
+        return tabsToClick.length;
       })()`,
       returnByValue: true
     });
