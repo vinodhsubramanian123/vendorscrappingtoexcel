@@ -2,7 +2,7 @@
 
 **Target BOQ File**: `test_boq_dl380_gen12.csv`  
 **Target Gemini Notebook**: `Dl 380 Spec Gen 12` (`1d190853-4e9c-48df-aa70-eae66c6f2c1f`)  
-**Evaluation Date**: 2026-08-06T11:26:49.597Z  
+**Evaluation Date**: 2026-08-06T11:50:59.763Z  
 **Quantitative Confidence Score**: `0.2 / 1.00` (🚨 HITL Review Required)  
 
 ---
