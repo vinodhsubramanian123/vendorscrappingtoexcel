@@ -70,8 +70,9 @@ graph TD
 
 ### Phase 5 & 6: Report Generation & Closed-Loop Feedback Learning
 - **Report Location**: `outputs/{Family}/{Gen}/{Model}_{FormFactor}/reports/BOQ_Evaluation_{basename}.md`
+- **Dashboard Integration**: Submissions can be sent directly via `/api/eval-boq` and downloaded via `/api/export-boq`.
 - **Feedback Module**: [`scripts/lib/feedback_loop.js`](file:///Users/macbookaira1466/Downloads/booktoSkill/scripts/lib/feedback_loop.js)
-- **Command**: `npm run eval:boq <boq_file> --simulate-portal-error "<error_text>"`
+- **Command**: `npm run eval:boq <boq_file> --simulate-portal-error "<error_text>"` or Dashboard modal.
 - Logs permanent `KnowledgeDeltas` in `outputs/history/catalog_deltas.json` and updates `_Catalog_Rules.json`.
 
 ---

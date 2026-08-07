@@ -477,3 +477,7 @@ graph TD
 44. **Agentic Browser Sandboxing**:
     - Autonomous browser subagents must be strictly sandboxed to the target `localhost` environments when executing UI tests.
     - Subagents are prohibited from autonomously navigating to authenticated portals (e.g., `partner.hpe.com`) during local UI testing, and must not attempt to exploit vulnerabilities to hot-patch live environments.
+
+45. **Dynamic UI State & Payload Fidelity Mandate**:
+    - Dashboard components (e.g., `ConflictGraphInspector`, `ArtifactInspector`, `WorkloadDnaCard`) MUST NOT render static or hardcoded "PASS" badges or mock confidence scores.
+    - All UI badges, physical aspect checklists, and audit certificates must dynamically bind to live JSON payloads (`evalResults.physicalChecks`, `auditResult.checks[]`, `workloadDna.confidence`) returned from backend API endpoints. Fallbacks must explicitly indicate "Pending Evaluation" or "No Data" rather than misleading fake passes.

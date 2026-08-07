@@ -69,18 +69,20 @@ graph TD
   - Validates full BOM + fixes across 5 rule hierarchy levels (`VENDOR`, `CHASSIS`, `CATEGORY`, `SUBCATEGORY`, `SKU`) using `conflict_graph.js`.
   - Outputs a **5-Tier Strategic Resolution Matrix** where **Rank 1 strictly matches customer workload intent** (neither over- nor under-provisioned).
 
-### 4. Grounded Gemini Notebook Validation (RAG)
-- **Actor**: [`nlm-skill`](file:///Users/macbookaira1466/Downloads/booktoSkill/.agents/skills/nlm-skill/SKILL.md)
-- **Action**: Programmatically queries Gemini NotebookLM (`Dl 380 Spec Gen 12` - ID: `1d190853-4e9c-48df-aa70-eae66c6f2c1f`) to cross-reference identified constraints against synced spec sheet documentation.
+### 4. Grounded Gemini Notebook Validation (RAG) & Dashboard Command Center
+- **Actor**: [`nlm-skill`](file:///Users/macbookaira1466/Downloads/booktoSkill/.agents/skills/nlm-skill/SKILL.md) & **React Dashboard** (`http://localhost:5173`)
+- **Action**: 
+  - Programmatically queries Gemini NotebookLM (`Dl 380 Spec Gen 12` - ID: `1d190853-4e9c-48df-aa70-eae66c6f2c1f`) to cross-reference identified constraints against synced spec sheet documentation.
+  - The React Dashboard provides a full Command-and-Control hub for triggering Knowledge Sync, exporting corrected BOQs, logging portal rejection KnowledgeDeltas, and managing the NotebookLM registry.
 
 ### 5. Human-in-the-Loop (HITL) Portal Trial
 - **Actor**: Human Sales Engineer / User
-- **Action**: Takes the top-ranked solution from Section 2.6 of the generated report (`outputs/{Family}/{Gen}/{Model}_{FormFactor}/reports/BOQ_Evaluation_{name}.md`) and verifies or builds it in the live vendor OCA portal.
+- **Action**: Takes the top-ranked solution from Section 2.6 of the generated report (`outputs/{Family}/{Gen}/{Model}_{FormFactor}/reports/BOQ_Evaluation_{name}.md`) or exports the corrected BOQ directly from the 5-Tier Matrix in the Dashboard, and verifies or builds it in the live vendor OCA portal.
 
 ### 6. Closed-Loop Feedback & Telemetry Learning
-- **Actor**: [`feedback_loop.js`](file:///Users/macbookaira1466/Downloads/booktoSkill/scripts/lib/feedback_loop.js) & [`telemetry.js`](file:///Users/macbookaira1466/Downloads/booktoSkill/scripts/lib/telemetry.js)
+- **Actor**: [`feedback_loop.js`](file:///Users/macbookaira1466/Downloads/booktoSkill/scripts/lib/feedback_loop.js), [`telemetry.js`](file:///Users/macbookaira1466/Downloads/booktoSkill/scripts/lib/telemetry.js), & Dashboard Rejection Modal
 - **Action**:
-  - Log vendor rejections via `npm run eval:boq <boq> --simulate-portal-error "<error>"`.
+  - Log vendor rejections via `npm run eval:boq <boq> --simulate-portal-error "<error>"` or directly via the Dashboard **"Report Portal Rejection"** modal.
   - Permanently appends `KnowledgeDeltas` to `history/catalog_deltas.json` and updates `_Catalog_Rules.json`.
   - Records execution metrics in `outputs/history/pipeline_telemetry.json` for observability (`npm run status`).
 
