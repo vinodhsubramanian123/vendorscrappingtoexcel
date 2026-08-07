@@ -17,7 +17,7 @@ export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback, se
         title: sol.name,
         subtitle: sol.workloadDnaMatch || `Rank ${sol.rank} Solution`,
         intentMatch: sol.tradeoffMetrics?.intentAlignment || `${Math.round(sol.score * 100)}%`,
-        capex: sol.estimatedCostUsd ? `$${sol.estimatedCostUsd.toLocaleString()}` : '$18,450',
+        capex: sol.estimatedCostUsd ? `$${sol.estimatedCostUsd.toLocaleString()}` : 'Pricing N/A',
         badgeClass: sol.rank === 1 ? 'badge-emerald' : sol.rank <= 3 ? 'badge-blue' : 'badge-amber',
         rationale: sol.reasoning,
         swaps: sol.tradeoffMetrics ? [
@@ -26,13 +26,7 @@ export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback, se
           `Expansion: ${sol.tradeoffMetrics.capacityExpansion}`
         ] : ['Standard physical fix injected']
       }))
-    : [
-        { rank: 1, title: 'Rank 1: Workload Intent Alignment', subtitle: 'Customer Workload Match', intentMatch: '98%', capex: '$18,450', badgeClass: 'badge-emerald', rationale: 'Includes SAP HANA optimized memory density & high-TDP processor cooling.', swaps: ['P49057-B21 → Intel Xeon Gold 6430', 'P38620-B21 → 16x 32GB DDR5-5600'] },
-        { rank: 2, title: 'Rank 2: Standardized CTO Baseline', subtitle: 'Factory Standard CTO', intentMatch: '92%', capex: '$16,800', badgeClass: 'badge-blue', rationale: 'Standard factory baseline CTO build without custom thermal overhead.', swaps: ['P49057-B21 → Standard Fan Kit'] },
-        { rank: 3, title: 'Rank 3: High-IOPS Storage Optimized', subtitle: 'Storage Density Tier', intentMatch: '88%', capex: '$21,200', badgeClass: 'badge-blue', rationale: 'Tri-Mode cabling with 8x NVMe Read-Intensive SFF drives.', swaps: ['P76453-B21 Tri-Mode Cable added', 'P26934-B21 1.92TB NVMe RI'] },
-        { rank: 4, title: 'Rank 4: Maximum Density Expansion', subtitle: 'Headroom Tier', intentMatch: '84%', capex: '$24,100', badgeClass: 'badge-amber', rationale: 'Dual processor with secondary PCIe riser for future GPU expandability.', swaps: ['P49057-B21 Dual Socket', 'P38620-B21 Secondary Riser'] },
-        { rank: 5, title: 'Rank 5: CapEx Minimized Buildable', subtitle: 'Budget Optimized Tier', intentMatch: '76%', capex: '$14,900', badgeClass: 'badge-amber', rationale: 'Minimum viable build passing 100% of physical constraints at lowest CapEx.', swaps: ['P49057-B21 Single Socket', 'P38620-B21 8x 32GB DDR5'] }
-      ];
+    : [];
 
   const handleExport = async (tier) => {
     setExportingRank(tier.rank);
@@ -92,7 +86,13 @@ export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback, se
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {tiers.map(tier => (
+          {tiers.length === 0 ? (
+            <div className="col-span-full text-center py-12 text-slate-400">
+              <Award className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+              <p className="text-sm font-semibold text-slate-600">No Resolution Tiers Available</p>
+              <p className="text-xs text-slate-400 mt-1">Evaluate a BOQ quote in the BOQ Evaluator tab to generate ranked buildable candidates.</p>
+            </div>
+          ) : tiers.map(tier => (
             <div
               key={tier.rank}
               className={`rounded-2xl p-5 border transition-all glass-card ${

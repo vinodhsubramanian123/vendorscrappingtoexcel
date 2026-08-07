@@ -44,11 +44,11 @@ export default function CatalogExplorer({ catalogData, chassisName }) {
     entry.skus?.forEach(sku => {
       allSkus.push({
         ...sku,
-				sku: sku.sku || sku['Product #'] || sku.partNumber || sku.id || 'CTO-OPTION',
-				description: sku.description || sku['Description'] || sku.name || sku.subCategory || 'Configuration Option',
-				optionType: sku.optionType || sku['Option Type'] || sku.Type || 'CTO',
-				listPrice: sku.listPrice || sku['List Price'] || 'N/A',
-				diffStatus: sku.diffStatus || sku['Diff Status'] || 'UNCHANGED',
+        sku: sku.sku || sku['Product #'] || sku.partNumber || sku.id || 'CTO-OPTION',
+        description: sku.description || sku['Description'] || sku.name || sku.subCategory || 'Configuration Option',
+        optionType: sku.optionType || sku['Option Type'] || sku.Type || 'CTO',
+        listPrice: sku.listPrice || sku['Price (USD)'] || sku['List Price (USD)'] || sku['List Price'] || 'N/A',
+        diffStatus: sku.diffStatus || sku['Diff Status'] || 'UNCHANGED',
         parentCategory: entry.parentCategory || 'Uncategorized',
         subCategory: entry.subCategory || 'General',
         constraint: entry.constraint,

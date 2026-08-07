@@ -181,7 +181,7 @@ export default function App() {
       const res = await fetch('/api/eval-boq', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...boqInput, chassisDir: currentCat?.id })
+        body: JSON.stringify({ ...boqInput, chassisDir: currentCat?.chassisDir || currentCat?.id })
       });
       const data = await res.json();
       setEvalResults(data);

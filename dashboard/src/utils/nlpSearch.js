@@ -43,7 +43,7 @@ class NlpCatalogIndexer {
             subCategory: entry.subCategory || '',
             rules: (entry.rules || []).join(' '),
             optionType: skuItem.optionType || skuItem['Option Type'] || skuItem.Type || 'CTO',
-            listPrice: skuItem.listPrice || skuItem['List Price'] || skuItem['List Price (USD)'] || 'N/A'
+            listPrice: skuItem.listPrice || skuItem['Price (USD)'] || skuItem['List Price (USD)'] || skuItem['List Price'] || 'N/A'
           };
           this.index.add(doc);
           count++;
