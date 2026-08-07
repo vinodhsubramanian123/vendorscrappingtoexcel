@@ -1,8 +1,32 @@
 import React, { useState } from 'react';
-import { Play, RefreshCw, Terminal, Download, ShieldCheck, Server, AlertCircle } from 'lucide-react';
+import { Play, RefreshCw, Terminal, Download, Server } from 'lucide-react';
 
 export default function ScraperTriggerCard({ logStream, isTaskRunning, onTriggerScrape, onTriggerRebuild, onTriggerDownloadPdf }) {
   const [scrapeMode, setScrapeMode] = useState('solution');
+
+  // Extract latest progress event if present
+  const latestProgressLog = logStream.slice().reverse().find(l => {
+    try {
+      const parsed = JSON.parse(l.text);
+      return parsed.type === 'PROGRESS';
+    } catch {
+      return false;
+    }
+  });
+
+  let progressPercent = 0;
+  let progressStage = 'IDLE';
+
+  if (latestProgressLog) {
+    try {
+      const p = JSON.parse(latestProgressLog.text);
+      progressPercent = p.percent || 0;
+      progressStage = p.stage || 'PROCESSING';
+    } catch {}
+  } else if (isTaskRunning) {
+    progressPercent = 45;
+    progressStage = 'IN_PROGRESS';
+  }
 
   return (
     <div className="space-y-6">
@@ -21,10 +45,26 @@ export default function ScraperTriggerCard({ logStream, isTaskRunning, onTrigger
 
           <div className="flex items-center gap-2">
             <span className={`badge ${isTaskRunning ? 'badge-amber animate-pulse' : 'badge-emerald'}`}>
-              {isTaskRunning ? 'Task Executing...' : 'Pipeline Mutex Idle'}
+              {isTaskRunning ? `Executing: ${progressStage}` : 'Pipeline Mutex Idle'}
             </span>
           </div>
         </div>
+
+        {/* Visual Progress Bar when task is running */}
+        {isTaskRunning && (
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6 space-y-2">
+            <div className="flex justify-between items-center text-xs font-semibold text-slate-700">
+              <span>Pipeline Workflow Progress: <span className="text-blue-600">{progressStage}</span></span>
+              <span>{progressPercent}%</span>
+            </div>
+            <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+              <div
+                className="bg-blue-600 h-full transition-all duration-300 rounded-full"
+                style={{ width: `${Math.max(progressPercent, 10)}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
 
         {/* Action Buttons Row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

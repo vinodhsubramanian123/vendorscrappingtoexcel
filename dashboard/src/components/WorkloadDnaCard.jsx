@@ -1,6 +1,5 @@
 import React from 'react';
 import { Cpu, Database, Zap, Layers, Activity } from 'lucide-react';
-import { RadialBarChart, RadialBar, ResponsiveContainer, Tooltip } from 'recharts';
 
 export default function WorkloadDnaCard({ dnaData }) {
   if (!dnaData) {
@@ -13,20 +12,14 @@ export default function WorkloadDnaCard({ dnaData }) {
     );
   }
 
-  const {
-    totalCores = 64,
-    coresPerSocket = 32,
-    ramPerCoreGb = 16,
-    gpuCount = 0,
-    storageIoType = 'NVMe Read Intensive',
-    workloadIntent = 'In-Memory Analytics / SAP HANA'
-  } = dnaData;
-
-  const chartData = [
-    { name: 'RAM/Core (GB)', value: Math.min(ramPerCoreGb * 2, 100), fill: '#2563EB' },
-    { name: 'Core Density', value: Math.min(coresPerSocket * 2, 100), fill: '#01A781' },
-    { name: 'GPU Acceleration', value: gpuCount > 0 ? 100 : 20, fill: '#D97706' }
-  ];
+  // Support both raw workloadDna payload and nested conflictGraph payload
+  const dna = dnaData.workloadDna || dnaData;
+  const totalCores = dna.totalCores || 64;
+  const coresPerSocket = dna.maxFreqGhz ? `${dna.maxFreqGhz}GHz` : (dna.totalCores ? Math.ceil(dna.totalCores / 2) : 32);
+  const ramPerCoreGb = dna.gbPerCore || (dna.totalMemoryGb && dna.totalCores ? Math.round(dna.totalMemoryGb / dna.totalCores) : 16);
+  const gpuCount = dna.hasGpu ? (dna.gpuCount || 1) : 0;
+  const storageIoType = dna.workloadDescription || dna.storageWorkload || dna.storageType || 'NVMe Read Intensive';
+  const workloadIntent = dna.primaryWorkload || dna.intent || 'In-Memory Analytics / SAP HANA';
 
   return (
     <div className="glass-card p-6 space-y-4">
@@ -34,7 +27,7 @@ export default function WorkloadDnaCard({ dnaData }) {
         <div>
           <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <Activity className="w-5 h-5 text-blue-600" />
-            Workload DNA Profiler
+            Live Workload DNA Profiler
           </h3>
           <p className="text-xs text-slate-500">Detected Customer Workload Intent: <span className="font-semibold text-blue-600">{workloadIntent}</span></p>
         </div>
