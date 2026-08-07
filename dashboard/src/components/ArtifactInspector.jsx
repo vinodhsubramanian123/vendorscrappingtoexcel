@@ -177,7 +177,7 @@ export default function ArtifactInspector({ currentCatalog, onAuditCatalog }) {
         {currentCatalog?.pdfPath ? (
           <div className="glass-card p-4 space-y-2">
             <h4 className="font-semibold text-xs text-slate-900 flex items-center gap-1.5">
-              <FileText className="w-4 h-4 text-amber-600" /> HPE QuickSpecs PDF
+              <FileText className="w-4 h-4 text-amber-600" /> Technical QuickSpecs / Datasheet PDF
             </h4>
             <p className="text-[11px] text-slate-500">Official technical QuickSpecs document</p>
             <a

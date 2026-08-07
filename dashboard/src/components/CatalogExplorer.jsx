@@ -182,7 +182,7 @@ export default function CatalogExplorer({ catalogData, chassisName }) {
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold sticky top-0 z-10">
               <tr>
                 <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">HPE SKU ID</th>
+                <th className="px-4 py-3">Vendor SKU ID / Part #</th>
                 <th className="px-4 py-3">Description</th>
                 <th className="px-4 py-3">Category</th>
                 <th className="px-4 py-3">Sub-Category</th>

@@ -10,16 +10,16 @@ export default function ConflictGraphInspector({ evalResults, chassisName }) {
   const aspectIcons = [Cpu, Memory, HardDrive, Zap, Power, Award];
 
   const aspects = [
-    { id: 1, name: 'Thermal & Compute Math', icon: Cpu, rule: 'TDP ≥ 240W requires High-Performance Fan Kit (P48820-B21)' },
-    { id: 2, name: 'Memory & Channel Balance', icon: Memory, rule: 'DIMMs mod 8 == 0 for optimal multi-channel bandwidth' },
-    { id: 3, name: 'Storage & Tri-Mode Cabling', icon: HardDrive, rule: 'Tri-Mode Controller requires dedicated cable kit P76453-B21' },
-    { id: 4, name: 'PCIe Riser & Slot Alignment', icon: Zap, rule: 'Primary & Secondary Risers lane allocation & TDP check' },
-    { id: 5, name: 'Power & DC Lug Kit Math', icon: Power, rule: '-48V DC PSUs require DC Lug Kit P36877-B21' },
-    { id: 6, name: 'Pointnext Support Taxonomy', icon: Award, rule: 'Hardware SKUs require valid Tech Care SLA tier (HU4A6A50C4V)' }
+    { id: 1, name: 'Thermal & Compute Math', icon: Cpu, defaultRule: 'TDP thermal envelope vs High-Performance Fan Kit population rules' },
+    { id: 2, name: 'Memory & Channel Balance', icon: Memory, defaultRule: 'Interleaving mod 8 channel balance & 1DPC/2DPC population rules' },
+    { id: 3, name: 'Storage & Tri-Mode Cabling', icon: HardDrive, defaultRule: 'Tri-Mode storage controller, drive cage & dedicated cable kit checks' },
+    { id: 4, name: 'PCIe Riser & Slot Alignment', icon: Zap, defaultRule: 'Primary, Secondary & Tertiary Risers lane allocation & TDP check' },
+    { id: 5, name: 'Power & DC Lug Kit Math', icon: Power, rule: 'Power supply redundancy rating & DC Lug Kit requirement checks' },
+    { id: 6, name: 'Vendor Support Taxonomy', icon: Award, defaultRule: 'Hardware SKU validation against mandatory Pointnext / Tech Care SLA tiers' }
   ].map((def, idx) => {
     const realCheck = rawAspects ? (Array.isArray(rawAspects) ? rawAspects[idx] : rawAspects[def.name]) : null;
     const passed = realCheck ? (realCheck.passed !== false && !realCheck.error) : true;
-    const detail = realCheck?.detail || realCheck?.message || def.rule;
+    const detail = realCheck?.detail || realCheck?.message || realCheck?.rule || def.defaultRule;
     const isEvaluated = !!evalResults;
 
     return {
@@ -42,7 +42,7 @@ export default function ConflictGraphInspector({ evalResults, chassisName }) {
               6-Aspect Physical Math Verification
             </h2>
             <p className="text-xs text-slate-500">
-              Automated pre-flight physical rules audit for <span className="font-semibold text-slate-800">{chassisName || 'DL380 Gen12 SFF'}</span>
+              Automated pre-flight physical rules audit for <span className="font-semibold text-slate-800">{chassisName || 'Selected Solution'}</span>
             </p>
           </div>
 
@@ -116,7 +116,7 @@ export default function ConflictGraphInspector({ evalResults, chassisName }) {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
               <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-amber-600" />
-                Native HPE CLIC Portal Error Inspector
+                Vendor Portal Error &amp; CLIC Inspector
               </h3>
               <button onClick={() => setShowClicModal(false)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
@@ -129,7 +129,7 @@ export default function ConflictGraphInspector({ evalResults, chassisName }) {
                   <div key={i} className="p-3 bg-rose-50 rounded-xl border border-rose-200 text-xs text-rose-900 flex items-start gap-2">
                     <XCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-bold">{err.code || `CLIC Violation ${i+1}`}</p>
+                      <p className="font-bold">{err.code || `Portal Violation ${i+1}`}</p>
                       <p className="text-[11px] text-rose-800 mt-0.5">{err.message || err}</p>
                     </div>
                   </div>
@@ -138,9 +138,9 @@ export default function ConflictGraphInspector({ evalResults, chassisName }) {
                 <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-900 flex items-start gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-bold">Zero CLIC Violations Detected</p>
+                    <p className="font-bold">Zero Portal Configuration Errors</p>
                     <p className="text-[11px] text-emerald-800 mt-0.5">
-                      The evaluated configuration passes 100% of native HPE CLIC portal factory rules.
+                      The evaluated solution passes 100% of vendor portal factory constraints &amp; physical rules.
                     </p>
                   </div>
                 </div>

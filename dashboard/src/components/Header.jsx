@@ -35,8 +35,8 @@ export default function Header({
               <Cpu className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-lg font-bold tracking-tight text-slate-900 leading-tight">HPE OCA Intelligence</h1>
-              <p className="text-xs text-slate-500 font-medium">Real-Time BOQ Observability & Catalog Engine</p>
+              <h1 className="text-lg font-bold tracking-tight text-slate-900 leading-tight">Catalog Intelligence</h1>
+              <p className="text-[11px] font-medium text-slate-500">Multi-Vendor Hardware BOM Engine</p>
             </div>
           </div>
 

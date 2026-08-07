@@ -90,7 +90,7 @@ export default function BoqUploader({ onEvaluateBoq, evalResults, logStream }) {
           <div>
             <p className="font-bold">Low Chassis Auto-Detection Confidence ({Math.round((evalResults?.chassisConfidence || 0.6) * 100)}%)</p>
             <p className="text-[11px] text-amber-800 mt-0.5">
-              The evaluator inferred chassis: <span className="font-bold">{evalResults?.chassis || 'DL380 Gen12 SFF'}</span>. Select a different chassis in the header dropdown if this is incorrect.
+              The evaluator inferred chassis: <span className="font-bold">{evalResults?.chassis || 'Selected Catalog'}</span>. Select a different chassis in the header dropdown if this is incorrect.
             </p>
           </div>
         </div>

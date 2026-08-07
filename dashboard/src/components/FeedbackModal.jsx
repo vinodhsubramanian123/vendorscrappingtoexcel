@@ -33,7 +33,7 @@ export default function FeedbackModal({ isOpen, onClose, resolutionCard }) {
         <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
           <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
             <MessageSquare className="w-5 h-5 text-blue-600" />
-            Log HPE Portal Feedback
+            Log Vendor Portal Feedback
           </h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
             <X className="w-5 h-5" />
