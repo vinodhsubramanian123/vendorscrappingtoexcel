@@ -184,7 +184,7 @@ function autoDetectChassisDetailed(boqItems = []) {
     const modelClean = variant.model.replace(/\s+/g, '_').replace(/HPE_?/i, '');
 
     // 1. Try exact match by model or base SKU
-    if (variant.baseSku && variant.baseSku !== 'CUSTOM_OVERRIDE' && variant.baseSku !== 'P73282-B21') {
+    if (variant.baseSku && variant.baseSku !== 'CUSTOM_OVERRIDE' && variant.baseSku !== 'UNKNOWN') {
       for (const cat of catalogs) {
         if (cat.id === modelClean || cat.chassis.includes(variant.model) || cat.catalogDir.includes(variant.model.replace(/\s+/g, '_'))) {
           return {
@@ -227,16 +227,14 @@ function autoDetectChassisDetailed(boqItems = []) {
     }
   } catch {}
 
-  // 4. Ultimate fallback
-  const catalogs = listAllCatalogs();
-  const fallbackDir = catalogs.length > 0 ? catalogs[0].catalogDir : '';
-
+  // 4. Ultimate fallback (now triggers strict failure in eval_boq.js)
   return {
-    chassisDir: fallbackDir,
+    chassisDir: '',
     matchType: 'FALLBACK',
-    confidenceScore: 0.40,
-    requiresUserConfirmation: true, // Q2: Fallback triggers user confirmation prompt
-    detectedVariant: { model: 'Default Fallback Chassis', formFactor: 'SFF', family: 'ProLiant' }
+    confidenceScore: 0.0,
+    requiresUserConfirmation: true, // Requires user confirmation via dropdown
+    unknown: true,
+    detectedVariant: { model: 'Unknown Variant', formFactor: 'Unknown', family: 'Unknown' }
   };
 }
 

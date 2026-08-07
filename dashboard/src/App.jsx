@@ -186,6 +186,7 @@ export default function App() {
       const data = await res.json();
       setEvalResults(data);
       setActiveTab('overview');
+      return data;
     } catch (err) {
       console.error(err);
     }

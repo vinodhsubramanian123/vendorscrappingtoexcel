@@ -17,49 +17,52 @@
 const path = require('path');
 const { loadCatalogRules } = require('./catalog_rules');
 const { cleanBaseSKU } = require('./sku');
+const fs = require('fs');
 
-/**
- * Base SKU mapping for chassis form factor auto-detection
- */
-const CHASSIS_BASE_SKU_MAP = {
-  'P73282-B21': { model: 'DL380 Gen12 SFF', formFactor: 'SFF', family: 'ProLiant' },
-  'P73283-B21': { model: 'DL380 Gen12 LFF', formFactor: 'LFF', family: 'ProLiant' },
-  'P73284-B21': { model: 'DL380 Gen12 EDSFF', formFactor: 'EDSFF', family: 'ProLiant' },
-  'P52534-B21': { model: 'DL380 Gen11 SFF', formFactor: 'SFF', family: 'ProLiant' },
-  'P52535-B21': { model: 'DL380 Gen11 LFF', formFactor: 'LFF', family: 'ProLiant' },
-  'P25902-B21': { model: 'SY480 Gen10 Plus', formFactor: 'Blade', family: 'Synergy' }
-};
+function getChassisMap() {
+  const mapPath = path.join(__dirname, '..', 'config', 'chassis_map.json');
+  if (fs.existsSync(mapPath)) {
+    try {
+      return JSON.parse(fs.readFileSync(mapPath, 'utf8')).chassis_base_skus || {};
+    } catch (e) {
+      return {};
+    }
+  }
+  return {};
+}
 
 /**
  * Detect chassis variant and form factor from input BOQ items.
  * @param {Array<object>} items 
  * @param {string} overrideVariant Optional explicit CLI override
- * @returns {object} { model, formFactor, baseSku, family }
+ * @returns {object} { model, formFactor, baseSku, family, unknown }
  */
 function detectChassisVariant(items, overrideVariant = '') {
   if (overrideVariant) {
     const cleanVar = overrideVariant.toUpperCase();
     return {
-      model: `HPE Server (${cleanVar})`,
+      model: `Generic Chassis (${cleanVar})`,
       formFactor: cleanVar.includes('LFF') ? 'LFF' : (cleanVar.includes('EDSFF') ? 'EDSFF' : 'SFF'),
       baseSku: 'CUSTOM_OVERRIDE',
-      family: 'ProLiant'
+      family: 'Unknown'
     };
   }
 
+  const chassisMap = getChassisMap();
   for (const it of items) {
     const clean = cleanBaseSKU(it.sku);
-    if (CHASSIS_BASE_SKU_MAP[clean]) {
-      return { ...CHASSIS_BASE_SKU_MAP[clean], baseSku: clean };
+    if (chassisMap[clean]) {
+      return { ...chassisMap[clean], baseSku: clean };
     }
   }
 
-  // Default fallback if no base chassis SKU matched
+  // Graceful failure state when no chassis could be resolved
   return {
-    model: 'HPE ProLiant DL380 Gen12 SFF',
-    formFactor: 'SFF',
-    baseSku: 'P73282-B21',
-    family: 'ProLiant'
+    model: 'Unknown Chassis',
+    formFactor: 'Unknown',
+    baseSku: 'UNKNOWN',
+    family: 'Unknown',
+    unknown: true
   };
 }
 
@@ -272,7 +275,7 @@ function synthesize5TierRankedSolutions(items = [], evalResults = {}, graphResul
  * @param {string} chassisVariantOverride Optional CLI override
  * @returns {object} Graph validation results & audit log
  */
-function validateConflictGraph(boqItems = [], missingDependencies = [], targetDir = 'outputs/ProLiant/Gen12/DL380_Gen12_SFF', chassisVariantOverride = '') {
+function validateConflictGraph(boqItems = [], missingDependencies = [], targetDir = '', chassisVariantOverride = '') {
   const chassisInfo = detectChassisVariant(boqItems, chassisVariantOverride);
   const catalogData = loadCatalogRules(targetDir);
   const workloadDna = extractWorkloadDna(boqItems);

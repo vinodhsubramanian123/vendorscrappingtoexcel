@@ -1,0 +1,10 @@
+{
+  "chassis_base_skus": {
+    "P73282-B21": { "model": "DL380 Gen12 SFF", "formFactor": "SFF", "family": "ProLiant" },
+    "P73283-B21": { "model": "DL380 Gen12 LFF", "formFactor": "LFF", "family": "ProLiant" },
+    "P73284-B21": { "model": "DL380 Gen12 EDSFF", "formFactor": "EDSFF", "family": "ProLiant" },
+    "P52534-B21": { "model": "DL380 Gen11 SFF", "formFactor": "SFF", "family": "ProLiant" },
+    "P52535-B21": { "model": "DL380 Gen11 LFF", "formFactor": "LFF", "family": "ProLiant" },
+    "P25902-B21": { "model": "SY480 Gen10 Plus", "formFactor": "Blade", "family": "Synergy" }
+  }
+}

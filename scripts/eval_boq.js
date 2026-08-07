@@ -87,10 +87,16 @@ Examples:
 
   // Auto-detect chassis from BOQ items if --chassis not provided
   let chassisDetection = null;
+  const { autoDetectChassisDetailed } = require('./lib/catalog_discovery');
+  
   if (!chassisDir) {
-    const { autoDetectChassisDetailed } = require('./lib/catalog_discovery');
     chassisDetection = autoDetectChassisDetailed(items);
-    chassisDir = chassisDetection.chassisDir;
+    if (chassisDetection.confidenceScore < 0.75) {
+      // G4: Strict Failure Mode if we cannot confidently map the chassis
+      chassisDetection.requiresUserConfirmation = true;
+    } else {
+      chassisDir = chassisDetection.chassisDir;
+    }
   } else {
     chassisDetection = {
       chassisDir,
@@ -100,9 +106,23 @@ Examples:
     };
   }
 
-  // Ultimate fallback
-  if (!chassisDir) {
-    chassisDir = 'outputs/ProLiant/Gen12/DL380_Gen12_SFF';
+  // Instead of an ultimate fallback, if we still don't have a chassis directory, we MUST throw.
+  if (!chassisDir && (chassisDetection.unknown || chassisDetection.requiresUserConfirmation)) {
+    console.error('❌ ERROR: [ERR_UNKNOWN_CHASSIS] Could not auto-detect chassis variant from BOQ items, and no --chassis flag was provided.');
+    console.error('💡 Please select the correct catalog in the UI dropdown or use the --chassis <dir> flag.');
+    
+    const errPayload = {
+      status: 'ERROR',
+      chassisDetection,
+      error: 'ERR_UNKNOWN_CHASSIS',
+      message: 'Could not auto-detect chassis. Please confirm the chassis variant.'
+    };
+    
+    if (process.env.STRUCTURED_PROGRESS) {
+      process.stdout.write('\n\n' + JSON.stringify(errPayload) + '\n');
+    }
+    
+    process.exit(1);
   }
 
   const defaultReportsDir = path.join(chassisDir, 'reports');
@@ -307,14 +327,15 @@ ${evalResults.warnings.length === 0 ? '' : evalResults.warnings.map(w => `- ⚠�
     reportContent += `\n`;
   }
 
-  reportContent += `### 🕸️ 2.5 Cross-Aspect Dependency & 5-Level Rule Audit Log\n\n`;
-  reportContent += `- **Detected Chassis Variant**: \`${graph.chassisInfo ? graph.chassisInfo.model : 'DL380 Gen12 SFF'}\`  \n`;
-  if (graph.rulesSource === 'NONE') {
-    reportContent += `- **Whole-Solution Buildability**: \`⚠️ NO_DATA (No rules evaluated)\`  \n`;
-  } else {
-    reportContent += `- **Whole-Solution Buildability**: \`${graph.isWholeSolutionValid ? '✅ PASSED' : '❌ CONFLICTS DETECTED'}\`  \n`;
+  reportContent += `## 1. Workload Fingerprint & Intent Analysis  \n`;
+  reportContent += `- **Detected Chassis Variant**: \`${graph.chassisInfo ? graph.chassisInfo.model : (chassisDir.split('/').pop() || 'Unknown')}\`  \n`;
+  reportContent += `- **Primary Workload DNA**: \`${graph.workloadDna ? graph.workloadDna.workloadDescription : 'Balanced Enterprise'}\`  \n`;
+  if (chassisDetection) {
+    reportContent += `- **Chassis Auto-Detection**: Match Type \`${chassisDetection.matchType}\` (Confidence: ${Math.round(chassisDetection.confidenceScore * 100)}%)  \n`;
   }
-  reportContent += `- **Rules Loaded Source**: \`${graph.rulesSource || 'DL380_Gen12_SFF_Catalog.json'}\` ${graph.isFallbackSource ? '(Fallback Safety Net)' : '(Dual Safety Net)'}  \n\n`;
+  
+  const rulesSrcName = chassisDir ? `${chassisDir.split('/').pop()}_Catalog.json` : 'Unknown_Catalog.json';
+  reportContent += `- **Rules Loaded Source**: \`${graph.rulesSource || rulesSrcName}\` ${graph.isFallbackSource ? '(Fallback Safety Net)' : '(Dual Safety Net)'}  \n\n`;
 
   if (graph.auditLog && graph.auditLog.length > 0) {
     reportContent += `| Hierarchy Level | Evaluated Rule Text | Status | Technical Audit Details |\n`;
