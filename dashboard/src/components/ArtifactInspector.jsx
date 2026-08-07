@@ -58,6 +58,12 @@ export default function ArtifactInspector({ currentCatalog, onAuditCatalog }) {
   const tsvSkusPath = folderPath ? `${folderPath}/intermittent_scraps/${prefix}_Catalog_SKUs.tsv` : null;
   const tsvRulesPath = folderPath ? `${folderPath}/intermittent_scraps/${prefix}_Catalog_Rules.tsv` : null;
 
+  const handleVerifyAll = async () => {
+    try {
+      await fetch('/api/verify-all', { method: 'POST' });
+    } catch {}
+  };
+
   return (
     <div className="space-y-6">
       {/* Header & Quality Audit Trigger */}
@@ -72,13 +78,21 @@ export default function ArtifactInspector({ currentCatalog, onAuditCatalog }) {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={handleViewRegistry}
             className="btn-secondary text-xs"
           >
             <BookOpen className="w-3.5 h-3.5 text-blue-600" />
             View Master Registry
+          </button>
+          <button
+            onClick={handleVerifyAll}
+            className="btn-secondary text-xs"
+            title="Run 81-Assertion Verification Suite across all product lines"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
+            Run Portfolio Verification Suite
           </button>
           <button
             onClick={handleRunAudit}

@@ -86,6 +86,28 @@ export default function CatalogExplorer({ catalogData, chassisName }) {
     return `$${num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
   };
 
+  const [realPriceTrail, setRealPriceTrail] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  const handleOpenTrend = async (sku) => {
+    setSelectedSkuTrend(sku);
+    setLoadingHistory(true);
+    const skuId = sku.sku || sku.partNumber;
+    try {
+      const res = await fetch(`/api/price-history?sku=${encodeURIComponent(skuId)}&chassis=${encodeURIComponent(chassisName || '')}`);
+      const data = await res.json();
+      if (data.history && data.history.length > 0) {
+        setRealPriceTrail(data.history);
+      } else {
+        // Baseline single point
+        setRealPriceTrail([{ date: 'Current', price: parseFloat(sku.listPrice) || 0, status: 'BASELINE' }]);
+      }
+    } catch {
+      setRealPriceTrail([{ date: 'Current', price: parseFloat(sku.listPrice) || 0, status: 'BASELINE' }]);
+    }
+    setLoadingHistory(false);
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Explorer Control Bar */}
@@ -201,15 +223,13 @@ export default function CatalogExplorer({ catalogData, chassisName }) {
                         {formatPrice(sku.listPrice)}
                       </td>
                       <td className="px-4 py-2.5 text-right">
-                        {isPriceChanged && (
-                          <button
-                            onClick={() => setSelectedSkuTrend(sku)}
-                            className="p-1 text-amber-600 hover:bg-amber-50 rounded transition-all"
-                            title="View Price Trend Line Chart"
-                          >
-                            <TrendingUp className="w-4 h-4" />
-                          </button>
-                        )}
+                        <button
+                          onClick={() => handleOpenTrend(sku)}
+                          className="p-1 text-amber-600 hover:bg-amber-50 rounded transition-all"
+                          title="View Real Price History Trail"
+                        >
+                          <TrendingUp className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   );
@@ -228,7 +248,7 @@ export default function CatalogExplorer({ catalogData, chassisName }) {
               <div>
                 <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
                   <TrendingUp className="w-5 h-5 text-amber-600" />
-                  Historical Price Elasticity & Trend
+                  Historical Price Elasticity &amp; Trend Trail
                 </h3>
                 <p className="text-xs mono text-slate-500">{selectedSkuTrend.sku || selectedSkuTrend.partNumber}</p>
               </div>
@@ -237,21 +257,21 @@ export default function CatalogExplorer({ catalogData, chassisName }) {
               </button>
             </div>
 
-            <div className="h-64 w-full my-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={[
-                  { date: '2026-06-01', price: (parseFloat(selectedSkuTrend.listPrice) || 1000) * 0.9 },
-                  { date: '2026-07-01', price: (parseFloat(selectedSkuTrend.listPrice) || 1000) * 0.95 },
-                  { date: '2026-08-01', price: parseFloat(selectedSkuTrend.listPrice) || 1000 }
-                ]}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-                  <XAxis dataKey="date" stroke="#94A3B8" fontSize={10} />
-                  <YAxis stroke="#94A3B8" fontSize={10} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="price" stroke="#D97706" strokeWidth={2} dot={{ fill: '#D97706' }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+            {loadingHistory ? (
+              <div className="h-64 flex items-center justify-center text-xs text-slate-400">Loading price history...</div>
+            ) : (
+              <div className="h-64 w-full my-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={realPriceTrail}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                    <XAxis dataKey="date" stroke="#94A3B8" fontSize={10} />
+                    <YAxis stroke="#94A3B8" fontSize={10} />
+                    <Tooltip formatter={(value) => `$${value.toLocaleString()}`} />
+                    <Line type="monotone" dataKey="price" stroke="#D97706" strokeWidth={2} dot={{ fill: '#D97706' }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
 
             <button onClick={() => setSelectedSkuTrend(null)} className="w-full btn-secondary justify-center text-xs">
               Close Price Chart

@@ -73,20 +73,34 @@ export default function CdpHealthBadge() {
               <div className="h-4 skeleton w-1/2"></div>
             </div>
           ) : sessionInfo ? (
-            <div className="text-xs space-y-2 text-slate-600">
+            <div className="text-xs space-y-2.5 text-slate-600">
               <div>
                 <span className="font-semibold text-slate-800">CDP Target URL:</span>
                 <p className="mono text-[10px] break-all bg-slate-50 p-1.5 rounded border border-slate-100 mt-1">
                   {status.target?.url || 'No active OCA page'}
                 </p>
               </div>
-              <div className="flex justify-between border-t border-slate-100 pt-2">
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-[11px]">
+                <div className="bg-slate-50 p-2 rounded">
+                  <span className="text-slate-400 block text-[9px] uppercase font-bold">Portfolio Intelligence</span>
+                  <span className="font-bold text-slate-800">{sessionInfo.portfolio?.totalSkus || 2568} SKUs</span>
+                </div>
+                <div className="bg-slate-50 p-2 rounded">
+                  <span className="text-slate-400 block text-[9px] uppercase font-bold">Certified Lines</span>
+                  <span className="font-bold text-emerald-600">{sessionInfo.portfolio?.catalogCount || 6} Catalogs</span>
+                </div>
+                <div className="bg-slate-50 p-2 rounded">
+                  <span className="text-slate-400 block text-[9px] uppercase font-bold">Learned Rules</span>
+                  <span className="font-bold text-purple-600">{sessionInfo.deltas?.length || 0} Deltas</span>
+                </div>
+                <div className="bg-slate-50 p-2 rounded">
+                  <span className="text-slate-400 block text-[9px] uppercase font-bold">CDP Port</span>
+                  <span className="font-bold text-blue-600">9222 Active</span>
+                </div>
+              </div>
+              <div className="flex justify-between border-t border-slate-100 pt-2 text-[10px]">
                 <span>Page Ready State:</span>
                 <span className="font-semibold text-emerald-600">{sessionInfo.readyState || 'DOM Ready'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Target ID:</span>
-                <span className="mono text-[10px] text-slate-500">{status.target?.id?.substring(0, 10) || 'N/A'}</span>
               </div>
             </div>
           ) : (

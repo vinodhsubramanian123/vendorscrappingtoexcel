@@ -430,6 +430,75 @@ app.post('/api/kill-task', (req, res) => {
   }
 });
 
+// Price History Log Endpoint (Fix Rule #45 for Price Trends)
+app.get('/api/price-history', (req, res) => {
+  const { chassis, sku } = req.query;
+  if (!sku) return res.status(400).json({ error: 'SKU parameter required' });
+
+  // Search for price_history.json in outputs
+  let historyFile = null;
+  function searchHistory(dir) {
+    if (!fs.existsSync(dir)) return;
+    const items = fs.readdirSync(dir, { withFileTypes: true });
+    for (const item of items) {
+      const fullPath = path.join(dir, item.name);
+      if (item.isDirectory()) {
+        searchHistory(fullPath);
+      } else if (item.name === 'price_history.json') {
+        if (!chassis || fullPath.includes(chassis)) {
+          historyFile = fullPath;
+          break;
+        }
+      }
+    }
+  }
+  searchHistory(OUTPUTS_DIR);
+
+  if (!historyFile || !fs.existsSync(historyFile)) {
+    return res.json({ sku, history: [] });
+  }
+
+  try {
+    const data = JSON.parse(fs.readFileSync(historyFile, 'utf-8'));
+    const trail = data[sku] || [];
+    res.json({ sku, history: trail });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Portfolio Verification Suite Endpoint (verify_all.js)
+app.post('/api/verify-all', (req, res) => {
+  if (activeTask) {
+    return res.status(409).json({ error: 'Another task is currently running' });
+  }
+
+  const verifyScript = path.join(PROJECT_ROOT, 'scripts', 'verify_all.js');
+  const proc = spawn('node', [verifyScript], { cwd: PROJECT_ROOT, env: { ...process.env, STRUCTURED_PROGRESS: '1' } });
+  activeTask = { type: 'VERIFY_ALL', pid: proc.pid, startTime: Date.now() };
+
+  broadcastSSE({ type: 'TASK_STARTED', task: activeTask.type });
+
+  proc.stdout.on('data', (data) => {
+    data.toString().split('\n').forEach(line => {
+      if (line.trim()) broadcastSSE({ type: 'LOG', text: line, stream: 'stdout' });
+    });
+  });
+
+  proc.stderr.on('data', (data) => {
+    data.toString().split('\n').forEach(line => {
+      if (line.trim()) broadcastSSE({ type: 'LOG', text: line, stream: 'stderr' });
+    });
+  });
+
+  proc.on('close', (code) => {
+    broadcastSSE({ type: 'TASK_COMPLETED', code, task: activeTask.type });
+    activeTask = null;
+  });
+
+  res.json({ message: 'Portfolio verification suite started', pid: proc.pid });
+});
+
 // -----------------------------------------------------------------------------
 // 8. Data Quality Audit Endpoint
 // -----------------------------------------------------------------------------
