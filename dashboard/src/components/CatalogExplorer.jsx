@@ -136,8 +136,8 @@ export default function CatalogExplorer({ catalogData, chassisName }) {
                           {status}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 font-bold mono text-slate-900">{sku.sku || sku.partNumber}</td>
-                      <td className="px-4 py-2.5 font-medium text-slate-700 max-w-xs truncate">{sku.description || sku.name}</td>
+                      <td className="px-4 py-2.5 font-bold mono text-slate-900">{sku.sku || sku.partNumber || sku.id || 'CTO-OPTION'}</td>
+                      <td className="px-4 py-2.5 font-medium text-slate-700 max-w-xs truncate">{sku.description || sku.name || sku.subCategory || 'Configuration Option'}</td>
                       <td className="px-4 py-2.5 text-slate-600">{sku.parentCategory}</td>
                       <td className="px-4 py-2.5 text-slate-500">{sku.subCategory}</td>
                       <td className="px-4 py-2.5 font-semibold text-slate-600">{sku.optionType || 'CTO'}</td>
