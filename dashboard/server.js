@@ -1,0 +1,388 @@
+'use strict';
+/**
+ * dashboard/server.js — HPE OCA Catalog Intelligence Express Server Bridge
+ *
+ * Provides REST & SSE APIs for the React dashboard UI on Port 3001.
+ * Connects UI actions to native Node.js pipeline scripts with zero external API key requirements.
+ */
+
+const express = require('express');
+const cors = require('cors');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const http = require('http');
+const { spawn, exec } = require('child_process');
+
+const PROJECT_ROOT = path.resolve(__dirname, '..');
+const OUTPUTS_DIR = path.join(PROJECT_ROOT, 'outputs');
+const TEMP_DIR = path.join(OUTPUTS_DIR, 'temp');
+const HISTORY_DIR = path.join(OUTPUTS_DIR, 'history');
+const CONFIG_DIR = path.join(PROJECT_ROOT, 'scripts', 'config');
+
+// Ensure required output directories exist
+[OUTPUTS_DIR, TEMP_DIR, HISTORY_DIR].forEach(dir => {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+});
+
+// Import shared library helpers
+const feedbackQueue = require(path.join(PROJECT_ROOT, 'scripts', 'lib', 'feedback_queue.js'));
+
+const app = express();
+const PORT = 3001;
+
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Serve static artifacts (JSON, TSV, PDF, Excel) securely
+app.use('/artifacts', express.static(OUTPUTS_DIR));
+
+// Configure Multer for BOQ uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, TEMP_DIR),
+  filename: (req, file, cb) => {
+    const cleanName = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    cb(null, `boq_${Date.now()}_${cleanName}`);
+  }
+});
+const upload = multer({ storage });
+
+// Active background task mutex lock & log streaming broadcaster
+let activeTask = null; // { type, process, startTime }
+const sseClients = new Set();
+
+function broadcastSSE(data) {
+  const payload = `data: ${JSON.stringify(data)}\n\n`;
+  for (const client of sseClients) {
+    client.write(payload);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 1. CDP Session & Observability Endpoints
+// -----------------------------------------------------------------------------
+
+app.get('/api/cdp-status', (req, res) => {
+  const reqCdp = http.get('http://localhost:9222/json', (cdpRes) => {
+    let raw = '';
+    cdpRes.on('data', chunk => raw += chunk);
+    cdpRes.on('end', () => {
+      try {
+        const targets = JSON.parse(raw);
+        const ocaTarget = targets.find(t => t.url && t.url.includes('oca.ext.hpe.com') && t.type === 'page');
+        res.json({
+          online: true,
+          activeSession: !!ocaTarget,
+          target: ocaTarget || null,
+          totalTargets: targets.length
+        });
+      } catch (err) {
+        res.json({ online: true, activeSession: false, target: null, error: err.message });
+      }
+    });
+  });
+  reqCdp.on('error', () => {
+    res.json({ online: false, activeSession: false, target: null });
+  });
+});
+
+app.get('/api/session-observability', (req, res) => {
+  const obsScript = path.join(PROJECT_ROOT, 'scripts', 'observability_status.js');
+  exec(`node "${obsScript}" --json`, (err, stdout) => {
+    if (err) {
+      return res.status(500).json({ error: err.message, status: 'OFFLINE' });
+    }
+    try {
+      const data = JSON.parse(stdout);
+      res.json(data);
+    } catch {
+      res.json({ raw: stdout, status: 'RAW' });
+    }
+  });
+});
+
+// -----------------------------------------------------------------------------
+// 2. Catalog & Discovery Endpoints
+// -----------------------------------------------------------------------------
+
+app.get('/api/available-catalogs', (req, res) => {
+  const registryFile = path.join(OUTPUTS_DIR, 'SCRAPED_CATALOGS.md');
+  const catalogs = [];
+
+  // Helper to recursively find catalog JSON files
+  function findCatalogs(dir) {
+    if (!fs.existsSync(dir)) return;
+    const items = fs.readdirSync(dir, { withFileTypes: true });
+    for (const item of items) {
+      const fullPath = path.join(dir, item.name);
+      if (item.isDirectory()) {
+        if (item.name !== 'history' && item.name !== 'raw_data' && item.name !== 'intermittent_scraps') {
+          findCatalogs(fullPath);
+        }
+      } else if (item.isFile() && item.name.endsWith('_Catalog.json')) {
+        const relativePath = path.relative(OUTPUTS_DIR, fullPath);
+        const folderPath = path.dirname(fullPath);
+        const folderName = path.basename(folderPath);
+
+        // Read metadata
+        let metadata = { chassis: folderName };
+        let totalSKUs = 0;
+        try {
+          const content = JSON.parse(fs.readFileSync(fullPath, 'utf-8'));
+          metadata = content.metadata || metadata;
+          totalSKUs = metadata.totalUniqueSKUs || content.entries?.reduce((acc, e) => acc + (e.skuCount || 0), 0) || 0;
+        } catch {}
+
+        // Check for quickspecs PDF
+        const pdfFile = fs.readdirSync(folderPath).find(f => f.endsWith('.pdf'));
+        const xlsxFile = fs.readdirSync(folderPath).find(f => f.endsWith('.xlsx'));
+
+        catalogs.push({
+          id: folderName,
+          chassis: metadata.chassis || folderName,
+          family: relativePath.split(path.sep)[0] || 'Unknown',
+          gen: relativePath.split(path.sep)[1] || 'Unknown',
+          jsonPath: `/artifacts/${relativePath.replace(/\\/g, '/')}`,
+          xlsxPath: xlsxFile ? `/artifacts/${path.relative(OUTPUTS_DIR, path.join(folderPath, xlsxFile)).replace(/\\/g, '/')}` : null,
+          pdfPath: pdfFile ? `/artifacts/${path.relative(OUTPUTS_DIR, path.join(folderPath, pdfFile)).replace(/\\/g, '/')}` : null,
+          totalSKUs,
+          scrapeDate: metadata.scrapeDate || 'N/A'
+        });
+      }
+    }
+  }
+
+  findCatalogs(OUTPUTS_DIR);
+  res.json({ catalogs });
+});
+
+app.get('/api/catalog-data', (req, res) => {
+  const relPath = req.query.path;
+  if (!relPath) return res.status(400).json({ error: 'Missing path query parameter' });
+  const fullPath = path.join(OUTPUTS_DIR, relPath.replace(/^\/artifacts\//, ''));
+  if (!fs.existsSync(fullPath)) return res.status(404).json({ error: 'Catalog file not found' });
+  try {
+    const content = fs.readFileSync(fullPath, 'utf-8');
+    res.setHeader('Content-Type', 'application/json');
+    res.send(content);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// -----------------------------------------------------------------------------
+// 3. Real-Time Log Terminal (Server-Sent Events)
+// -----------------------------------------------------------------------------
+
+app.get('/api/stream-logs', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  sseClients.add(res);
+  res.write(`data: ${JSON.stringify({ type: 'CONNECTED', message: 'SSE Stream Active' })}\n\n`);
+
+  req.on('close', () => {
+    sseClients.delete(res);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// 4. Execution & Task Triggers (Mutex Lock Protected)
+// -----------------------------------------------------------------------------
+
+app.post('/api/scrape', (req, res) => {
+  if (activeTask) {
+    return res.status(409).json({ error: 'Another task is currently running', task: activeTask.type });
+  }
+
+  const { mode } = req.body; // 'solution' or 'storage'
+  const scriptName = mode === 'storage' ? 'scrape_oca_storage_solution.js' : 'scrape_oca_solution.js';
+  const scriptPath = path.join(PROJECT_ROOT, 'scripts', scriptName);
+
+  const proc = spawn('node', [scriptPath], { cwd: PROJECT_ROOT, env: { ...process.env, STRUCTURED_PROGRESS: '1' } });
+  activeTask = { type: `SCRAPE_${mode.toUpperCase()}`, pid: proc.pid, startTime: Date.now() };
+
+  broadcastSSE({ type: 'TASK_STARTED', task: activeTask.type });
+
+  proc.stdout.on('data', (data) => {
+    const lines = data.toString().split('\n');
+    lines.forEach(line => {
+      if (line.trim()) broadcastSSE({ type: 'LOG', text: line, stream: 'stdout' });
+    });
+  });
+
+  proc.stderr.on('data', (data) => {
+    const lines = data.toString().split('\n');
+    lines.forEach(line => {
+      if (line.trim()) broadcastSSE({ type: 'LOG', text: line, stream: 'stderr' });
+    });
+  });
+
+  proc.on('close', (code) => {
+    broadcastSSE({ type: 'TASK_COMPLETED', code, task: activeTask.type });
+    activeTask = null;
+  });
+
+  res.json({ message: 'Scrape task started', pid: proc.pid });
+});
+
+app.post('/api/rebuild', (req, res) => {
+  if (activeTask) {
+    return res.status(409).json({ error: 'Another task is currently running' });
+  }
+
+  const scriptPath = path.join(PROJECT_ROOT, 'scripts', 'rebuild_all.js');
+  const proc = spawn('node', [scriptPath], { cwd: PROJECT_ROOT });
+  activeTask = { type: 'REBUILD_ALL', pid: proc.pid, startTime: Date.now() };
+
+  broadcastSSE({ type: 'TASK_STARTED', task: activeTask.type });
+
+  proc.stdout.on('data', (data) => {
+    broadcastSSE({ type: 'LOG', text: data.toString(), stream: 'stdout' });
+  });
+
+  proc.on('close', (code) => {
+    broadcastSSE({ type: 'TASK_COMPLETED', code, task: activeTask.type });
+    activeTask = null;
+  });
+
+  res.json({ message: 'Rebuild task started', pid: proc.pid });
+});
+
+// -----------------------------------------------------------------------------
+// 5. BOQ Upload & Evaluation Engine
+// -----------------------------------------------------------------------------
+
+app.post('/api/upload-boq', upload.single('boqFile'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No BOQ file uploaded' });
+  res.json({
+    message: 'BOQ uploaded successfully',
+    filepath: req.file.path,
+    filename: req.file.originalname
+  });
+});
+
+app.post('/api/eval-boq', (req, res) => {
+  const { filepath, rawText, chassisDir } = req.body;
+
+  let targetPath = filepath;
+  if (!targetPath && rawText) {
+    targetPath = path.join(TEMP_DIR, `boq_text_${Date.now()}.json`);
+    fs.writeFileSync(targetPath, rawText, 'utf-8');
+  }
+
+  if (!targetPath || !fs.existsSync(targetPath)) {
+    return res.status(400).json({ error: 'Valid BOQ file or text input is required' });
+  }
+
+  const evalScript = path.join(PROJECT_ROOT, 'scripts', 'eval_boq.js');
+  const args = [evalScript, targetPath, '--json'];
+  if (chassisDir) {
+    args.push('--chassis', chassisDir);
+  }
+
+  exec(`node ${args.map(a => `"${a}"`).join(' ')}`, { cwd: PROJECT_ROOT, maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
+    if (err && !stdout) {
+      return res.status(500).json({ error: err.message });
+    }
+    try {
+      const data = JSON.parse(stdout);
+      res.json(data);
+    } catch {
+      res.json({ rawOutput: stdout });
+    }
+  });
+});
+
+// -----------------------------------------------------------------------------
+// 6. NotebookLM RAG & Async Smart Search
+// -----------------------------------------------------------------------------
+
+app.post('/api/notebook-query', (req, res) => {
+  const { query, chassis } = req.body;
+  if (!query) return res.status(400).json({ error: 'Query string is required' });
+
+  // Resolve notebook ID from notebooks.json config
+  const notebooksPath = path.join(CONFIG_DIR, 'notebooks.json');
+  let notebookId = null;
+  if (fs.existsSync(notebooksPath)) {
+    try {
+      const notebooks = JSON.parse(fs.readFileSync(notebooksPath, 'utf-8'));
+      notebookId = notebooks[chassis] || notebooks.DEFAULT || null;
+    } catch {}
+  }
+
+  if (!notebookId) {
+    return res.json({
+      query,
+      answer: "Local Evaluation Engine: RAG notebook mapping unavailable for this chassis. Serving local 5-level conflict graph matrix.",
+      citations: [],
+      source: 'LOCAL_FALLBACK'
+    });
+  }
+
+  exec(`nlm notebook query "${notebookId}" "${query.replace(/"/g, '\\"')}" --json`, (err, stdout) => {
+    if (err) {
+      return res.json({
+        query,
+        answer: `NotebookLM Query Fallback: ${err.message}`,
+        citations: [],
+        source: 'FALLBACK'
+      });
+    }
+    try {
+      const data = JSON.parse(stdout);
+      res.json({ ...data, source: 'NOTEBOOK_LM' });
+    } catch {
+      res.json({ query, answer: stdout, citations: [], source: 'NOTEBOOK_LM_RAW' });
+    }
+  });
+});
+
+// -----------------------------------------------------------------------------
+// 7. User Feedback Queue & Portal Deltas
+// -----------------------------------------------------------------------------
+
+app.get('/api/feedback-list', (req, res) => {
+  res.json(feedbackQueue.listFeedback());
+});
+
+app.post('/api/feedback-submit', (req, res) => {
+  const { text, category, context } = req.body;
+  if (!text) return res.status(400).json({ error: 'Feedback text is required' });
+  const entry = feedbackQueue.appendFeedback(text, category, context);
+  const agentPrompt = feedbackQueue.formatAgentTaskPrompt(entry);
+  res.json({ entry, agentPrompt });
+});
+
+// -----------------------------------------------------------------------------
+// 8. Data Quality Audit Endpoint
+// -----------------------------------------------------------------------------
+
+app.post('/api/audit-catalog', (req, res) => {
+  const { xlsxPath } = req.body;
+  if (!xlsxPath) return res.status(400).json({ error: 'xlsxPath required' });
+  const fullXlsxPath = path.join(OUTPUTS_DIR, xlsxPath.replace(/^\/artifacts\//, ''));
+
+  const verifyScript = path.join(PROJECT_ROOT, 'scripts', 'verify_excel_tally.js');
+  exec(`node "${verifyScript}" "${fullXlsxPath}" --json`, (err, stdout) => {
+    try {
+      const result = JSON.parse(stdout);
+      res.json(result);
+    } catch {
+      res.json({ passed: !err, raw: stdout });
+    }
+  });
+});
+
+// -----------------------------------------------------------------------------
+// Start Server
+// -----------------------------------------------------------------------------
+
+app.listen(PORT, () => {
+  console.log(`⚡ HPE OCA Dashboard Server Bridge running on http://localhost:${PORT}`);
+  console.log(`📁 Static artifacts served from: ${OUTPUTS_DIR}`);
+});
