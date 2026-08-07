@@ -384,10 +384,172 @@ app.post('/api/audit-catalog', (req, res) => {
 });
 
 // -----------------------------------------------------------------------------
+// 9. Knowledge Sync — Push learned rules to NotebookLM (SSE streamed)
+// -----------------------------------------------------------------------------
+
+app.post('/api/sync-knowledge', (req, res) => {
+  if (activeTask) {
+    return res.status(409).json({ error: 'Another task is currently running', task: activeTask.type });
+  }
+
+  const syncScript = path.join(PROJECT_ROOT, 'scripts', 'lib', 'knowledge_sync.js');
+  if (!fs.existsSync(syncScript)) {
+    return res.status(404).json({ error: 'knowledge_sync.js not found' });
+  }
+
+  const proc = spawn('node', [syncScript], { cwd: PROJECT_ROOT, env: { ...process.env, STRUCTURED_PROGRESS: '1' } });
+  activeTask = { type: 'KNOWLEDGE_SYNC', pid: proc.pid, startTime: Date.now() };
+  broadcastSSE({ type: 'TASK_STARTED', task: activeTask.type });
+
+  proc.stdout.on('data', (data) => {
+    data.toString().split('\n').forEach(line => {
+      if (line.trim()) broadcastSSE({ type: 'LOG', text: line, stream: 'stdout' });
+    });
+  });
+  proc.stderr.on('data', (data) => {
+    data.toString().split('\n').forEach(line => {
+      if (line.trim()) broadcastSSE({ type: 'LOG', text: line, stream: 'stderr' });
+    });
+  });
+  proc.on('close', (code) => {
+    broadcastSSE({ type: 'TASK_COMPLETED', code, task: 'KNOWLEDGE_SYNC' });
+    activeTask = null;
+  });
+
+  res.json({ message: 'Knowledge sync started', pid: proc.pid });
+});
+
+// -----------------------------------------------------------------------------
+// 10. Simulate Portal Rejection — Injects an error into the learning engine
+// -----------------------------------------------------------------------------
+
+app.post('/api/simulate-error', (req, res) => {
+  const { boqPath, errorMessage, chassis } = req.body;
+  if (!errorMessage) return res.status(400).json({ error: 'errorMessage is required' });
+
+  // Write a KnowledgeDelta entry directly into catalog_deltas.json
+  const deltasFile = path.join(OUTPUTS_DIR, 'history', 'catalog_deltas.json');
+  let deltas = [];
+  if (fs.existsSync(deltasFile)) {
+    try { deltas = JSON.parse(fs.readFileSync(deltasFile, 'utf-8')); } catch {}
+  }
+  if (!Array.isArray(deltas)) deltas = [];
+
+  const newDelta = {
+    id: `DELTA_${Date.now()}`,
+    timestamp: new Date().toISOString(),
+    source: 'PORTAL_REJECTION',
+    chassis: chassis || 'UNKNOWN',
+    boqPath: boqPath || null,
+    errorMessage,
+    status: 'PENDING_SYNC',
+    scopeTaxonomy: chassis ? 'CHASSIS_SPECIFIC' : 'UNIVERSAL_VENDOR'
+  };
+  deltas.push(newDelta);
+  fs.mkdirSync(path.dirname(deltasFile), { recursive: true });
+  fs.writeFileSync(deltasFile, JSON.stringify(deltas, null, 2), 'utf-8');
+
+  broadcastSSE({
+    type: 'LOG',
+    text: `⚠️ [PORTAL_REJECTION] Delta logged: ${errorMessage} (ID: ${newDelta.id})`,
+    stream: 'stdout'
+  });
+
+  res.json({ message: 'Portal rejection logged as KnowledgeDelta', delta: newDelta });
+});
+
+// -----------------------------------------------------------------------------
+// 11. Export Corrected BOQ — Generates downloadable corrected JSON from eval results
+// -----------------------------------------------------------------------------
+
+app.post('/api/export-boq', (req, res) => {
+  const { evalResults, chassisId, rankTier } = req.body;
+  if (!evalResults) return res.status(400).json({ error: 'evalResults payload is required' });
+
+  const tier = rankTier || 1;
+  const timestamp = Date.now();
+  const exportDir = path.join(OUTPUTS_DIR, 'temp', 'exports');
+  fs.mkdirSync(exportDir, { recursive: true });
+
+  const exportFilename = `corrected_boq_rank${tier}_${chassisId || 'unknown'}_${timestamp}.json`;
+  const exportPath = path.join(exportDir, exportFilename);
+
+  const exportPayload = {
+    exportedAt: new Date().toISOString(),
+    chassis: chassisId || 'Unknown',
+    appliedRank: tier,
+    conflictsSummary: evalResults.conflictGraph?.summary || null,
+    rankedSolution: evalResults.conflictGraph?.rankedSolutions?.find(s => s.rank === tier) || null,
+    workloadDna: evalResults.workloadDna || null,
+    physicalChecks: evalResults.physicalChecks || null,
+    correctedSkus: evalResults.conflictGraph?.rankedSolutions?.find(s => s.rank === tier)?.skuList || []
+  };
+
+  fs.writeFileSync(exportPath, JSON.stringify(exportPayload, null, 2), 'utf-8');
+
+  res.json({
+    message: `Rank ${tier} corrected BOQ exported`,
+    filename: exportFilename,
+    downloadPath: `/artifacts/temp/exports/${exportFilename}`,
+    exportedAt: exportPayload.exportedAt
+  });
+});
+
+// -----------------------------------------------------------------------------
+// 12. Notebook Config Registry — Read & Write notebooks.json from UI
+// -----------------------------------------------------------------------------
+
+app.get('/api/config/notebooks', (req, res) => {
+  const notebooksPath = path.join(CONFIG_DIR, 'notebooks.json');
+  if (!fs.existsSync(notebooksPath)) {
+    return res.json({ defaultNotebookId: '', notebooks: {} });
+  }
+  try {
+    res.json(JSON.parse(fs.readFileSync(notebooksPath, 'utf-8')));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/config/notebooks', (req, res) => {
+  const { defaultNotebookId, notebooks } = req.body;
+  if (!notebooks || typeof notebooks !== 'object') {
+    return res.status(400).json({ error: 'notebooks object is required' });
+  }
+  const notebooksPath = path.join(CONFIG_DIR, 'notebooks.json');
+  try {
+    const existing = fs.existsSync(notebooksPath)
+      ? JSON.parse(fs.readFileSync(notebooksPath, 'utf-8'))
+      : {};
+    const updated = {
+      ...existing,
+      defaultNotebookId: defaultNotebookId || existing.defaultNotebookId || '',
+      notebooks: { ...existing.notebooks, ...notebooks }
+    };
+    fs.writeFileSync(notebooksPath, JSON.stringify(updated, null, 2), 'utf-8');
+    res.json({ message: 'Notebook registry updated', config: updated });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// -----------------------------------------------------------------------------
 // Start Server
 // -----------------------------------------------------------------------------
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`⚡ HPE OCA Dashboard Server Bridge running on http://localhost:${PORT}`);
   console.log(`📁 Static artifacts served from: ${OUTPUTS_DIR}`);
 });
+
+// Graceful shutdown — Rule #42: prevent zombie processes on SIGTERM
+process.on('SIGTERM', () => {
+  if (activeTask?.process) {
+    try { activeTask.process.kill('SIGTERM'); } catch {}
+  }
+  server.close(() => {
+    console.log('⚡ Dashboard server shut down cleanly.');
+    process.exit(0);
+  });
+});
+process.on('SIGINT', () => process.emit('SIGTERM'));

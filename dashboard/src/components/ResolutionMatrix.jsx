@@ -1,8 +1,14 @@
-import React from 'react';
-import { Award, Check, MessageSquare } from 'lucide-react';
+import React, { useState } from 'react';
+import { Award, Check, MessageSquare, Download, AlertTriangle, X, Loader } from 'lucide-react';
 
-export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback }) {
-  // Extract real ranked solutions from conflictGraph if available
+export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback, selectedChassis }) {
+  const [exportingRank, setExportingRank] = useState(null);
+  const [exportedFiles, setExportedFiles] = useState({});
+  const [rejectionModal, setRejectionModal] = useState(null);
+  const [rejectionText, setRejectionText] = useState('');
+  const [isSubmittingRejection, setIsSubmittingRejection] = useState(false);
+  const [rejectionConfirmed, setRejectionConfirmed] = useState(null);
+
   const rankedFromEval = evalResults?.conflictGraph?.rankedSolutions;
 
   const tiers = (rankedFromEval && rankedFromEval.length > 0)
@@ -21,57 +27,56 @@ export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback }) 
         ] : ['Standard physical fix injected']
       }))
     : [
-        {
-          rank: 1,
-          title: 'Rank 1: Workload Intent Alignment',
-          subtitle: 'Customer Workload Match',
-          intentMatch: '98%',
-          capex: '$18,450',
-          badgeClass: 'badge-emerald',
-          rationale: 'Includes SAP HANA optimized memory density & high-TDP processor cooling.',
-          swaps: ['P49057-B21 -> Intel Xeon Gold 6430', 'P38620-B21 -> 16x 32GB DDR5-5600']
-        },
-        {
-          rank: 2,
-          title: 'Rank 2: Standardized CTO Baseline',
-          subtitle: 'Factory Standard CTO',
-          intentMatch: '92%',
-          capex: '$16,800',
-          badgeClass: 'badge-blue',
-          rationale: 'Standard factory baseline CTO build without custom thermal overhead.',
-          swaps: ['P49057-B21 -> Standard Fan Kit']
-        },
-        {
-          rank: 3,
-          title: 'Rank 3: High-IOPS Storage Optimized',
-          subtitle: 'Storage Density Tier',
-          intentMatch: '88%',
-          capex: '$21,200',
-          badgeClass: 'badge-blue',
-          rationale: 'Tri-Mode cabling with 8x NVMe Read-Intensive SFF drives.',
-          swaps: ['P76453-B21 Tri-Mode Cable added', 'P26934-B21 1.92TB NVMe RI']
-        },
-        {
-          rank: 4,
-          title: 'Rank 4: Maximum Density Expansion',
-          subtitle: 'Headroom Tier',
-          intentMatch: '84%',
-          capex: '$24,100',
-          badgeClass: 'badge-amber',
-          rationale: 'Dual processor with secondary PCIe riser installed for future GPU expandability.',
-          swaps: ['P49057-B21 Dual Socket', 'P38620-B21 Secondary Riser']
-        },
-        {
-          rank: 5,
-          title: 'Rank 5: CapEx Minimized Buildable',
-          subtitle: 'Budget Optimized Tier',
-          intentMatch: '76%',
-          capex: '$14,900',
-          badgeClass: 'badge-amber',
-          rationale: 'Minimum viable build passing 100% of physical constraints at lowest CapEx.',
-          swaps: ['P49057-B21 Single Socket', 'P38620-B21 8x 32GB DDR5']
-        }
+        { rank: 1, title: 'Rank 1: Workload Intent Alignment', subtitle: 'Customer Workload Match', intentMatch: '98%', capex: '$18,450', badgeClass: 'badge-emerald', rationale: 'Includes SAP HANA optimized memory density & high-TDP processor cooling.', swaps: ['P49057-B21 → Intel Xeon Gold 6430', 'P38620-B21 → 16x 32GB DDR5-5600'] },
+        { rank: 2, title: 'Rank 2: Standardized CTO Baseline', subtitle: 'Factory Standard CTO', intentMatch: '92%', capex: '$16,800', badgeClass: 'badge-blue', rationale: 'Standard factory baseline CTO build without custom thermal overhead.', swaps: ['P49057-B21 → Standard Fan Kit'] },
+        { rank: 3, title: 'Rank 3: High-IOPS Storage Optimized', subtitle: 'Storage Density Tier', intentMatch: '88%', capex: '$21,200', badgeClass: 'badge-blue', rationale: 'Tri-Mode cabling with 8x NVMe Read-Intensive SFF drives.', swaps: ['P76453-B21 Tri-Mode Cable added', 'P26934-B21 1.92TB NVMe RI'] },
+        { rank: 4, title: 'Rank 4: Maximum Density Expansion', subtitle: 'Headroom Tier', intentMatch: '84%', capex: '$24,100', badgeClass: 'badge-amber', rationale: 'Dual processor with secondary PCIe riser for future GPU expandability.', swaps: ['P49057-B21 Dual Socket', 'P38620-B21 Secondary Riser'] },
+        { rank: 5, title: 'Rank 5: CapEx Minimized Buildable', subtitle: 'Budget Optimized Tier', intentMatch: '76%', capex: '$14,900', badgeClass: 'badge-amber', rationale: 'Minimum viable build passing 100% of physical constraints at lowest CapEx.', swaps: ['P49057-B21 Single Socket', 'P38620-B21 8x 32GB DDR5'] }
       ];
+
+  const handleExport = async (tier) => {
+    setExportingRank(tier.rank);
+    try {
+      const res = await fetch('/api/export-boq', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ evalResults, chassisId: selectedChassis, rankTier: tier.rank })
+      });
+      const data = await res.json();
+      if (data.downloadPath) {
+        setExportedFiles(prev => ({ ...prev, [tier.rank]: data }));
+        const a = document.createElement('a');
+        a.href = data.downloadPath;
+        a.download = data.filename;
+        a.click();
+      }
+    } catch (err) {
+      console.error('Export failed:', err);
+    }
+    setExportingRank(null);
+  };
+
+  const handleRejectionSubmit = async () => {
+    if (!rejectionText.trim()) return;
+    setIsSubmittingRejection(true);
+    try {
+      const res = await fetch('/api/simulate-error', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ errorMessage: rejectionText, chassis: selectedChassis })
+      });
+      const data = await res.json();
+      setRejectionConfirmed(data.delta?.id || 'LOGGED');
+    } catch (err) {
+      console.error('Rejection submit failed:', err);
+    }
+    setIsSubmittingRejection(false);
+    setTimeout(() => {
+      setRejectionModal(null);
+      setRejectionText('');
+      setRejectionConfirmed(null);
+    }, 2500);
+  };
 
   return (
     <div className="space-y-6">
@@ -79,10 +84,10 @@ export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback }) 
         <div className="border-b border-slate-100 pb-3 mb-4">
           <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
             <Award className="w-5 h-5 text-emerald-600" />
-            5-Tier Strategic Resolution Matrix Cards
+            5-Tier Strategic Resolution Matrix
           </h2>
           <p className="text-xs text-slate-500">
-            Multi-tiered valid build candidates generated by the Vendor BOM Comparison Engine.
+            Multi-tiered buildable candidates. Apply fixes and export a corrected BOQ, or report a portal rejection to train the engine.
           </p>
         </div>
 
@@ -119,17 +124,106 @@ export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback }) 
                 ))}
               </div>
 
+              {/* Apply & Export BOQ */}
+              {exportedFiles[tier.rank] ? (
+                <a
+                  href={exportedFiles[tier.rank].downloadPath}
+                  download={exportedFiles[tier.rank].filename}
+                  className="w-full mb-2 flex items-center gap-1.5 justify-center btn-primary text-xs"
+                  style={{ textDecoration: 'none' }}
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Re-Download Rank {tier.rank}
+                </a>
+              ) : (
+                <button
+                  onClick={() => handleExport(tier)}
+                  disabled={exportingRank !== null || !evalResults}
+                  title={!evalResults ? 'Run a BOQ evaluation first to enable export' : ''}
+                  className="w-full mb-2 btn-primary justify-center text-xs disabled:opacity-40"
+                >
+                  {exportingRank === tier.rank
+                    ? <><Loader className="w-3.5 h-3.5 animate-spin" /> Exporting...</>
+                    : <><Download className="w-3.5 h-3.5" /> Apply &amp; Export Rank {tier.rank}</>
+                  }
+                </button>
+              )}
+
+              {/* Report Portal Rejection */}
               <button
-                onClick={() => onOpenPortalFeedback(tier)}
+                onClick={() => setRejectionModal(tier)}
                 className="w-full btn-secondary justify-center text-xs"
               >
-                <MessageSquare className="w-3.5 h-3.5 text-blue-600" />
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                Report Portal Rejection
+              </button>
+
+              {/* Log Feedback */}
+              <button
+                onClick={() => onOpenPortalFeedback(tier)}
+                className="w-full mt-2 flex items-center gap-1.5 justify-center text-xs text-slate-400 hover:text-blue-600 transition-colors py-1"
+              >
+                <MessageSquare className="w-3 h-3" />
                 Log Portal Feedback
               </button>
             </div>
           ))}
         </div>
       </div>
+
+      {/* Portal Rejection Training Modal */}
+      {rejectionModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 w-full max-w-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-600" />
+                Report Portal Rejection — Rank {rejectionModal.rank}
+              </h3>
+              <button onClick={() => { setRejectionModal(null); setRejectionText(''); setRejectionConfirmed(null); }}>
+                <X className="w-5 h-5 text-slate-400 hover:text-slate-700" />
+              </button>
+            </div>
+
+            {rejectionConfirmed ? (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
+                <Check className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
+                <p className="font-bold text-emerald-800 text-sm">KnowledgeDelta Logged!</p>
+                <p className="text-xs text-emerald-600 mt-1">ID: {rejectionConfirmed}</p>
+                <p className="text-[11px] text-slate-500 mt-2">Go to the Scraper tab and click "Sync Knowledge" to push this to NotebookLM.</p>
+              </div>
+            ) : (
+              <>
+                <p className="text-xs text-slate-600 mb-4">
+                  Describe the HPE portal rejection. This is logged as a <strong>KnowledgeDelta</strong> scoped to chassis{' '}
+                  <span className="font-bold text-blue-600">{selectedChassis || 'Unknown'}</span>, permanently improving the evaluation engine.
+                </p>
+                <textarea
+                  value={rejectionText}
+                  onChange={e => setRejectionText(e.target.value)}
+                  placeholder='e.g. "Portal rejected: Max 10 NVMe drives exceeded with Tri-Mode controller in SFF chassis."'
+                  className="w-full border border-slate-200 rounded-xl p-3 text-xs text-slate-800 resize-none h-28 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+                <div className="flex justify-end gap-2 mt-4">
+                  <button onClick={() => { setRejectionModal(null); setRejectionText(''); }} className="btn-secondary text-xs">
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleRejectionSubmit}
+                    disabled={!rejectionText.trim() || isSubmittingRejection}
+                    className="btn-primary text-xs disabled:opacity-40"
+                  >
+                    {isSubmittingRejection
+                      ? <><Loader className="w-3.5 h-3.5 animate-spin" /> Logging...</>
+                      : <><AlertTriangle className="w-3.5 h-3.5" /> Log as KnowledgeDelta</>
+                    }
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

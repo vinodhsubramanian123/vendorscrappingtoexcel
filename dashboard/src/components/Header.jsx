@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Cpu, Search, Sparkles, Server, CheckCircle2, AlertCircle, RefreshCw, MessageSquare, Terminal } from 'lucide-react';
+import { Cpu, Search, Sparkles, Server, RefreshCw, MessageSquare, Settings } from 'lucide-react';
 import CdpHealthBadge from './CdpHealthBadge';
 
 export default function Header({ 
@@ -9,7 +9,8 @@ export default function Header({
   activeTab, 
   setActiveTab,
   onSmartSearch,
-  onOpenFeedbackDrawer
+  onOpenFeedbackDrawer,
+  onOpenSettings
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -97,6 +98,14 @@ export default function Header({
           >
             <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
             Feedback Queue
+          </button>
+
+          <button
+            onClick={onOpenSettings}
+            className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg hover:bg-slate-50 transition-all shadow-sm"
+            title="System Settings"
+          >
+            <Settings className="w-3.5 h-3.5 text-slate-500" />
           </button>
         </div>
       </div>

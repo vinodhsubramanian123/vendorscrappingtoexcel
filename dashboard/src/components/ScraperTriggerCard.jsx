@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Play, RefreshCw, Terminal, Download, Server } from 'lucide-react';
+import { Play, RefreshCw, Terminal, Download, Server, Sparkles, Loader } from 'lucide-react';
 
-export default function ScraperTriggerCard({ logStream, isTaskRunning, onTriggerScrape, onTriggerRebuild, onTriggerDownloadPdf }) {
+export default function ScraperTriggerCard({ logStream, isTaskRunning, onTriggerScrape, onTriggerRebuild, onTriggerDownloadPdf, onTriggerSyncKnowledge }) {
   const [scrapeMode, setScrapeMode] = useState('solution');
 
   // Extract latest progress event if present
@@ -140,6 +140,25 @@ export default function ScraperTriggerCard({ logStream, isTaskRunning, onTrigger
             >
               <Download className="w-3.5 h-3.5 text-amber-600" />
               Fetch PDF
+            </button>
+          </div>
+
+          {/* Knowledge Sync */}
+          <div className="bg-slate-50/80 rounded-xl p-4 border border-blue-200/80 col-span-full md:col-span-1">
+            <h4 className="font-bold text-slate-800 text-xs mb-1 flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-blue-600" /> Sync Knowledge to NotebookLM
+            </h4>
+            <p className="text-[11px] text-slate-500 mb-4">Push all learned KnowledgeDeltas and catalog updates to your Gemini Notebooks for RAG queries.</p>
+            
+            <button
+              onClick={onTriggerSyncKnowledge}
+              disabled={isTaskRunning}
+              className="w-full btn-primary justify-center text-xs disabled:opacity-50"
+            >
+              {isTaskRunning
+                ? <><Loader className="w-3.5 h-3.5 animate-spin" /> Running...</>
+                : <><Sparkles className="w-3.5 h-3.5" /> Sync Knowledge</>
+              }
             </button>
           </div>
 

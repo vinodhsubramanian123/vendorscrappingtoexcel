@@ -10,6 +10,7 @@ import NotebookRagDrawer from './components/NotebookRagDrawer';
 import ArtifactInspector from './components/ArtifactInspector';
 import UserFeedbackDrawer from './components/UserFeedbackDrawer';
 import FeedbackModal from './components/FeedbackModal';
+import SettingsDrawer from './components/SettingsDrawer';
 
 export default function App() {
   const [catalogs, setCatalogs] = useState([]);
@@ -31,6 +32,9 @@ export default function App() {
   
   // Agent Feedback Queue Drawer State
   const [isFeedbackDrawerOpen, setIsFeedbackDrawerOpen] = useState(false);
+
+  // Settings Drawer State
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
   // Portal Feedback Modal State
   const [selectedCardForFeedback, setSelectedCardForFeedback] = useState(null);
@@ -134,6 +138,17 @@ export default function App() {
     }
   };
 
+  // Handler: Sync Knowledge to NotebookLM
+  const handleTriggerSyncKnowledge = async () => {
+    setLogStream([]);
+    setActiveTab('scraper');
+    try {
+      await fetch('/api/sync-knowledge', { method: 'POST' });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   // Handler: Evaluate BOQ
   const handleEvaluateBoq = async (boqInput) => {
     try {
@@ -164,6 +179,7 @@ export default function App() {
         setActiveTab={setActiveTab}
         onSmartSearch={handleSmartSearch}
         onOpenFeedbackDrawer={() => setIsFeedbackDrawerOpen(true)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
       {/* Main Content Body */}
@@ -176,6 +192,7 @@ export default function App() {
             <ResolutionMatrix
               evalResults={evalResults}
               onOpenPortalFeedback={setSelectedCardForFeedback}
+              selectedChassis={selectedChassis}
             />
             <ConflictGraphInspector
               evalResults={evalResults}
@@ -213,6 +230,7 @@ export default function App() {
           <ResolutionMatrix
             evalResults={evalResults}
             onOpenPortalFeedback={setSelectedCardForFeedback}
+            selectedChassis={selectedChassis}
           />
         )}
 
@@ -232,6 +250,7 @@ export default function App() {
             onTriggerScrape={handleTriggerScrape}
             onTriggerRebuild={handleTriggerRebuild}
             onTriggerDownloadPdf={() => {}}
+            onTriggerSyncKnowledge={handleTriggerSyncKnowledge}
           />
         )}
 
@@ -243,6 +262,11 @@ export default function App() {
         onClose={() => setIsRagOpen(false)}
         ragData={ragData}
         isQuerying={isQueryingRag}
+      />
+
+      <SettingsDrawer
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
       />
 
       <UserFeedbackDrawer
