@@ -143,6 +143,7 @@ app.get('/api/available-catalogs', (req, res) => {
           chassis: metadata.chassis || folderName,
           family: relativePath.split(path.sep)[0] || 'Unknown',
           gen: relativePath.split(path.sep)[1] || 'Unknown',
+          chassisDir: path.relative(OUTPUTS_DIR, folderPath).replace(/\\/g, '/'),
           jsonPath: `/artifacts/${relativePath.replace(/\\/g, '/')}`,
           xlsxPath: xlsxFile ? `/artifacts/${path.relative(OUTPUTS_DIR, path.join(folderPath, xlsxFile)).replace(/\\/g, '/')}` : null,
           pdfPath: pdfFile ? `/artifacts/${path.relative(OUTPUTS_DIR, path.join(folderPath, pdfFile)).replace(/\\/g, '/')}` : null,
@@ -284,15 +285,32 @@ app.post('/api/eval-boq', (req, res) => {
     args.push('--chassis', chassisDir);
   }
 
-  execFile('node', args, { cwd: PROJECT_ROOT, maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
-    if (err && !stdout) {
-      return res.status(500).json({ error: err.message });
-    }
+  const proc = spawn('node', args, { cwd: PROJECT_ROOT, env: { ...process.env, STRUCTURED_PROGRESS: '1' } });
+  activeTask = { type: 'EVAL_BOQ', pid: proc.pid, startTime: Date.now() };
+  broadcastSSE({ type: 'TASK_STARTED', task: activeTask.type });
+
+  let stdoutBuffer = '';
+
+  proc.stdout.on('data', (data) => {
+    stdoutBuffer += data.toString();
+  });
+
+  proc.stderr.on('data', (data) => {
+    const lines = data.toString().split('\n');
+    lines.forEach(line => {
+      if (line.trim()) broadcastSSE({ type: 'LOG', text: line, stream: 'stderr' });
+    });
+  });
+
+  proc.on('close', (code) => {
+    broadcastSSE({ type: 'TASK_COMPLETED', code, task: 'EVAL_BOQ' });
+    activeTask = null;
+
     try {
-      const data = JSON.parse(stdout);
+      const data = JSON.parse(stdoutBuffer);
       res.json(data);
     } catch {
-      res.json({ rawOutput: stdout });
+      res.json({ rawOutput: stdoutBuffer, error: 'Failed to parse evaluator JSON' });
     }
   });
 });

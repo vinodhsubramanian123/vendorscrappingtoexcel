@@ -175,6 +175,7 @@ export default function App() {
 
   // Handler: Evaluate BOQ
   const handleEvaluateBoq = async (boqInput) => {
+    setLogStream([]);
     try {
       const currentCat = catalogs.find(c => c.id === selectedChassis);
       const res = await fetch('/api/eval-boq', {
@@ -237,7 +238,11 @@ export default function App() {
         {/* BOQ Evaluator Tab */}
         {activeTab === 'boq' && (
           <div className="space-y-6">
-            <BoqUploader onEvaluateBoq={handleEvaluateBoq} evalResults={evalResults} />
+            <BoqUploader 
+              onEvaluateBoq={handleEvaluateBoq} 
+              evalResults={evalResults} 
+              logStream={logStream} 
+            />
             {evalResults && <WorkloadDnaCard dnaData={evalResults.workloadDna} />}
           </div>
         )}
