@@ -1,129 +1,88 @@
-# Comprehensive Technical Implementation Plan: Phase 7 — Real-Time Catalog Intelligence & BOQ Observability Dashboard
+# Technical Implementation Plan: Phase 7 — HPE OCA Catalog Intelligence & BOQ Observability Dashboard
 
-This plan provides an end-to-end audited technical blueprint for building the **HPE OCA Catalog Intelligence & Real-Time BOQ Observability Dashboard**. Every stage has been technical-feasibility audited and certified.
+This document details the validated, end-to-end technical specification for the **HPE OCA Catalog Intelligence & Real-Time BOQ Observability Dashboard**. Every component has been audited for architectural feasibility, performance, backend communication routing, and alignment with the HPE OCA pipeline.
 
 ---
 
-## 🎨 Design System & Aesthetics (Ultra-Sleek Porcelain Light Mode)
+## 🎨 1. Design System & Aesthetics (Ultra-Sleek Porcelain Light Mode)
 
-- **Theme & Palette**: Modern Light Mode (`#F8FAFC` soft porcelain background) with translucent pearl white glassmorphism cards (`rgba(255, 255, 255, 0.85)` backdrop blur, `1px solid #E2E8F0` subtle borders, and ambient drop shadows `0 10px 30px -10px rgba(15, 23, 42, 0.05)`).
+- **Theme & Palette**: Ultra-Sleek Porcelain Light Mode (`#F8FAFC` soft porcelain background) with translucent white glassmorphism cards (`rgba(255, 255, 255, 0.85)` backdrop blur, `1px solid #E2E8F0` subtle borders, and ambient drop shadows `0 10px 30px -10px rgba(15, 23, 42, 0.05)`).
 - **Accents**:
-  - **HPE Emerald Green**: `#01A781` (Rank 1 Intent Match badge, active success indicators, primary action buttons).
+  - **HPE Emerald Green**: `#01A781` (Rank 1 Intent Match badge, success indicators, primary action buttons).
   - **Royal Electric Blue**: `#2563EB` (Telemetry streaming gauges, active navigation tabs, interactive links).
-  - **Vibrant Amber**: `#D97706` (Price change indicators, advisory notices).
-  - **Rose Red**: `#DC2626` (Removed tombstone SKUs, error alerts).
-  - **Deep Slate Typography**: `#0F172A` for primary headers, `#475569` for secondary body text.
-- **Typography**: Google Fonts Inter / Outfit with crisp hierarchy, monospaced SKU badges (`JetBrains Mono`).
+  - **Vibrant Amber**: `#D97706` (Price change deltas, advisory warnings).
+  - **Rose Red**: `#DC2626` (Tombstone removed SKUs, error alerts).
+  - **Deep Slate Typography**: `#0F172A` for primary headers, `#475569` for body text.
+- **UX Paradigm**: 100% Non-blocking, asynchronous execution. All long-running tasks use elegant skeleton loaders and pulsing indicators, ensuring the UI remains ultra-responsive at all times.
 
 ---
 
-## 🏗️ Technical Architecture & Key Modules
+## 🏗️ 2. Technical Architecture & Key Modules
 
-> **Zero External API Key Architecture**: The web dashboard connects to a local Express/Node.js server bridge (`server.js`). UI button clicks trigger the existing **Antigravity CLI workflows** (`npm run scrape`, `npm run eval:boq`, `nlm notebook query`, `npm run registry:sync`) using native process execution (`child_process.spawn`) and stream logs in real-time via **Server-Sent Events (SSE)**.
+> **Zero External API Key Architecture**: The web dashboard connects to a local Express/Node.js server bridge (`dashboard/server.js`). UI actions trigger native CLI workflows via `child_process.spawn` and stream output live using **Server-Sent Events (SSE)**.
 
-> **Frontend Isolation Architecture**: The dashboard UI is a completely isolated React/Vite project inside the `dashboard/` directory with its own `package.json`. This strict boundary ensures UI libraries (`react`, `recharts`, `lucide-react`) do not pollute the root offline scraping engine's dependencies (`ws`, `xlsx-js-style`).
-
-├── package.json                       ← Root backend dependencies (ws, xlsx-js-style)
-└── dashboard/
-    ├── public/
-    │   └── favicon.ico
-    ├── src/
-    │   ├── components/
-    │   │   ├── Header.jsx                 ← Navigation & live CDP port 9222 health indicator
-    │   │   ├── ScraperTriggerCard.jsx     ← Live trigger for npm run scrape with SSE log terminal
-    │   │   ├── CatalogExplorer.jsx        ← Multi-sheet Excel viewer + FlexSearch NLP attribute search
-    │   │   ├── BoqUploader.jsx            ← File drag-and-drop & text paste zone triggering eval:boq
-    │   │   ├── WorkloadDnaCard.jsx        ← CPU core density, RAM/core ratio, GPU class gauges (via Recharts)
-    │   │   ├── ConflictGraphInspector.jsx ← 5-level rule hierarchy & 6-aspect physical math gauge (via Recharts)
-    │   │   ├── ResolutionMatrix.jsx       ← 5-tier strategic candidate cards (Rank 1-5)
-    │   │   ├── NotebookRagDrawer.jsx      ← Gemini NotebookLM RAG citations & notes drawer
-    │   │   └── FeedbackModal.jsx          ← Interactive HITL feedback & KnowledgeDelta logger
-    │   ├── styles/
-    │   │   └── index.css                  ← Light Mode design tokens, CSS variables, glassmorphism
-    │   ├── utils/
-    │   │   └── nlpSearch.js               ← FlexSearch client-side SKU attribute indexer
-    │   ├── App.jsx                        ← Main dashboard orchestrator & SSE event listener
-    │   └── main.jsx
-    ├── server.js                          ← Express/SSE CLI bridge (spawns npm/nlm scripts & streams logs)
-    ├── package.json                       ← Dashboard UI dependencies (react, vite, recharts, lucide-react)
-    └── vite.config.js
-```
+### Core Backend Implementations (`server.js`)
+1. **Port Mapping & CORS**: `server.js` runs on port `3001`. The UI (Vite) runs on `5173`. `vite.config.js` uses a proxy to route all `/api/*` requests to `http://localhost:3001`, eliminating CORS issues.
+2. **Static File Serving**: `server.js` exposes the parent `outputs/` directory via `app.use('/artifacts', express.static(path.join(__dirname, '../outputs')))`.
+3. **Multipart BOQ Uploads**: Uses `multer` on `/api/upload-boq` to save dragged-and-dropped BOQ files to a temporary `outputs/temp/` folder before passing the absolute path to `npm run eval:boq`.
+4. **Task Mutex (Locking)**: Implements a global lock (`isScraping = true`) in memory to prevent concurrent CDP Port 9222 collisions.
+5. **Unified Startup**: The root `package.json` will include a single `npm run dashboard` script using `concurrently` to spin up both the Vite frontend and Express backend synchronously.
 
 ---
 
-## 📋 Comprehensive End-to-End Component Specifications
+## 📋 3. Detailed Component Specifications
 
-### ✅ Component 0: Live CDP Session Health Indicator
-- Polls `http://localhost:9222/json` via `server.js` every 5 seconds.
-- Displays green pulse badge when an active `oca.ext.hpe.com` session is detected.
-- Warning badge when browser debugging port is offline.
+### ✅ Component 0: Live CDP Session Health & Observability (`Header.jsx`)
+- **Global Context**: Dropdown fetches available catalogs from `/api/available-catalogs` to switch context (e.g., from `DL380_Gen12_SFF` to `Synergy_Compute`).
+- **Deep Session Observability**: Clickable CDP health badge polls `http://localhost:9222/json` and uses `observability_status.js` to display the exact OCA Session state in a sleek popover.
 
-### ✅ Component 1: Interactive Master Excel Catalog Viewer & NLP Attribute Search
-- **Full Excel Sheet Renderer**: Renders complete multi-sheet Excel catalog (`*_OCA_Catalog.xlsx` / `*_Catalog.json`) directly in the UI for any selected chassis (`DL380_Gen12_SFF`, `DL380_Gen11`, `Alletra`, `Synergy`, `StoreEver`, `Cray`).
-- **FlexSearch Client-Side NLP Indexer**: Fast sub-millisecond search across all 2,568 SKUs by attribute (e.g. *"210W CPUs"*, *"DDR5-6400 memory"*, *"5-year Tech Care Essential"*).
-- **Color-Coded Historical Price Diffs**: Visualizes SKU additions (`ADDED` green), tombstones (`REMOVED` red strikethrough), and price deltas (`PRICE_CHANGED` amber).
+### ✅ Component 1: Unified Async Smart Search & Catalog Explorer (`CatalogExplorer.jsx`)
+- **Multi-Sheet Catalog Viewer**: Renders full scraped Excel catalogs directly in the UI.
+- **Historical Price Trend Visualizer**: Clicking any SKU with an amber `PRICE_CHANGED` badge opens a Recharts line graph parsing `price_history.json` to visualize historical price elasticity.
+- **Universal Smart Search Bar (Non-Blocking UI)**:
+  - **Instant Local Filtering**: Types text for sub-millisecond client-side filtering via FlexSearch.
+  - **Agentic Deep Search**: If you type *"Please check in notebook"*, the UI triggers an asynchronous, non-blocking background request to NotebookLM and Antigravity, displaying skeleton loaders until rich results slide in.
 
-### ✅ Component 2: Scraper Execution & Structured Real-Time Terminal Stream
-- **One-Click Scrape Trigger**: Button triggers `npm run scrape` or `npm run scrape:storage`.
-- **SSE Real-Time Terminal View**: Server-Sent Events (`/api/stream-logs`) stream console output. `server.js` intercepts raw stdout and wraps it in structured JSON (e.g., `{ type: "success", text: "✅ PASS:..." }`).
-- **Dynamic Syntax Highlighting**: The terminal UI parses the JSON stream to dynamically color-code logs (Green for Guardrail passes, Red for errors, Blue for navigation) rather than displaying a monotone text block.
+### ✅ Component 2: Pipeline Execution & Scraper Controls (`ScraperTriggerCard.jsx`)
+- **Live Scrape Triggers**: Mutex-protected buttons to launch E2E scraper or storage wizard scraper with a real-time SSE Log Terminal.
+- **Offline Catalog Rebuild**: A button to instantly trigger `rebuild_all.js`.
+- **QuickSpecs Fetcher**: A dedicated action to trigger `download_quickspecs_pdf.js`.
 
-### ✅ Component 3: BOQ Upload & Workload DNA Profiler
-- Drag-and-drop zone for `.xlsx`, `.csv`, `.json`, or raw text quotes.
-- Live Workload DNA extraction cards:
-  - **CPU Core Density**: Cores/socket ratio badge.
-  - **Memory Density Ratio**: GB/core gauge (flags SAP HANA / In-Memory Database).
-  - **GPU Accelerator Class**: VDI / AI Workload badge.
-  - **Storage I/O**: NVMe RI vs MU vs WI density meter.
+### ✅ Component 3: BOQ Upload & Workload DNA Profiler (`BoqUploader.jsx` & `WorkloadDnaCard.jsx`)
+- Uploads `.xlsx`, `.csv`, `.json` to `/api/upload-boq`.
+- Live Workload DNA extraction cards (CPU Core Density, Memory Density Ratio, GPU Accelerator Class, Storage I/O density meter).
 
-### ✅ Component 4: 6-Aspect Physical Math & 5-Level Conflict Inspector
-- Animated pulse gauges and charts (rendered via **Recharts**) for 6 physical aspects:
-  1. Compute & Thermal ($\text{TDP} \ge 240\text{W} \implies \text{High-Performance Fan}$).
-  2. Memory & Channel ($\text{DIMMs} \pmod 8 == 0$).
-  3. Storage & Interconnect (Tri-Mode Cable `P76453-B21`).
-  4. PCIe Slot Capacity & Risers.
-  5. Power & DC Lug Kits (`P36877-B21`).
-  6. Pointnext Support Suffix Taxonomy (`HU4A6A50C4V` / `HU4A6A500DK`).
+### ✅ Component 4: 6-Aspect Math & CLIC Error Inspector (`ConflictGraphInspector.jsx`)
+- **Physical Math Gauges**: Animated Recharts verifying all 6 physical aspect assertions.
+- **Live CLIC Portal Error Inspector**: Integrates `parse_clic_modal.js` to asynchronously fetch and display native HPE OCA configuration errors directly alongside our own Conflict Graph.
 
-### ✅ Component 5: 5-Tier Strategic Resolution Matrix Cards
-- Interactive candidate cards displaying:
-  - **Rank 1**: Customer Workload Intent Match (Badge & Intent Alignment %).
-  - **Rank 2**: Standardized CTO Baseline.
-  - **Rank 3**: High-IOPS Storage Optimized.
-  - **Rank 4**: Maximum Density & Expansion Headroom.
-  - **Rank 5**: CapEx Minimized Buildable Tier.
-- Displays unit cost, total CapEx, SKU modifications count, and rationale.
+### ✅ Component 5: 5-Tier Strategic Resolution Matrix Cards (`ResolutionMatrix.jsx`)
+- Interactive candidate solution cards covering Ranks 1 to 5.
 
-### ✅ Component 6: Token-Efficient Gemini NotebookLM MCP RAG Reasoning Engine
-- **Delegated Deep Reasoning**: Server endpoint `/api/notebook-query` calls `nlm notebook query <notebook_id> "<query>" --json` via MCP. Offloads heavy spec sheet analysis to NotebookLM, saving agent LLM tokens while serving deep citations!
-- **Interactive RAG Drawer**: Displays QuickSpecs citations, backplane cabling guides, and Rule #40 support taxonomy explanations side-by-side with evaluation steps.
-- **Graceful Offline Fallback**: If the `nlm` CLI is unavailable or times out, the dashboard gracefully catches the `(RAG Query Unavailable)` status and displays the locally computed 5-level rule evaluation matrix as a fallback, preventing an empty UI state.
+### ✅ Component 6: Token-Efficient Gemini NotebookLM RAG Engine (`NotebookRagDrawer.jsx`)
+- **Dynamic Config Binding**: Maps the active chassis to its Notebook ID via `scripts/config/notebooks.json`.
+- Displays a dedicated slide-out drawer for deep RAG citations.
 
-### ✅ Component 7: Antigravity Agent Orchestration & Interactive HITL Feedback Modal
-- **Antigravity AI Presentation Layer**: Orchestrates UI/UX state, workflow transitions, and visual micro-animations ("icing on the cake").
-- **Interactive Feedback Action**: Users click **"Log Vendor Portal Feedback"** on any resolution card.
-- **Real-Time KnowledgeDelta Logging**: Triggers `scripts/lib/feedback_loop.js` directly from the UI, writing timestamped deltas to `catalog_deltas.json` and dynamically updating rule graphs without code changes.
+### ✅ Component 7: Artifact Inspector & Data Quality Audit (`ArtifactInspector.jsx`)
+- **Artifact Transparency**: Dedicated tab to view raw scrape data, intermediate TSVs, and catalog diffs securely fetched over `/artifacts`.
+- **Data Quality Audit Badge**: A one-click action that triggers `verify_excel_tally.js` and displays a 100% Certified Pass/Fail checklist.
 
-### ✅ Component 8: In-Dashboard Agentic Feature Request & Self-Improving UI Loop
-- **Direct UI Feedback Widget**: A slide-out **"Agent Feedback & Feature Request"** drawer in the dashboard where you can type UI tweaks, bug reports, or feature requests directly inside the app!
-- **Feedback Queue Hook (`user_feedback_queue.json`)**: Button clicks in the UI post your feature requests directly to `server.js`, logging them into `outputs/history/user_feedback_queue.json`.
-- **Closed-Loop Agent Pair-Programming**:
-  1. You type feedback in the UI dashboard (e.g., *"Add a chart for power consumption"*, *"Fix alignment on PCIe Risers"*).
-  2. The Antigravity AI Agent picks up the request from the queue, performs code edits in `dashboard/src/` or `scripts/lib/`, and runs automated verification tests.
-  3. Displays visual loading progress in the dashboard UI.
-  4. Upon 100% successful test pass, the dashboard automatically hot-reloads and prompts you to check the new feature live!
+### ✅ Component 8: User Feedback & Task Dispatch Queue (`UserFeedbackDrawer.jsx`)
+- Slide-out drawer to log UI tweaks or feature requests to `outputs/history/user_feedback_queue.json` without blocking the UI.
+
+### ✅ Component 9: Closed-Loop Knowledge Sync & HITL Portal Deltas (`FeedbackModal.jsx`)
+- Interactive "Log Portal Feedback" modal on resolution cards for marking portal rejections or manual overrides.
+- Triggers `scripts/lib/feedback_loop.js` and `scripts/lib/knowledge_sync.js` asynchronously.
 
 ---
 
-## 🧪 Step-by-Step Verification & Certification Protocol
+## 🧪 4. Step-by-Step Verification & Certification Protocol
 
-1. **Backend API Audit**:
-   - Run `npm run test:all` to certify all 5 test suites pass 100%.
+1. **Backend API Audit**: Run `npm test` in the root folder to verify pipeline evaluation tests pass 100%.
 2. **Dashboard Dev Server Launch**:
-   - Run `node dashboard/server.js` and `npm run dev` inside `dashboard/`.
-   - Verify zero console errors and clean SSE connection.
+   - Run `npm run dashboard` from the root directory to instantly boot both the UI and backend server.
 3. **End-to-End Workflow Verification**:
-   - Click "Scrape Chassis" ➔ Confirm live log stream in SSE terminal.
-   - Upload `test_boq_dl380_gen12.json` ➔ Verify Workload DNA card & 5-Tier Resolution Matrix cards populate.
-   - Click "Query NotebookLM" ➔ Verify slide-out drawer displays NotebookLM RAG citations.
-   - Submit HITL portal rejection feedback ➔ Verify `catalog_deltas.json` updates in place.
+   - **Context Selection**: Pick a chassis from the Global Chassis Selector.
+   - **Smart Search**: Enter an agentic NotebookLM query and verify the non-blocking skeleton loader.
+   - **Price Elasticity**: Click a price-changed SKU to view the Recharts trend line.
+   - **Artifact & Quality Audit**: Open Artifact Inspector and run the Data Quality Audit.
