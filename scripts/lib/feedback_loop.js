@@ -44,7 +44,10 @@ function classifyPortalError(errorMessage) {
  * @param {string} outputDir E.g. "outputs/ProLiant/Gen12/DL380_Gen12_SFF"
  * @returns {object} Generated KnowledgeDelta
  */
-function processPortalFeedback(portalError, outputDir = 'outputs/ProLiant/Gen12/DL380_Gen12_SFF') {
+function processPortalFeedback(portalError, outputDir) {
+  if (!outputDir) {
+    throw new Error('processPortalFeedback requires an explicit outputDir parameter (no hardcoded default).');
+  }
   const classification = classifyPortalError(portalError);
 
   const historyDir = path.join(outputDir, 'history');
@@ -86,6 +89,13 @@ function processPortalFeedback(portalError, outputDir = 'outputs/ProLiant/Gen12/
   try {
     const { recordFeedbackTelemetry } = require('./telemetry');
     recordFeedbackTelemetry(delta);
+  } catch (_) {}
+
+  // S1: Auto-trigger Master Knowledge Sync & NotebookLM payload generation
+  try {
+    const { buildMasterKnowledgeRegistry, generateNotebookSyncPayload } = require('./knowledge_sync');
+    buildMasterKnowledgeRegistry();
+    generateNotebookSyncPayload(delta.chassis);
   } catch (_) {}
 
   return delta;

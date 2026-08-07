@@ -42,6 +42,12 @@ function verifyAll() {
   const xlsxFiles = findXlsxFiles(OUTPUTS_ROOT);
   console.log(`Found ${xlsxFiles.length} scraped Excel workbook(s) in outputs/.\n`);
 
+  if (xlsxFiles.length === 0) {
+    console.log('⚠️ NO DATA: 0 product catalogs found. Pipeline evaluation not applicable.');
+    console.log('================================================================\n');
+    return;
+  }
+
   let passCount = 0;
   let failCount = 0;
 

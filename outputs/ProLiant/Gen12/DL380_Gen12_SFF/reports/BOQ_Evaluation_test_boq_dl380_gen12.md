@@ -2,7 +2,7 @@
 
 **Target BOQ File**: `tests/fixtures/test_boq_dl380_gen12.csv`  
 **Target Gemini Notebook**: `Dl 380 Spec Gen 12` (`1d190853-4e9c-48df-aa70-eae66c6f2c1f`)  
-**Evaluation Date**: 2026-08-06T17:44:59.530Z  
+**Evaluation Date**: 2026-08-07T07:08:30.869Z  
 **Quantitative Confidence Score**: `0.2 / 1.00` (🚨 HITL Review Required)  
 
 ---
@@ -11,13 +11,13 @@
 
 | # | Product # (SKU) | Consolidated Qty | Description | Est. Unit Price (USD) | Extended Price (USD) |
 |---|---|---|---|---|---|
-| 1 | `P73282-B21` | 1 | HPE ProLiant Compute DL380 Gen12 SFF NC Configure-to-order Server | $5,584 | $5,584 |
+| 1 | `P73282-B21` | 1 | HPE ProLiant Compute DL380 Gen12 SFF NC Configure-to-order Server | $0 | $0 |
 | 2 | `P74573-B21` | 2 | Intel Xeon 6730P 2.5GHz 32-core 250W Processor for HPE | $10,516 | $21,032 |
-| 3 | `P69728-B21` | 12 | HPE 64GB (1x64GB) Dual Rank x4 DDR5-6400 CAS-52-52-52 EC8 Registered Smart Memory Kit | $551 | $6,612 |
+| 3 | `P69728-B21` | 12 | HPE 64GB (1x64GB) Dual Rank x4 DDR5-6400 CAS-52-52-52 EC8 Registered Smart Memory Kit | $0 | $0 |
 | 4 | `P47777-B21` | 1 | HPE MR416i-p Gen11 SPG x16 Lanes 8GB Cache PCI SPG Controller | $5,999 | $5,999 |
 | 5 | `P17023-B21` | 2 | HPE 1600W Flex Slot -48VDC Hot Plug Power Supply Kit | $1,561 | $3,122 |
 
-**Current Baseline BOM Total**: `$42,349 USD`
+**Current Baseline BOM Total**: `$30,153 USD`
 
 ---
 
@@ -44,7 +44,7 @@
 
 - **Detected Chassis Variant**: `DL380 Gen12 SFF`  
 - **Whole-Solution Buildability**: `✅ PASSED`  
-- **Rules Loaded Source**: `outputs/ProLiant/Gen12/DL380_Gen12_SFF/DL380_Gen12_SFF_Catalog_Rules.json` (Dual Safety Net)  
+- **Rules Loaded Source**: `/Users/macbookaira1466/Downloads/booktoSkill/outputs/ProLiant/Gen12/DL380_Gen12_SFF/DL380_Gen12_SFF_Catalog_Rules.json` (Dual Safety Net)  
 
 | Hierarchy Level | Evaluated Rule Text | Status | Technical Audit Details |
 |---|---|---|---|
@@ -88,9 +88,9 @@
 
 ## 💰 3. Budget-Constrained Optimization & Golden Rule Assurance
 
-✅ GOLDEN RULE COMPLIANT: Mandatory buildable cost $43,594 fits within target budget of $0 (Surplus: $0).
+ℹ️ No budget constraint provided — showing mandatory buildable cost only.
 
-- **Mandatory Buildable Cost**: `$43,594 USD` (Includes all direct SKU fixes)
+- **Mandatory Buildable Cost**: `$31,384 USD` (Includes all direct SKU fixes)
 ---
 
 ## 🤖 4. Pre-Flight Physical Validation (RAG Unavailable)

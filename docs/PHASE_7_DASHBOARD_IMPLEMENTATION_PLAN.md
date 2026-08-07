@@ -21,30 +21,32 @@ This plan provides an end-to-end audited technical blueprint for building the **
 
 > **Zero External API Key Architecture**: The web dashboard connects to a local Express/Node.js server bridge (`server.js`). UI button clicks trigger the existing **Antigravity CLI workflows** (`npm run scrape`, `npm run eval:boq`, `nlm notebook query`, `npm run registry:sync`) using native process execution (`child_process.spawn`) and stream logs in real-time via **Server-Sent Events (SSE)**.
 
-```
-dashboard/
-├── public/
-│   └── favicon.ico
-├── src/
-│   ├── components/
-│   │   ├── Header.jsx                 ← Navigation & live CDP port 9222 health indicator
-│   │   ├── ScraperTriggerCard.jsx     ← Live trigger for npm run scrape with SSE log terminal
-│   │   ├── CatalogExplorer.jsx        ← Multi-sheet Excel viewer + FlexSearch NLP attribute search
-│   │   ├── BoqUploader.jsx            ← File drag-and-drop & text paste zone triggering eval:boq
-│   │   ├── WorkloadDnaCard.jsx        ← CPU core density, RAM/core ratio, GPU class gauges
-│   │   ├── ConflictGraphInspector.jsx ← 5-level rule hierarchy & 6-aspect physical math gauge
-│   │   ├── ResolutionMatrix.jsx       ← 5-tier strategic candidate cards (Rank 1-5)
-│   │   ├── NotebookRagDrawer.jsx      ← Gemini NotebookLM RAG citations & notes drawer
-│   │   └── FeedbackModal.jsx          ← Interactive HITL feedback & KnowledgeDelta logger
-│   ├── styles/
-│   │   └── index.css                  ← Light Mode design tokens, CSS variables, glassmorphism
-│   ├── utils/
-│   │   └── nlpSearch.js               ← FlexSearch client-side SKU attribute indexer
-│   ├── App.jsx                        ← Main dashboard orchestrator & SSE event listener
-│   └── main.jsx
-├── server.js                          ← Express/SSE CLI bridge (spawns npm/nlm scripts & streams logs)
-├── package.json
-└── vite.config.js
+> **Frontend Isolation Architecture**: The dashboard UI is a completely isolated React/Vite project inside the `dashboard/` directory with its own `package.json`. This strict boundary ensures UI libraries (`react`, `recharts`, `lucide-react`) do not pollute the root offline scraping engine's dependencies (`ws`, `xlsx-js-style`).
+
+├── package.json                       ← Root backend dependencies (ws, xlsx-js-style)
+└── dashboard/
+    ├── public/
+    │   └── favicon.ico
+    ├── src/
+    │   ├── components/
+    │   │   ├── Header.jsx                 ← Navigation & live CDP port 9222 health indicator
+    │   │   ├── ScraperTriggerCard.jsx     ← Live trigger for npm run scrape with SSE log terminal
+    │   │   ├── CatalogExplorer.jsx        ← Multi-sheet Excel viewer + FlexSearch NLP attribute search
+    │   │   ├── BoqUploader.jsx            ← File drag-and-drop & text paste zone triggering eval:boq
+    │   │   ├── WorkloadDnaCard.jsx        ← CPU core density, RAM/core ratio, GPU class gauges (via Recharts)
+    │   │   ├── ConflictGraphInspector.jsx ← 5-level rule hierarchy & 6-aspect physical math gauge (via Recharts)
+    │   │   ├── ResolutionMatrix.jsx       ← 5-tier strategic candidate cards (Rank 1-5)
+    │   │   ├── NotebookRagDrawer.jsx      ← Gemini NotebookLM RAG citations & notes drawer
+    │   │   └── FeedbackModal.jsx          ← Interactive HITL feedback & KnowledgeDelta logger
+    │   ├── styles/
+    │   │   └── index.css                  ← Light Mode design tokens, CSS variables, glassmorphism
+    │   ├── utils/
+    │   │   └── nlpSearch.js               ← FlexSearch client-side SKU attribute indexer
+    │   ├── App.jsx                        ← Main dashboard orchestrator & SSE event listener
+    │   └── main.jsx
+    ├── server.js                          ← Express/SSE CLI bridge (spawns npm/nlm scripts & streams logs)
+    ├── package.json                       ← Dashboard UI dependencies (react, vite, recharts, lucide-react)
+    └── vite.config.js
 ```
 
 ---
@@ -61,9 +63,10 @@ dashboard/
 - **FlexSearch Client-Side NLP Indexer**: Fast sub-millisecond search across all 2,568 SKUs by attribute (e.g. *"210W CPUs"*, *"DDR5-6400 memory"*, *"5-year Tech Care Essential"*).
 - **Color-Coded Historical Price Diffs**: Visualizes SKU additions (`ADDED` green), tombstones (`REMOVED` red strikethrough), and price deltas (`PRICE_CHANGED` amber).
 
-### ✅ Component 2: Scraper Execution & Real-Time Terminal Log Stream
+### ✅ Component 2: Scraper Execution & Structured Real-Time Terminal Stream
 - **One-Click Scrape Trigger**: Button triggers `npm run scrape` or `npm run scrape:storage`.
-- **SSE Real-Time Terminal View**: Server-Sent Events (`/api/stream-logs`) stream raw CDP console output, section height checks, and tab navigations (`Menu`, `Services`, `BOM`) directly into a collapsible in-app terminal pane.
+- **SSE Real-Time Terminal View**: Server-Sent Events (`/api/stream-logs`) stream console output. `server.js` intercepts raw stdout and wraps it in structured JSON (e.g., `{ type: "success", text: "✅ PASS:..." }`).
+- **Dynamic Syntax Highlighting**: The terminal UI parses the JSON stream to dynamically color-code logs (Green for Guardrail passes, Red for errors, Blue for navigation) rather than displaying a monotone text block.
 
 ### ✅ Component 3: BOQ Upload & Workload DNA Profiler
 - Drag-and-drop zone for `.xlsx`, `.csv`, `.json`, or raw text quotes.
@@ -74,7 +77,7 @@ dashboard/
   - **Storage I/O**: NVMe RI vs MU vs WI density meter.
 
 ### ✅ Component 4: 6-Aspect Physical Math & 5-Level Conflict Inspector
-- Animated pulse gauges for 6 physical aspects:
+- Animated pulse gauges and charts (rendered via **Recharts**) for 6 physical aspects:
   1. Compute & Thermal ($\text{TDP} \ge 240\text{W} \implies \text{High-Performance Fan}$).
   2. Memory & Channel ($\text{DIMMs} \pmod 8 == 0$).
   3. Storage & Interconnect (Tri-Mode Cable `P76453-B21`).
@@ -92,8 +95,9 @@ dashboard/
 - Displays unit cost, total CapEx, SKU modifications count, and rationale.
 
 ### ✅ Component 6: Token-Efficient Gemini NotebookLM MCP RAG Reasoning Engine
-- **Delegated Deep Reasoning**: Server endpoint `/api/notebook-query` calls `nlm notebook query <notebook_id> "<query>"` via MCP. Offloads heavy spec sheet analysis to NotebookLM, saving agent LLM tokens while serving deep citations!
+- **Delegated Deep Reasoning**: Server endpoint `/api/notebook-query` calls `nlm notebook query <notebook_id> "<query>" --json` via MCP. Offloads heavy spec sheet analysis to NotebookLM, saving agent LLM tokens while serving deep citations!
 - **Interactive RAG Drawer**: Displays QuickSpecs citations, backplane cabling guides, and Rule #40 support taxonomy explanations side-by-side with evaluation steps.
+- **Graceful Offline Fallback**: If the `nlm` CLI is unavailable or times out, the dashboard gracefully catches the `(RAG Query Unavailable)` status and displays the locally computed 5-level rule evaluation matrix as a fallback, preventing an empty UI state.
 
 ### ✅ Component 7: Antigravity Agent Orchestration & Interactive HITL Feedback Modal
 - **Antigravity AI Presentation Layer**: Orchestrates UI/UX state, workflow transitions, and visual micro-animations ("icing on the cake").

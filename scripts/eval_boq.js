@@ -4,6 +4,11 @@
  *
  * Runs end-to-end BOQ parsing (multi-sheet Excel, multipliers, line separators), 6-aspect physical pre-checks,
  * quantitative confidence scoring, Gemini Notebook RAG validation, and 5-Tier Resolution Report synthesis.
+ *
+ * Supports:
+ *   --chassis <dir>   Target chassis catalog directory (auto-detected from BOQ if omitted)
+ *   --json            Machine-parseable JSON output mode for dashboard SSE consumption
+ *   --notebook-id <id> Override Gemini Notebook ID
  */
 
 const fs = require('fs');
@@ -12,19 +17,43 @@ const os = require('os');
 const { execSync } = require('child_process');
 const { parseAndConsolidateBOQ, evaluatePhysicalMath, formatNotebookQueryPayload } = require('./lib/boq_evaluator');
 const { calculateConfidenceScore, processPortalFeedback } = require('./lib/feedback_loop');
+const { autoDetectChassisDir } = require('./lib/catalog_discovery');
 
-const DEFAULT_NOTEBOOK_ID = '1d190853-4e9c-48df-aa70-eae66c6f2c1f'; // Dl 380 Spec Gen 12
+/**
+ * Load notebook ID from config file or use hardcoded fallback.
+ */
+function getDefaultNotebookId() {
+  const configPath = path.join(__dirname, 'config', 'notebooks.json');
+  if (fs.existsSync(configPath)) {
+    try {
+      const cfg = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      return cfg.defaultNotebookId || cfg.default || '1d190853-4e9c-48df-aa70-eae66c6f2c1f';
+    } catch {}
+  }
+  return '1d190853-4e9c-48df-aa70-eae66c6f2c1f';
+}
 
 async function main() {
   const startTime = Date.now();
   const args = process.argv.slice(2);
+  const JSON_MODE = args.includes('--json');
+
   if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
     console.log(`
-Usage: node scripts/eval_boq.js <input_boq_file> [--notebook-id <id>] [--output <output_report.md>] [--simulate-portal-error "<error>"]
+Usage: node scripts/eval_boq.js <input_boq_file> [options]
+
+Options:
+  --chassis <dir>              Target chassis catalog directory (auto-detected from BOQ if omitted)
+  --notebook-id <id>           Gemini Notebook ID for RAG validation
+  --output <output_report.md>  Output report path
+  --json                       Machine-parseable JSON output mode
+  --budget <usd>               Target CapEx budget in USD
+  --simulate-portal-error ".." Simulate a portal rejection error
+  --output-dir <dir>           Output directory for feedback deltas
 
 Examples:
   node scripts/eval_boq.js test_boq_dl380_gen12.csv
-  node scripts/eval_boq.js my_quote.xlsx --output outputs/reports/eval_report.md
+  node scripts/eval_boq.js my_quote.xlsx --chassis outputs/Alletra/Storage/Alletra_Storage_System --json
   node scripts/eval_boq.js test_boq_dl380_gen12.csv --simulate-portal-error "ERR_STORAGE_CABLE_REQUIRED: Controller MR416i-p requires P76453-B21 Box 1/2 Cable Kit."
 `);
     process.exit(0);
@@ -36,14 +65,46 @@ Examples:
     process.exit(1);
   }
 
-  let notebookId = DEFAULT_NOTEBOOK_ID;
+  let notebookId = getDefaultNotebookId();
   const nbIdx = args.indexOf('--notebook-id');
   if (nbIdx !== -1 && args[nbIdx + 1]) {
     notebookId = args[nbIdx + 1];
   }
 
   const inputBase = path.basename(inputFile, path.extname(inputFile));
-  const chassisDir = 'outputs/ProLiant/Gen12/DL380_Gen12_SFF';
+
+  // G25/G32: Dynamic chassis directory — explicit flag, auto-detect from BOQ, or fallback
+  let chassisDir = '';
+  const chIdx = args.indexOf('--chassis');
+  if (chIdx !== -1 && args[chIdx + 1]) {
+    chassisDir = args[chIdx + 1];
+  }
+  // Auto-detection happens after BOQ parsing (below) if chassisDir is still empty
+
+  // Parse BOQ first so we can use items for auto-detection
+  const rawContent = fs.readFileSync(inputFile, 'utf-8');
+  const items = parseAndConsolidateBOQ(rawContent, inputFile);
+
+  // Auto-detect chassis from BOQ items if --chassis not provided
+  let chassisDetection = null;
+  if (!chassisDir) {
+    const { autoDetectChassisDetailed } = require('./lib/catalog_discovery');
+    chassisDetection = autoDetectChassisDetailed(items);
+    chassisDir = chassisDetection.chassisDir;
+  } else {
+    chassisDetection = {
+      chassisDir,
+      matchType: 'EXPLICIT_CLI',
+      confidenceScore: 1.0,
+      requiresUserConfirmation: false
+    };
+  }
+
+  // Ultimate fallback
+  if (!chassisDir) {
+    chassisDir = 'outputs/ProLiant/Gen12/DL380_Gen12_SFF';
+  }
+
   const defaultReportsDir = path.join(chassisDir, 'reports');
   if (!fs.existsSync(defaultReportsDir)) {
     fs.mkdirSync(defaultReportsDir, { recursive: true });
@@ -59,58 +120,80 @@ Examples:
   const errIdx = args.indexOf('--simulate-portal-error');
   if (errIdx !== -1 && args[errIdx + 1]) {
     const simError = args[errIdx + 1];
-    // Derive output dir from --output-dir arg or default to DL380_Gen12_SFF
+    // G33: Derive output dir from --output-dir arg or use resolved chassisDir (no longer hardcoded)
     const odIdx = args.indexOf('--output-dir');
-    const feedbackDir = (odIdx !== -1 && args[odIdx + 1]) ? args[odIdx + 1] : 'outputs/ProLiant/Gen12/DL380_Gen12_SFF';
-    console.log(`\n🔄 Processing simulated partner portal error feedback...`);
+    const feedbackDir = (odIdx !== -1 && args[odIdx + 1]) ? args[odIdx + 1] : chassisDir;
+    if (!JSON_MODE) console.log(`\n🔄 Processing simulated partner portal error feedback...`);
     const delta = processPortalFeedback(simError, feedbackDir);
-    console.log(`✅ KnowledgeDelta logged: ${delta.deltaId} (${delta.ruleUpdate})`);
+    if (!JSON_MODE) console.log(`✅ KnowledgeDelta logged: ${delta.deltaId} (${delta.ruleUpdate})`);
   }
 
-  console.log(`\n===============================================================`);
-  console.log(`🚀 HPE BOQ PRE-FLIGHT EVALUATION & GEMINI NOTEBOOK VALIDATOR`);
-  console.log(`===============================================================`);
-  console.log(`  📄 Input BOQ File : ${inputFile}`);
-  console.log(`  📚 Notebook ID    : ${notebookId}`);
-  console.log(`  📝 Output Report  : ${outputPath}`);
+  if (!JSON_MODE) {
+    console.log(`\n===============================================================`);
+    console.log(`🚀 HPE BOQ PRE-FLIGHT EVALUATION & GEMINI NOTEBOOK VALIDATOR`);
+    console.log(`===============================================================`);
+    console.log(`  📄 Input BOQ File : ${inputFile}`);
+    console.log(`  📚 Notebook ID    : ${notebookId}`);
+    console.log(`  📝 Output Report  : ${outputPath}`);
+    console.log(`  🔧 Chassis Dir    : ${chassisDir}`);
+  }
 
-  // Step 1: Parse and consolidate BOQ
-  const rawContent = fs.readFileSync(inputFile, 'utf-8');
-  const items = parseAndConsolidateBOQ(rawContent, inputFile);
-  console.log(`\n🔍 Phase 1: Consolidated ${items.length} unique hardware SKUs from BOQ.`);
+  // Step 1 already done above (BOQ parsed before chassis auto-detect)
+  if (!JSON_MODE) console.log(`\n🔍 Phase 1: Consolidated ${items.length} unique hardware SKUs from BOQ.`);
 
   // Step 2: Modular 6-Aspect Solution Pre-Check Engine
-  const evalResults = evaluatePhysicalMath(items);
+  // G25: Derive catalog filename dynamically from chassis directory basename
+  const chassisPrefix = path.basename(chassisDir);
+  const catalogPath = path.join(chassisDir, `${chassisPrefix}_Catalog.json`);
+  let catalogData = null;
+  if (fs.existsSync(catalogPath)) {
+    try {
+      catalogData = JSON.parse(fs.readFileSync(catalogPath, 'utf-8'));
+    } catch (err) { }
+  }
+
+  // G26: Pass chassisDir through to evaluatePhysicalMath → validateConflictGraph
+  const evalResults = evaluatePhysicalMath(items, catalogData, chassisDir);
   const graph = evalResults.conflictGraph || {};
 
-  console.log(`\n⚡ Phase 2: Modular 6-Aspect Physical Pre-Checks Completed:`);
-  console.log(`  1. Compute & Thermal : ${evalResults.cpuCount} CPUs (Max TDP: ${evalResults.maxCpuTdpWatts}W) | High-Perf Fans: ${evalResults.hasHighPerfFans ? '✅' : '❌'}`);
-  console.log(`  2. Memory & Channels : ${evalResults.memoryCount} DIMMs (${evalResults.totalMemoryGb} GB Total)`);
-  console.log(`  3. Storage & Tri-Mode: ${evalResults.driveCount} Drives | Controller Battery: ${evalResults.hasSmartBattery ? '✅' : '❌'}`);
-  console.log(`  4. Networking & OCP  : OCP Adapter Present: ${evalResults.hasOcpAdapter ? '✅' : '❌'}`);
-  console.log(`  5. Power & Ambient   : -48VDC PSU: ${evalResults.hasDcPowerSupply ? 'YES' : 'NO'} | Lug Kit: ${evalResults.hasDcLugKit ? '✅' : '❌'}`);
-  console.log(`  6. Support Services  : Tech Care Support Present: ${evalResults.hasSupportService ? '✅' : '❌'}`);
+  if (!JSON_MODE) {
+    console.log(`\n⚡ Phase 2: Modular 6-Aspect Physical Pre-Checks Completed:`);
+    console.log(`  1. Compute & Thermal : ${evalResults.cpuCount} CPUs (Max TDP: ${evalResults.maxCpuTdpWatts}W) | High-Perf Fans: ${evalResults.hasHighPerfFans ? '✅' : '❌'}`);
+    console.log(`  2. Memory & Channels : ${evalResults.memoryCount} DIMMs (${evalResults.totalMemoryGb} GB Total)`);
+    console.log(`  3. Storage & Tri-Mode: ${evalResults.driveCount} Drives | Controller Battery: ${evalResults.hasSmartBattery ? '✅' : '❌'}`);
+    console.log(`  4. Networking & OCP  : OCP Adapter Present: ${evalResults.hasOcpAdapter ? '✅' : '❌'}`);
+    console.log(`  5. Power & Ambient   : -48VDC PSU: ${evalResults.hasDcPowerSupply ? 'YES' : 'NO'} | Lug Kit: ${evalResults.hasDcLugKit ? '✅' : '❌'}`);
+    console.log(`  6. Support Services  : Tech Care Support Present: ${evalResults.hasSupportService ? '✅' : '❌'}`);
+  };
 
-  console.log(`\n🕸️ Phase 2.5: 5-Level Dependency Conflict Graph Validation:`);
-  console.log(`  Chassis Variant    : ${graph.chassisInfo ? graph.chassisInfo.model : 'DL380 Gen12 SFF'}`);
-  console.log(`  Rules Evaluated    : ${graph.totalRulesEvaluated || 33} across VENDOR, CHASSIS, CATEGORY, SUBCATEGORY, SKU levels`);
-  console.log(`  Rules Source       : ${graph.rulesSource || 'DL380_Gen12_SFF_Catalog.json'} ${graph.isFallbackSource ? '(Fallback Safety Net)' : '(Dual Safety Net)'}`);
-  console.log(`  Whole Solution     : ${graph.isWholeSolutionValid ? '✅ PASSED (No cross-aspect conflicts)' : '❌ CONFLICTS DETECTED'}`);
-
-  if (graph.resolvedFixes && graph.resolvedFixes.length > 0) {
-    console.log(`  Cascading Fixes    : ${graph.resolvedFixes.length} fix(es) validated without downstream conflicts.`);
+  if (!JSON_MODE) {
+    console.log(`\n🕸️ Phase 2.5: 5-Level Dependency Conflict Graph Validation:`);
+    console.log(`  Chassis Variant    : ${graph.chassisInfo ? graph.chassisInfo.model : 'Unknown'}`);
+    console.log(`  Rules Evaluated    : ${graph.totalRulesEvaluated || 0} across VENDOR, CHASSIS, CATEGORY, SUBCATEGORY, SKU levels`);
+    console.log(`  Rules Source       : ${graph.rulesSource || 'N/A'} ${graph.isFallbackSource ? '(Fallback Safety Net)' : '(Dual Safety Net)'}`);
+    if (graph.rulesSource === 'NONE') {
+      console.log(`  Whole Solution     : ⚠️ NO_DATA (No rules evaluated)`);
+    } else {
+      console.log(`  Whole Solution     : ${graph.isWholeSolutionValid ? '✅ PASSED (No cross-aspect conflicts)' : '❌ CONFLICTS DETECTED'}`);
+    }
   }
 
-  console.log(`\n  📊 Quantitative Confidence Score: ${evalResults.confidence.score} / 1.00`);
-  console.log(`  ${evalResults.confidence.summary}`);
+  if (!JSON_MODE) {
+    if (graph.resolvedFixes && graph.resolvedFixes.length > 0) {
+      console.log(`  Cascading Fixes    : ${graph.resolvedFixes.length} fix(es) validated without downstream conflicts.`);
+    }
 
-  if (evalResults.errors.length > 0) {
-    console.log(`\n❌ CRITICAL PHYSICAL VIOLATIONS:`);
-    evalResults.errors.forEach(e => console.log(`   - ${e}`));
-  }
-  if (evalResults.warnings.length > 0) {
-    console.log(`\n⚠️ PHYSICAL WARNINGS:`);
-    evalResults.warnings.forEach(w => console.log(`   - ${w}`));
+    console.log(`\n  📊 Quantitative Confidence Score: ${evalResults.confidence.score} / 1.00`);
+    console.log(`  ${evalResults.confidence.summary}`);
+
+    if (evalResults.errors.length > 0) {
+      console.log(`\n❌ CRITICAL PHYSICAL VIOLATIONS:`);
+      evalResults.errors.forEach(e => console.log(`   - ${e}`));
+    }
+    if (evalResults.warnings.length > 0) {
+      console.log(`\n⚠️ PHYSICAL WARNINGS:`);
+      evalResults.warnings.forEach(w => console.log(`   - ${w}`));
+    }
   }
 
   // Helper to check if nlm CLI is installed and available in PATH
@@ -130,7 +213,7 @@ Examples:
 
   let ragAnswer = '';
   if (isNlmAvailable) {
-    console.log(`\n🤖 Phase 3: Querying Gemini Notebook RAG (${notebookId})...`);
+    if (!JSON_MODE) console.log(`\n🤖 Phase 3: Querying Gemini Notebook RAG (${notebookId})...`);
     const tmpOutFile = path.join(os.tmpdir(), 'boq_rag_response.json');
     const tmpPromptFile = path.join(os.tmpdir(), 'boq_prompt_clean.txt');
     fs.writeFileSync(tmpPromptFile, queryPayload.replace(/"/g, "'"), 'utf-8');
@@ -152,10 +235,10 @@ Examples:
         }
       }
     } catch (err) {
-      console.warn(`  ⚠️ Notebook RAG query execution error: ${err.message}`);
+      if (!JSON_MODE) console.warn(`  ⚠️ Notebook RAG query execution error: ${err.message}`);
     }
   } else {
-    console.log(`\n⚠️ Phase 3: 'nlm' CLI not detected in PATH. Skipping Gemini Notebook RAG query.`);
+    if (!JSON_MODE) console.log(`\n⚠️ Phase 3: 'nlm' CLI not detected in PATH. Skipping Gemini Notebook RAG query.`);
   }
 
   if (!ragAnswer || ragAnswer.includes('ETIMEDOUT')) {
@@ -181,7 +264,7 @@ ${evalResults.warnings.length === 0 ? '' : evalResults.warnings.map(w => `- ⚠�
   }
 
   const { optimizeForBudget } = require('./lib/budget_optimizer');
-  const budgetOpt = optimizeForBudget(items, evalResults, targetBudgetUsd);
+  const budgetOpt = optimizeForBudget(items, evalResults, targetBudgetUsd, catalogData);
 
   // Step 5: Synthesize Final Markdown Report
   const reportDir = path.dirname(outputPath);
@@ -226,7 +309,11 @@ ${evalResults.warnings.length === 0 ? '' : evalResults.warnings.map(w => `- ⚠�
 
   reportContent += `### 🕸️ 2.5 Cross-Aspect Dependency & 5-Level Rule Audit Log\n\n`;
   reportContent += `- **Detected Chassis Variant**: \`${graph.chassisInfo ? graph.chassisInfo.model : 'DL380 Gen12 SFF'}\`  \n`;
-  reportContent += `- **Whole-Solution Buildability**: \`${graph.isWholeSolutionValid ? '✅ PASSED' : '❌ CONFLICTS DETECTED'}\`  \n`;
+  if (graph.rulesSource === 'NONE') {
+    reportContent += `- **Whole-Solution Buildability**: \`⚠️ NO_DATA (No rules evaluated)\`  \n`;
+  } else {
+    reportContent += `- **Whole-Solution Buildability**: \`${graph.isWholeSolutionValid ? '✅ PASSED' : '❌ CONFLICTS DETECTED'}\`  \n`;
+  }
   reportContent += `- **Rules Loaded Source**: \`${graph.rulesSource || 'DL380_Gen12_SFF_Catalog.json'}\` ${graph.isFallbackSource ? '(Fallback Safety Net)' : '(Dual Safety Net)'}  \n\n`;
 
   if (graph.auditLog && graph.auditLog.length > 0) {
@@ -290,12 +377,71 @@ ${evalResults.warnings.length === 0 ? '' : evalResults.warnings.map(w => `- ⚠�
   const { recordEvaluationTelemetry } = require('./lib/telemetry');
   recordEvaluationTelemetry(evalResults, inputFile, Date.now() - startTime);
 
-  console.log(`\n===============================================================`);
-  console.log(`✅ EVALUATION COMPLETE! Report saved to: ${outputPath}`);
-  console.log(`===============================================================\n`);
+  // G27a: Structured JSON output mode for dashboard SSE consumption
+  if (JSON_MODE) {
+    const jsonResult = {
+      status: 'SUCCESS',
+      data: {
+        inputFile,
+        chassisDir,
+        chassisPrefix,
+        chassisDetection,
+        notebookId,
+        outputReportPath: outputPath,
+        itemCount: items.length,
+        items,
+        evalResults: {
+          cpuCount: evalResults.cpuCount,
+          maxCpuTdpWatts: evalResults.maxCpuTdpWatts,
+          memoryCount: evalResults.memoryCount,
+          totalMemoryGb: evalResults.totalMemoryGb,
+          isBalancedChannel: evalResults.isBalancedChannel,
+          driveCount: evalResults.driveCount,
+          hasStorageController: evalResults.hasStorageController,
+          hasSmartBattery: evalResults.hasSmartBattery,
+          hasHighPerfFans: evalResults.hasHighPerfFans,
+          hasDcPowerSupply: evalResults.hasDcPowerSupply,
+          hasDcLugKit: evalResults.hasDcLugKit,
+          hasOcpAdapter: evalResults.hasOcpAdapter,
+          hasSupportService: evalResults.hasSupportService,
+          requiredPcieCards: evalResults.requiredPcieCards,
+          totalPcieSlotsAvailable: evalResults.totalPcieSlotsAvailable,
+          errors: evalResults.errors,
+          warnings: evalResults.warnings,
+          missingDependencies: evalResults.missingDependencies,
+          confidence: evalResults.confidence
+        },
+        conflictGraph: {
+          chassisInfo: graph.chassisInfo,
+          workloadDna: graph.workloadDna,
+          isWholeSolutionValid: graph.isWholeSolutionValid,
+          totalRulesEvaluated: graph.totalRulesEvaluated,
+          conflicts: graph.conflicts,
+          resolvedFixes: graph.resolvedFixes,
+          rankedSolutions: graph.rankedSolutions,
+          auditLog: graph.auditLog,
+          rulesSource: graph.rulesSource,
+          isFallbackSource: graph.isFallbackSource
+        },
+        budgetOptimization: budgetOpt,
+        ragAnswer: ragAnswer || null,
+        durationMs: Date.now() - startTime
+      }
+    };
+    process.stdout.write(JSON.stringify(jsonResult));
+  } else {
+    console.log(`\n===============================================================`);
+    console.log(`✅ EVALUATION COMPLETE! Report saved to: ${outputPath}`);
+    console.log(`===============================================================\n`);
+  }
 }
 
 main().catch(err => {
-  console.error('Fatal evaluation error:', err);
+  const JSON_MODE = process.argv.includes('--json');
+  if (JSON_MODE) {
+    process.stdout.write(JSON.stringify({ status: 'ERROR', error: err.message }));
+  } else {
+    console.error('Fatal evaluation error:', err);
+  }
   process.exit(1);
 });

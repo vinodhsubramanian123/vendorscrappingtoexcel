@@ -12,39 +12,45 @@ const path = require('path');
 const { cleanBaseSKU } = require('./sku');
 
 /**
- * Grounded List Price Database (USD) derived from V1 scraped catalog data
- */
-const SKIELD_LIST_PRICES_USD = {
-  'P73282-B21': 5584.00,  // Base DL380 Gen12 SFF NC Chassis
-  'P74573-B21': 10516.00, // Xeon 6730P 32-core 250W CPU
-  'P74792-B21': 316.00,   // Performance Heatsink Kit
-  'P69728-B21': 551.00,    // 64GB DDR5-6400 Smart Memory Kit
-  'P47777-B21': 5999.00,  // MR416i-p Storage Controller
-  'P01366-B21': 110.00,   // 96W Smart Storage Battery
-  'P48918-B21': 38.00,    // Controller Enablement Cable Kit
-  '873763-B21': 14.00,    // No Drive Configuration FIO Kit
-  'P17023-B21': 1561.00,  // 1600W -48VDC Power Supply
-  'P36877-B21': 135.00,   // DC Power Cable Lug Kit
-  'P48820-B21': 972.00,   // High Performance Fan Kit
-  'P51181-B21': 485.00,   // Broadcom BCM5719 1Gb 4p OCP3 Adapter
-  'P72203-B21': 77.00,    // CPU1 to Rear OCP SlotB Cable Kit
-  'P26269-B21': 2598.00,  // Broadcom 10/25Gb 4p OCP3 Adapter
-  'P72201-B21': 84.00,    // CPU1 to Rear OCP SlotA Cable Kit
-  'P03178-B21': 890.00,   // 1000W Titanium Flex Slot PS Kit
-  'P78145-B21': 11.00,    // C13 - C14 2m FIO Power Cord
-  'P75741-B21': 355.00,   // 8SFF x4 U.3 Tri-Mode Drive Cage Kit
-  'P76453-B21': 96.00,    // Box 1/2 Cable Kit
-  'P63829-B21': 1200.00   // 1.92TB NVMe Gen4 SSD
-};
-
-/**
- * Get unit list price for a SKU (USD)
+ * Get unit list price for a SKU (USD) by looking it up in the parsed catalog.
  * @param {string} skuStr 
+ * @param {object} catalogData 
  * @returns {number} Price in USD
  */
-function getSkuListPrice(skuStr) {
+function getSkuListPrice(skuStr, catalogData = null) {
   const clean = cleanBaseSKU(skuStr);
-  return SKIELD_LIST_PRICES_USD[clean] || 500.00; // Default estimate if unknown
+  if (catalogData && Array.isArray(catalogData.entries)) {
+    for (const sub of catalogData.entries) {
+      if (Array.isArray(sub.skus)) {
+        const match = sub.skus.find(s => s['Product #'] && cleanBaseSKU(s['Product #']) === clean);
+        if (match) {
+          const rawPrice = match['Unit Price (USD)'] || match['Price (USD)'] || match['Price'];
+          if (rawPrice) {
+            const parsed = parseFloat(String(rawPrice).replace(/[^0-9.]/g, ''));
+            if (!isNaN(parsed)) return parsed;
+          }
+        }
+      }
+    }
+  }
+  return 0.00; // Zero Hardcoding Rule: Return 0 if not found
+}
+
+/**
+ * Load family upgrade templates from config file.
+ * @param {string} family
+ * @returns {Array<object>} Upgrades list
+ */
+function loadUpgradeTemplates(family = 'ProLiant') {
+  const cfgPath = path.join(__dirname, '..', 'config', 'upgrade_templates.json');
+  if (fs.existsSync(cfgPath)) {
+    try {
+      const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
+      const families = cfg.families || {};
+      return families[family] || families['ProLiant'] || [];
+    } catch {}
+  }
+  return [];
 }
 
 /**
@@ -53,14 +59,17 @@ function getSkuListPrice(skuStr) {
  * @param {Array<object>} consolidatedItems 
  * @param {object} evalResults 
  * @param {number} targetBudgetUsd 
+ * @param {object} catalogData
  * @returns {object} Optimization analysis
  */
-function optimizeForBudget(consolidatedItems, evalResults, targetBudgetUsd = 0) {
+function optimizeForBudget(consolidatedItems, evalResults, targetBudgetUsd = 0, catalogData = null) {
   let currentBomCost = 0;
+  let zeroPriceCount = 0;
 
   // Calculate current baseline BOM cost
   consolidatedItems.forEach(it => {
-    const unitPrice = getSkuListPrice(it.sku);
+    const unitPrice = getSkuListPrice(it.sku, catalogData);
+    if (unitPrice === 0) zeroPriceCount++;
     it.unitPriceUsd = unitPrice;
     it.extendedPriceUsd = unitPrice * it.quantity;
     currentBomCost += it.extendedPriceUsd;
@@ -71,8 +80,21 @@ function optimizeForBudget(consolidatedItems, evalResults, targetBudgetUsd = 0) 
   const injectedSkus = [];
 
   if (evalResults && evalResults.missingDependencies) {
+    const dedupedDeps = [];
+    const skuMap = new Map();
     evalResults.missingDependencies.forEach(dep => {
-      const unitPrice = getSkuListPrice(dep.sku);
+      if (skuMap.has(dep.sku)) {
+        skuMap.get(dep.sku).quantity = Math.max(skuMap.get(dep.sku).quantity, dep.quantity);
+      } else {
+        const depCopy = { ...dep };
+        skuMap.set(dep.sku, depCopy);
+        dedupedDeps.push(depCopy);
+      }
+    });
+
+    dedupedDeps.forEach(dep => {
+      const unitPrice = getSkuListPrice(dep.sku, catalogData);
+      if (unitPrice === 0) zeroPriceCount++;
       const extPrice = unitPrice * dep.quantity;
       mandatoryBomCost += extPrice;
       injectedSkus.push({
@@ -91,28 +113,34 @@ function optimizeForBudget(consolidatedItems, evalResults, targetBudgetUsd = 0) 
   const budgetOverrunUsd = isBudgetExceeded ? (mandatoryBomCost - targetBudgetUsd) : 0;
   const remainingBudgetUsd = (!isBudgetExceeded && hasBudgetConstraint) ? (targetBudgetUsd - mandatoryBomCost) : 0;
 
-  // Upgrades recommendations if surplus budget remains
+  // Dynamic upgrade recommendations based on remaining surplus budget and family templates
   const recommendedUpgrades = [];
   if (remainingBudgetUsd > 0) {
-    if (remainingBudgetUsd >= 112555.00) {
-      recommendedUpgrades.push({
-        upgrade: '1DPC Symmetrical 16-DIMM Memory Balance (1.0TB Total)',
-        sku: 'P69728-B21',
-        qty: 4,
-        costUsd: 110444.00,
-        benefit: 'Populates all 16 memory channels symmetrically @ 6000MT/s 1DPC'
-      });
-    }
-    if (remainingBudgetUsd >= 2500.00) {
-      recommendedUpgrades.push({
-        upgrade: '25GbE OCP 3.0 High-Speed Adapter Upgrade',
-        sku: 'P26269-B21',
-        qty: 1,
-        costUsd: 2598.00,
-        benefit: 'Upgrades 1Gb network ports to 25GbE SFP28 for virtualization'
-      });
-    }
+    const family = (catalogData && catalogData.metadata && catalogData.metadata.family) ? catalogData.metadata.family : 'ProLiant';
+    const templates = loadUpgradeTemplates(family);
+
+    templates.forEach(tpl => {
+      if (remainingBudgetUsd >= tpl.minSurplusUsd) {
+        // Retrieve dynamic price from catalog if available, fallback to estimated
+        const catalogPrice = getSkuListPrice(tpl.sku, catalogData);
+        const finalPrice = catalogPrice > 0 ? catalogPrice : tpl.estimatedCostUsd;
+        recommendedUpgrades.push({
+          upgrade: tpl.upgrade,
+          sku: tpl.sku,
+          qty: tpl.qty || 1,
+          costUsd: finalPrice,
+          benefit: tpl.benefit
+        });
+      }
+    });
   }
+
+  const hasZeroPriceSkus = zeroPriceCount > 0;
+  const goldenRuleSummary = !hasBudgetConstraint
+    ? `ℹ️ No budget constraint provided — showing mandatory buildable cost only.`
+    : (isBudgetExceeded
+      ? `⚠️ GOLDEN RULE MANDATE: Target budget of $${targetBudgetUsd.toLocaleString()} is exceeded by +$${budgetOverrunUsd.toLocaleString()}. Mandatory buildable cost is $${mandatoryBomCost.toLocaleString()} to eliminate unbuildable errors.`
+      : `✅ GOLDEN RULE COMPLIANT: Mandatory buildable cost $${mandatoryBomCost.toLocaleString()} fits within target budget of $${targetBudgetUsd.toLocaleString()} (Surplus: $${remainingBudgetUsd.toLocaleString()}).`);
 
   return {
     targetBudgetUsd,
@@ -123,14 +151,15 @@ function optimizeForBudget(consolidatedItems, evalResults, targetBudgetUsd = 0) 
     isBudgetExceeded,
     budgetOverrunUsd,
     remainingBudgetUsd,
+    hasZeroPriceSkus,
+    zeroPriceCount,
     recommendedUpgrades,
-    goldenRuleSummary: isBudgetExceeded
-      ? `⚠️ GOLDEN RULE MANDATE: Target budget of $${targetBudgetUsd.toLocaleString()} is exceeded by +$${budgetOverrunUsd.toLocaleString()}. Mandatory buildable cost is $${mandatoryBomCost.toLocaleString()} to eliminate unbuildable errors.`
-      : `✅ GOLDEN RULE COMPLIANT: Mandatory buildable cost $${mandatoryBomCost.toLocaleString()} fits within target budget of $${targetBudgetUsd.toLocaleString()} (Surplus: $${remainingBudgetUsd.toLocaleString()}).`
+    goldenRuleSummary
   };
 }
 
 module.exports = {
   getSkuListPrice,
-  optimizeForBudget
+  optimizeForBudget,
+  loadUpgradeTemplates
 };

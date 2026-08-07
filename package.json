@@ -21,6 +21,7 @@
     "rebuild": "node scripts/rebuild_all.js",
     "eval:boq": "node scripts/eval_boq.js",
     "registry:sync": "node scripts/lib/sync_registry.js",
+    "sync:knowledge": "node scripts/lib/knowledge_sync.js",
     "status": "node scripts/observability_status.js",
     "inspect:session": "node scripts/inspect_oca_session.js",
     "inspect:clic": "node scripts/visual_clic_inspector.js",
@@ -34,7 +35,6 @@
   },
   "dependencies": {
     "ws": "^8.18.0",
-    "xlsx": "^0.18.5",
     "xlsx-js-style": "^1.2.0"
   }
 }

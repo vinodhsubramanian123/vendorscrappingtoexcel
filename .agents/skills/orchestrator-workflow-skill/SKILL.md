@@ -22,24 +22,25 @@ graph TD
         C --> D["scripts/lib/diff_catalog.js (Price Trails)"]
         C --> E["*_Catalog_Rules.json (Dual Safety Net)"]
         D --> F["outputs/SCRAPED_CATALOGS.md (Master Registry)"]
-        D --> G["nlm-skill (Sync to Gemini NotebookLM)"]
+        E --> G["knowledge-sync-skill (Master Registry & Scope Taxonomy)"]
+        G --> H["nlm-skill (Sync to Gemini NotebookLM)"]
     end
 
     subgraph "Stage 3 & 4: BOQ Eval, Workload DNA & Conflict Graph"
-        H["Customer BOQ / Quote"] --> I["boq-eval-skill"]
-        I --> J["scripts/lib/boq_evaluator.js (6-Aspect Physical Math)"]
-        J --> K["scripts/lib/conflict_graph.js (5-Level Conflict Graph & Workload DNA)"]
-        K --> L["5-Tier Strategic Resolution Matrix (Rank 1: Intent Match)"]
-        L --> M["Grounded Gemini Notebook RAG (nlm-skill)"]
+        I["Customer BOQ / Quote"] --> J["boq-eval-skill"]
+        J --> K["scripts/lib/boq_evaluator.js (6-Aspect Physical Math)"]
+        K --> L["scripts/lib/conflict_graph.js (5-Level Conflict Graph & Workload DNA)"]
+        L --> M["5-Tier Strategic Resolution Matrix (Rank 1: Intent Match)"]
+        M --> N["Grounded Gemini Notebook RAG (nlm-skill)"]
     end
 
     subgraph "Stage 5 & 6: HITL Trial, Telemetry & Closed-Loop Learning"
-        M --> N["outputs/{Family}/{Gen}/{Model}/reports/ (BOQ Report)"]
-        N --> O["Human-in-the-Loop (HITL) Portal Build"]
-        O -- "Portal Error Rejection" --> P["scripts/lib/feedback_loop.js"]
-        P --> Q["outputs/history/catalog_deltas.json (KnowledgeDelta)"]
-        Q --> J
-        N --> R["scripts/lib/telemetry.js (outputs/history/pipeline_telemetry.json)"]
+        N --> O["outputs/{Family}/{Gen}/{Model}/reports/ (BOQ Report)"]
+        O --> P["Human-in-the-Loop (HITL) Portal Build"]
+        P -- "Portal Error Rejection" --> Q["scripts/lib/feedback_loop.js"]
+        Q --> R["outputs/history/catalog_deltas.json (KnowledgeDelta)"]
+        R --> G
+        O --> S["scripts/lib/telemetry.js (outputs/history/pipeline_telemetry.json)"]
     end
 ```
 

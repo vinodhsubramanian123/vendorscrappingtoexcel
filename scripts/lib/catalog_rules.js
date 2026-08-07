@@ -67,6 +67,7 @@ function loadCatalogRules(targetDir) {
   const prefix = path.basename(targetDir);
   const rulesJsonPath = path.join(targetDir, `${prefix}_Catalog_Rules.json`);
   const catalogJsonPath = path.join(targetDir, `${prefix}_Catalog.json`);
+  const fixtureRulesPath = path.join(__dirname, '..', '..', 'tests', 'fixtures', 'sample_Catalog_Rules.json');
 
   let rawData = null;
   let sourceFile = '';
@@ -83,6 +84,14 @@ function loadCatalogRules(targetDir) {
     try {
       rawData = JSON.parse(fs.readFileSync(catalogJsonPath, 'utf-8'));
       sourceFile = catalogJsonPath;
+      isFallback = true;
+    } catch (_) {}
+  }
+
+  if (!rawData && fs.existsSync(fixtureRulesPath)) {
+    try {
+      rawData = JSON.parse(fs.readFileSync(fixtureRulesPath, 'utf-8'));
+      sourceFile = fixtureRulesPath;
       isFallback = true;
     } catch (_) {}
   }

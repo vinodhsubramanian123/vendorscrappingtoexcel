@@ -174,16 +174,27 @@ function synthesize5TierRankedSolutions(items = [], evalResults = {}, graphResul
   const fixCost = fixes.reduce((acc, f) => acc + (f.quantity * 300), 0);
   const totalBuildableCost = baseCost + fixCost;
 
+  // D3: Dynamic score computation based on actual workload DNA alignment
+  const fixPenalty = Math.min(0.15, fixes.length * 0.02); // Max 15% penalty for many fixes
+  const rank1Score = parseFloat(Math.max(0.70, 1.0 - fixPenalty).toFixed(2));
+  const rank2Score = parseFloat(Math.max(0.65, rank1Score - 0.07).toFixed(2));
+  const rank3Score = parseFloat(Math.max(0.60, rank1Score - 0.13).toFixed(2));
+  const rank4Score = parseFloat(Math.max(0.55, rank1Score - 0.19).toFixed(2));
+  const rank5Score = parseFloat(Math.max(0.50, rank1Score - 0.26).toFixed(2));
+
+  // Compute intent alignment dynamically from DNA match quality
+  const intentAlign1 = fixes.length === 0 ? '100% (Direct Match)' : `${Math.max(85, 100 - fixes.length * 3)}% (${fixes.length} Fix${fixes.length > 1 ? 'es' : ''} Applied)`;
+
   return [
     {
       rank: 1,
       name: 'Rank 1: Customer Workload Intent Preserved (Optimal Match)',
-      score: 0.98,
+      score: rank1Score,
       estimatedCostUsd: totalBuildableCost,
       workloadDnaMatch: dna.workloadDescription,
       changesCount: fixes.length,
       tradeoffMetrics: {
-        intentAlignment: '100% (Direct Match)',
+        intentAlignment: intentAlign1,
         skuModifications: `${fixes.length} physical fixes injected`,
         costDeltaUsd: `+$${fixCost.toLocaleString()} (Mandatory Buildability)`,
         capacityExpansion: 'Optimal (Zero over/under-provisioning)'
@@ -193,12 +204,12 @@ function synthesize5TierRankedSolutions(items = [], evalResults = {}, graphResul
     {
       rank: 2,
       name: 'Rank 2: Standardized CTO Baseline & Maximum Stability',
-      score: 0.91,
+      score: rank2Score,
       estimatedCostUsd: totalBuildableCost + 1200,
       workloadDnaMatch: 'CTO Factory Default Standardized Configuration',
       changesCount: fixes.length + 1,
       tradeoffMetrics: {
-        intentAlignment: '92% (Standardized)',
+        intentAlignment: `${Math.max(80, 100 - fixes.length * 3 - 8)}% (Standardized)`,
         skuModifications: `${fixes.length + 1} modifications`,
         costDeltaUsd: `+$${(fixCost + 1200).toLocaleString()}`,
         capacityExpansion: 'Standard Factory Margins'
@@ -208,12 +219,12 @@ function synthesize5TierRankedSolutions(items = [], evalResults = {}, graphResul
     {
       rank: 3,
       name: 'Rank 3: High-IOPS & Storage Performance Optimized',
-      score: 0.85,
+      score: rank3Score,
       estimatedCostUsd: totalBuildableCost + 3500,
       workloadDnaMatch: `Optimized for ${dna.storageWorkload} ${dna.storageType} Performance`,
       changesCount: fixes.length + 2,
       tradeoffMetrics: {
-        intentAlignment: '88% (Storage Heavy)',
+        intentAlignment: `${Math.max(75, 100 - fixes.length * 3 - 12)}% (Storage Heavy)`,
         skuModifications: `${fixes.length + 2} modifications`,
         costDeltaUsd: `+$${(fixCost + 3500).toLocaleString()}`,
         capacityExpansion: 'High Drive Controller Throughput'
@@ -223,12 +234,12 @@ function synthesize5TierRankedSolutions(items = [], evalResults = {}, graphResul
     {
       rank: 4,
       name: 'Rank 4: Maximum Density & Future Scalability Expansion',
-      score: 0.79,
+      score: rank4Score,
       estimatedCostUsd: totalBuildableCost + 8500,
       workloadDnaMatch: 'Max Headroom (Full PCIe Riser & 1DPC Memory Expansion)',
       changesCount: fixes.length + 3,
       tradeoffMetrics: {
-        intentAlignment: '80% (Scalability Focused)',
+        intentAlignment: `${Math.max(70, 100 - fixes.length * 3 - 20)}% (Scalability Focused)`,
         skuModifications: `${fixes.length + 3} modifications`,
         costDeltaUsd: `+$${(fixCost + 8500).toLocaleString()}`,
         capacityExpansion: '100% Slot & Channel Headroom'
@@ -238,12 +249,12 @@ function synthesize5TierRankedSolutions(items = [], evalResults = {}, graphResul
     {
       rank: 5,
       name: 'Rank 5: Budget & CapEx Minimized Buildable Tier',
-      score: 0.72,
+      score: rank5Score,
       estimatedCostUsd: totalBuildableCost,
       workloadDnaMatch: 'Strict Minimum CapEx (100% Buildable Baseline)',
       changesCount: fixes.length,
       tradeoffMetrics: {
-        intentAlignment: '75% (Minimal Baseline)',
+        intentAlignment: `${Math.max(65, 100 - fixes.length * 3 - 25)}% (Minimal Baseline)`,
         skuModifications: `${fixes.length} mandatory fixes only`,
         costDeltaUsd: '$0 Surplus Added',
         capacityExpansion: 'Baseline Only'

@@ -11,7 +11,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const TELEMETRY_FILE = path.join('outputs', 'history', 'pipeline_telemetry.json');
+const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
+const TELEMETRY_FILE = path.join(PROJECT_ROOT, 'outputs', 'history', 'pipeline_telemetry.json');
 
 /**
  * Read existing telemetry data or initialize default telemetry object.

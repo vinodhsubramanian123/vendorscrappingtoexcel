@@ -16,22 +16,40 @@ const { generateMainSheet, generateRulesSheet, generateSummarySheet } = require(
 // ── CLI Arguments ─────────────────────────────────────────────────────────────
 const rawInputPath   = process.argv[2];
 const jsonOutputPath = process.argv[3];
-const IS_VERBOSE     = process.argv.includes('--verbose') || process.argv.includes('-v');
+const IS_VERBOSE = process.argv.includes('--verbose') || process.argv.includes('-v');
+const JSON_MODE  = process.argv.includes('--json');
+
+if (JSON_MODE) {
+  console.log = () => {};
+  console.warn = () => {};
+  console.info = () => {};
+  console.error = () => {};
+}
 
 if (!rawInputPath || !jsonOutputPath) {
-  console.error('Usage: node scripts/build_catalog.js <raw_data/oca_raw_data_full.json> <outputs/.../Catalog.json> [--verbose]');
+  if (JSON_MODE) {
+    process.stdout.write(JSON.stringify({ status: 'ERROR', error: 'Missing required CLI arguments rawInputPath and jsonOutputPath' }));
+  } else {
+    console.error('Usage: node scripts/build_catalog.js <raw_data/oca_raw_data_full.json> <outputs/.../Catalog.json> [--verbose]');
+  }
   process.exit(1);
 }
 if (!fs.existsSync(rawInputPath)) {
-  console.error(`❌ ERROR: Raw input file not found: ${rawInputPath}`);
+  if (JSON_MODE) {
+    process.stdout.write(JSON.stringify({ status: 'ERROR', error: `Raw input file not found: ${rawInputPath}` }));
+  } else {
+    console.error(`❌ ERROR: Raw input file not found: ${rawInputPath}`);
+  }
   process.exit(1);
 }
 
-console.log('================================================================');
-console.log('📦 CLASSIFICATION ENGINE — BUILD CATALOG');
-console.log(`Input:  ${rawInputPath}`);
-console.log(`Output: ${jsonOutputPath}`);
-console.log('================================================================\n');
+if (!JSON_MODE) {
+  console.log('================================================================');
+  console.log('📦 CLASSIFICATION ENGINE — BUILD CATALOG');
+  console.log(`Input:  ${rawInputPath}`);
+  console.log(`Output: ${jsonOutputPath}`);
+  console.log('================================================================\n');
+}
 
 const targetDir = path.dirname(jsonOutputPath);
 const scrapsDir = path.join(targetDir, 'intermittent_scraps');
@@ -466,19 +484,36 @@ fs.writeFileSync(rulesJsonPath, JSON.stringify(rulesJsonData, null, 2));
 
 fs.writeFileSync(jsonOutputPath, JSON.stringify(enrichedCatalog, null, 2));
 
-console.log('=== FILES SAVED ===');
-console.log(`  📄 ${filePrefix}_Catalog_SKUs.tsv    (${mainTSV.split('\n').length} rows)`);
-console.log(`  📄 ${filePrefix}_Catalog_Rules.tsv   (${rulesTSV.split('\n').length} rows)`);
-console.log(`  📄 ${filePrefix}_Catalog_Summary.tsv (${summaryTSV.split('\n').length} rows)`);
-console.log(`  📄 ${filePrefix}_Catalog_Rules.json  (${rulesJsonData.rules.length} rules, dual safety net)`);
-console.log(`  📄 ${catalogBaseName}.json        (structured companion JSON)`);
-
-console.log('\n=== CATEGORY BREAKDOWN ===');
 const catCounts = {};
 for (const e of enrichedCatalog.entries) {
   catCounts[e.parentCategory] = (catCounts[e.parentCategory] || 0) + e.skuCount;
 }
-Object.entries(catCounts).sort((a, b) => b[1] - a[1]).forEach(([cat, count]) => {
-  console.log(`  • ${cat.padEnd(35)}: ${count} SKUs`);
-});
-console.log('\n✅ CLASSIFICATION COMPLETE.');
+
+if (JSON_MODE) {
+  const jsonResult = {
+    status: 'SUCCESS',
+    data: {
+      jsonOutputPath,
+      chassisLabel,
+      metadata: enrichedCatalog.metadata,
+      totalEntries: enrichedCatalog.entries.length,
+      totalUniqueSKUs: enrichedCatalog.metadata.totalUniqueSKUs,
+      rulesCount: rulesJsonData.rules.length,
+      categoryBreakdown: catCounts
+    }
+  };
+  process.stdout.write(JSON.stringify(jsonResult));
+} else {
+  console.log('=== FILES SAVED ===');
+  console.log(`  📄 ${filePrefix}_Catalog_SKUs.tsv    (${mainTSV.split('\n').length} rows)`);
+  console.log(`  📄 ${filePrefix}_Catalog_Rules.tsv   (${rulesTSV.split('\n').length} rows)`);
+  console.log(`  📄 ${filePrefix}_Catalog_Summary.tsv (${summaryTSV.split('\n').length} rows)`);
+  console.log(`  📄 ${filePrefix}_Catalog_Rules.json  (${rulesJsonData.rules.length} rules, dual safety net)`);
+  console.log(`  📄 ${catalogBaseName}.json        (structured companion JSON)`);
+
+  console.log('\n=== CATEGORY BREAKDOWN ===');
+  Object.entries(catCounts).sort((a, b) => b[1] - a[1]).forEach(([cat, count]) => {
+    console.log(`  • ${cat.padEnd(35)}: ${count} SKUs`);
+  });
+  console.log('\n✅ CLASSIFICATION COMPLETE.');
+}

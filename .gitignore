@@ -13,6 +13,7 @@ yarn-error.log
 outputs/**/*.json
 outputs/**/*.xlsx
 outputs/**/*.tsv
+outputs/**/*.csv
 outputs/**/*.pdf
 outputs/**/*.html
 # Always keep the registry and directory structure

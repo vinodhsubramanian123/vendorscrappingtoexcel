@@ -1,0 +1,11 @@
+{
+  "defaultNotebookId": "1d190853-4e9c-48df-aa70-eae66c6f2c1f",
+  "notebooks": {
+    "DL380_Gen12_SFF": "1d190853-4e9c-48df-aa70-eae66c6f2c1f",
+    "DL380_Gen11": "",
+    "Alletra_Storage_System": "",
+    "MSL3040_Tape": "",
+    "GX5000_General_RACK": "",
+    "SY100Gb_F32_Module": ""
+  }
+}

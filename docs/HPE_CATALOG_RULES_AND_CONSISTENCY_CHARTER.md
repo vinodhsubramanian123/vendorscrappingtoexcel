@@ -1,8 +1,8 @@
-# HPE Gen12 Catalog Intelligence & Configuration Consistency Charter
+# HPE Catalog Intelligence & Configuration Consistency Charter
 
-This charter defines the master configuration rules, component precedence rankings, thermal saturation mathematics, support service pricing standards, and pre/post-flight quality assertions for HPE ProLiant Gen12 and sister product lines (Gen11, Synergy, Alletra, Cray).
+This charter defines the master configuration rules, component precedence rankings, thermal saturation mathematics, support service pricing standards, and pre/post-flight quality assertions for **all HPE product lines** (ProLiant Gen11/Gen12, Synergy, Alletra, Cray, StoreEver, etc.).
 
-It is designed to serve as both an **operational guide for catalog scrapers/auditors** and a **reusable System Prompt Template** to paste into new Gemini Notebooks to ensure 100% data consistency across product generations.
+It is designed to serve as both an **operational guide for catalog scrapers/auditors** and a **reusable System Prompt Template** to paste into new Gemini Notebooks to ensure 100% data consistency across product generations and families.
 
 ---
 
@@ -38,7 +38,9 @@ STRICT GROUNDING SAFEGUARDS:
 
 ---
 
-## ⚙️ 2. Gen12 Configuration Rules & Compatibility Taxonomy
+## ⚙️ 2. HPE Configuration Rules & Compatibility Taxonomy (DL380 Gen12 Example)
+
+*Note: While the rules engine is universally applicable to all HPE products, the SKU numbers (e.g., P48820-B21) and constraints below are provided using the ProLiant DL380 Gen12 as a concrete baseline example. Other chassis (e.g. Alletra, Synergy) will parse analogous constraints dynamically from their respective scraped catalogs.*
 
 ### A. Processor & Thermal Management Rules
 | Subcategory | Constraint | Configuration Rule / Restriction | Operational Impact |

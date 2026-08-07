@@ -8,9 +8,10 @@
 
 const fs = require('fs');
 const path = require('path');
-const xlsx = require('xlsx');
+const xlsx = require('xlsx-js-style');
 const { cleanBaseSKU, isValidHpeSKU, HPE_SKU_EXTRACT_REGEX } = require('./sku');
 const { calculateConfidenceScore } = require('./feedback_loop');
+const { classifyComponentRole } = require('./product_meta');
 
 /**
  * High TDP threshold requiring High-Performance Fan Kits
@@ -120,16 +121,24 @@ function parseAndConsolidateBOQ(rawInput, filePath = '') {
 /**
  * Aspect 1: Compute & Thermal Pre-Check
  */
-function evalComputeThermal(items) {
+function evalComputeThermal(items, catalogData = null) {
   let cpuCount = 0;
   let maxCpuTdpWatts = 0;
 
   for (const it of items) {
     const desc = it.description.toLowerCase();
-    if (desc.includes('processor') || desc.includes('intel xeon') || desc.includes('amd epyc') || /^p\d{5}-b21$/i.test(it.sku)) {
+    
+    // Attempt to lookup role from catalog if available, fallback to product_meta classifier
+    let role = classifyComponentRole('', desc);
+    if (catalogData && catalogData.entries) {
+      const match = catalogData.entries.find(e => e.skus && e.skus.find(s => cleanBaseSKU(s['Product #']) === cleanBaseSKU(it.sku)));
+      if (match) role = classifyComponentRole(match.parentCategory, desc);
+    }
+
+    if (role === 'Processor' || /^p\d{5}-b21$/i.test(it.sku)) {
       if (desc.includes('processor') || desc.includes('xeon') || desc.includes('epyc')) {
         cpuCount += it.quantity;
-        const tdpMatch = desc.match(/(\d{3})\s*w/i);
+        const tdpMatch = desc.match(/(\d{2,3})\s*w/i);
         if (tdpMatch) {
           const tdp = parseInt(tdpMatch[1], 10);
           if (tdp > maxCpuTdpWatts) maxCpuTdpWatts = tdp;
@@ -147,29 +156,41 @@ function evalComputeThermal(items) {
 /**
  * Aspect 2: Memory & Channel Pre-Check
  */
-function evalMemoryChannel(items) {
+function evalMemoryChannel(items, passedCpuCount = 0, catalogData = null) {
   let memoryCount = 0;
   let totalMemoryGb = 0;
+  let cpuCount = passedCpuCount;
 
   for (const it of items) {
     const desc = it.description.toLowerCase();
-    if (desc.includes('memory') || desc.includes('rdimm') || desc.includes('ddr5')) {
+    let role = classifyComponentRole('', desc);
+    if (catalogData && catalogData.entries) {
+      const match = catalogData.entries.find(e => e.skus && e.skus.find(s => cleanBaseSKU(s['Product #']) === cleanBaseSKU(it.sku)));
+      if (match) role = classifyComponentRole(match.parentCategory, desc);
+    }
+
+    if (role === 'Memory' || desc.includes('memory') || desc.includes('rdimm') || desc.includes('ddr5')) {
       memoryCount += it.quantity;
       const gbMatch = desc.match(/(\d+)\s*gb/i);
       if (gbMatch) {
         totalMemoryGb += (parseInt(gbMatch[1], 10) * it.quantity);
       }
     }
+    if (!passedCpuCount && (desc.includes('processor') || desc.includes('xeon') || desc.includes('epyc'))) {
+      cpuCount += it.quantity;
+    }
   }
 
-  const isBalancedChannel = memoryCount > 0 && (memoryCount % 8 === 0 || memoryCount === 16);
+  if (cpuCount === 0) cpuCount = 2; // Default if no CPUs found
+
+  const isBalancedChannel = memoryCount > 0 && (memoryCount % cpuCount === 0) && ((memoryCount / cpuCount) % 8 === 0);
   return { memoryCount, totalMemoryGb, isBalancedChannel };
 }
 
 /**
  * Aspect 3: Storage & Tri-Mode Controller Pre-Check
  */
-function evalStorageTriMode(items) {
+function evalStorageTriMode(items, catalogData = null) {
   let driveCount = 0;
   let hasStorageController = false;
   let hasSmartBattery = false;
@@ -178,7 +199,14 @@ function evalStorageTriMode(items) {
   for (const it of items) {
     const desc = it.description.toLowerCase();
     const sku = cleanBaseSKU(it.sku);
-    if (desc.includes('hdd') || desc.includes('ssd') || desc.includes('drive') || desc.includes('nvme')) {
+
+    let role = classifyComponentRole('', desc);
+    if (catalogData && catalogData.entries) {
+      const match = catalogData.entries.find(e => e.skus && e.skus.find(s => cleanBaseSKU(s['Product #']) === cleanBaseSKU(it.sku)));
+      if (match) role = classifyComponentRole(match.parentCategory, desc);
+    }
+
+    if (role === 'Drive Cage / Drive' || desc.includes('hdd') || desc.includes('ssd') || desc.includes('drive') || desc.includes('nvme')) {
       if (!desc.includes('no drive') && !desc.includes('cage') && !desc.includes('controller')) {
         driveCount += it.quantity;
       }
@@ -200,13 +228,20 @@ function evalStorageTriMode(items) {
 /**
  * Aspect 4: Networking & OCP 3.0 Interconnect Pre-Check
  */
-function evalNetworkingOcp(items) {
+function evalNetworkingOcp(items, catalogData = null) {
   let networkPortsCount = 0;
   let hasOcpAdapter = false;
 
   for (const it of items) {
     const desc = it.description.toLowerCase();
-    if (desc.includes('ocp') || desc.includes('adapter') || desc.includes('ethernet') || desc.includes('bcm5719') || desc.includes('bcm57504')) {
+    
+    let role = classifyComponentRole('', desc);
+    if (catalogData && catalogData.entries) {
+      const match = catalogData.entries.find(e => e.skus && e.skus.find(s => cleanBaseSKU(s['Product #']) === cleanBaseSKU(it.sku)));
+      if (match) role = classifyComponentRole(match.parentCategory, desc);
+    }
+
+    if (role === 'Network Adapter' || desc.includes('ocp') || desc.includes('adapter') || desc.includes('ethernet') || desc.includes('bcm5719') || desc.includes('bcm57504')) {
       hasOcpAdapter = true;
       networkPortsCount += (4 * it.quantity);
     }
@@ -251,14 +286,21 @@ function evalPcieRiserSlots(items) {
 /**
  * Aspect 5: Power & Environmental Pre-Check
  */
-function evalPowerEnvironment(items) {
+function evalPowerEnvironment(items, catalogData = null) {
   let hasDcPowerSupply = false;
   let hasDcLugKit = false;
 
   for (const it of items) {
     const desc = it.description.toLowerCase();
     const sku = cleanBaseSKU(it.sku);
-    if (desc.includes('-48vdc') || desc.includes('dc power')) {
+
+    let role = classifyComponentRole('', desc);
+    if (catalogData && catalogData.entries) {
+      const match = catalogData.entries.find(e => e.skus && e.skus.find(s => cleanBaseSKU(s['Product #']) === cleanBaseSKU(it.sku)));
+      if (match) role = classifyComponentRole(match.parentCategory, desc);
+    }
+
+    if (role === 'Power Supply' && (desc.includes('-48vdc') || desc.includes('dc power'))) {
       hasDcPowerSupply = true;
     }
     if (sku === MANDATORY_SKUS.DC_LUG_KIT.sku || desc.includes('lug kit')) {
@@ -272,11 +314,16 @@ function evalPowerEnvironment(items) {
 /**
  * Aspect 6: Support & Manufacturing Pre-Check
  */
-function evalSupportManufacturing(items) {
+function evalSupportManufacturing(items, catalogData = null) {
   let hasSupportService = false;
   for (const it of items) {
     const desc = it.description.toLowerCase();
-    if (desc.includes('tech care') || desc.includes('support') || desc.includes('warranty') || /^h[a-z0-9]{6}/i.test(it.sku)) {
+    let role = classifyComponentRole('', desc);
+    if (catalogData && catalogData.entries) {
+      const match = catalogData.entries.find(e => e.skus && e.skus.find(s => cleanBaseSKU(s['Product #']) === cleanBaseSKU(it.sku)));
+      if (match) role = classifyComponentRole(match.parentCategory, desc);
+    }
+    if (role === 'Service & Support' || desc.includes('tech care') || desc.includes('support') || desc.includes('warranty') || /^h[a-z0-9]{6}/i.test(it.sku)) {
       hasSupportService = true;
     }
   }
@@ -288,14 +335,14 @@ function evalSupportManufacturing(items) {
  * @param {Array<object>} items Consolidated BOQ items
  * @returns {object} Evaluation results
  */
-function evaluatePhysicalMath(items) {
-  const compute = evalComputeThermal(items);
-  const memory = evalMemoryChannel(items);
-  const storage = evalStorageTriMode(items);
-  const network = evalNetworkingOcp(items);
-  const pcie    = evalPcieRiserSlots(items);
-  const power = evalPowerEnvironment(items);
-  const support = evalSupportManufacturing(items);
+function evaluatePhysicalMath(items, catalogData = null, targetDir = '') {
+  const compute = evalComputeThermal(items, catalogData);
+  const memory = evalMemoryChannel(items, compute.cpuCount, catalogData);
+  const storage = evalStorageTriMode(items, catalogData);
+  const network = evalNetworkingOcp(items, catalogData);
+  const pcie    = evalPcieRiserSlots(items); // Doesn't need strict taxonomy given specific part descriptions
+  const power = evalPowerEnvironment(items, catalogData);
+  const support = evalSupportManufacturing(items, catalogData);
 
   const errors = [];
   const warnings = [];
@@ -400,8 +447,10 @@ function evaluatePhysicalMath(items) {
   };
 
   // Step 2.5: Run 5-Level Dependency Conflict Graph Validation
+  // G26: Use provided targetDir or auto-detect from items (no hardcoded path)
   const { validateConflictGraph } = require('./conflict_graph');
-  const graphResults = validateConflictGraph(items, missingDependencies, 'outputs/ProLiant/Gen12/DL380_Gen12_SFF');
+  const resolvedDir = targetDir || 'outputs/ProLiant/Gen12/DL380_Gen12_SFF';
+  const graphResults = validateConflictGraph(items, missingDependencies, resolvedDir);
   evalSummary.conflictGraph = graphResults;
 
   // Deduct score if whole solution has graph conflicts

@@ -8,11 +8,13 @@ const fs   = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const { sendCommand, getOCATarget, connectWS, setupDialogAutoHandler, extractTablesAsRows, extractChunkedText, sleep } = require('./lib/cdp');
+const { emitProgress, emitLog, emitResult } = require('./lib/progress');
 const { updateScrapedRegistry } = require('./lib/registry');
 const { parseProductMeta } = require('./lib/product_meta');
 
 const PROJECT_ROOT  = path.resolve(__dirname, '..');
 const OUTPUTS_ROOT  = path.join(PROJECT_ROOT, 'outputs');
+const JSON_MODE     = process.argv.includes('--json');
 
 async function main() {
   console.log('================================================================');
@@ -251,7 +253,7 @@ async function main() {
     process.exit(1);
   }
 
-  // STEP 7: Registry Update
+  // STEP 7: Registry Update & Knowledge Sync
   const actualPdfPath = pdfDestPath && fs.existsSync(pdfDestPath) ? pdfDestPath : null;
   updateScrapedRegistry({
     timestamp:    new Date().toISOString(),
@@ -267,13 +269,36 @@ async function main() {
     textLength:   combinedFullText.length
   });
 
-  console.log('\n================================================================');
-  console.log(`🎉 STORAGE SCRAPER COMPLETED — Output Directory:`);
-  console.log(`   ${outputDir}`);
-  console.log('================================================================\n');
+  try {
+    const { buildMasterKnowledgeRegistry } = require('./lib/knowledge_sync');
+    buildMasterKnowledgeRegistry();
+  } catch (_) {}
+
+  if (JSON_MODE) {
+    emitResult('SUCCESS', {
+      solutionName: heading,
+      family: meta.family,
+      gen: meta.gen,
+      chassisName: meta.cleanName,
+      outputDir,
+      jsonPath: catalogJson,
+      xlsxPath: catalogXlsx,
+      pdfPath: actualPdfPath,
+      tablesCount: allTables.length
+    });
+  } else {
+    console.log('\n================================================================');
+    console.log(`🎉 STORAGE SCRAPER COMPLETED — Output Directory:`);
+    console.log(`   ${outputDir}`);
+    console.log('================================================================\n');
+  }
 }
 
 main().catch(err => {
-  console.error('\n❌ STORAGE SCRAPER ERROR:', err.message || err);
+  if (JSON_MODE) {
+    emitResult('ERROR', {}, err.message || String(err));
+  } else {
+    console.error('\n❌ STORAGE SCRAPER ERROR:', err.message || err);
+  }
   process.exit(1);
 });

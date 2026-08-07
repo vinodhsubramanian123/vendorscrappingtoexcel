@@ -12,11 +12,13 @@ const {
   expandSections, extractChunkedText, extractTablesAsRows, extractSectionHeaders,
   sleep
 } = require('./lib/cdp');
+const { emitProgress, emitLog, emitResult } = require('./lib/progress');
 const { updateScrapedRegistry } = require('./lib/registry');
 const { parseProductMeta } = require('./lib/product_meta');
 
 const PROJECT_ROOT  = path.resolve(__dirname, '..');
 const OUTPUTS_ROOT  = path.join(PROJECT_ROOT, 'outputs');
+const JSON_MODE     = process.argv.includes('--json');
 
 const SCROLL_HEIGHT_THRESHOLD = 15000;   // Rule #19
 
@@ -269,8 +271,8 @@ async function main() {
     process.exit(1);
   }
 
-  // STEP 8: Update Master Registry
-  console.log('\n--- STEP 8: Updating Master Scraped Catalogs Registry ---');
+  // STEP 8: Update Master Registry & Knowledge Sync
+  console.log('\n--- STEP 8: Updating Master Scraped Catalogs Registry & Knowledge Sync ---');
   const actualPdfPath = pdfDestPath && fs.existsSync(pdfDestPath) ? pdfDestPath : null;
   updateScrapedRegistry({
     timestamp:    new Date().toISOString(),
@@ -286,14 +288,39 @@ async function main() {
     textLength:   totalLen
   });
 
+  try {
+    const { buildMasterKnowledgeRegistry } = require('./lib/knowledge_sync');
+    buildMasterKnowledgeRegistry();
+  } catch (_) {}
+
   const durationSec = ((Date.now() - pipelineStart) / 1000).toFixed(1);
-  console.log('\n================================================================');
-  console.log(`🎉 PIPELINE COMPLETED SUCCESSFULLY in ${durationSec}s — Output Directory:`);
-  console.log(`   ${outputDir}`);
-  console.log('================================================================\n');
+
+  if (JSON_MODE) {
+    emitResult('SUCCESS', {
+      solutionName: treeInfo.solutionName || 'OCA Solution',
+      family: meta.family,
+      gen: meta.gen,
+      chassisName: meta.cleanName,
+      outputDir,
+      jsonPath: catalogJson,
+      xlsxPath: catalogXlsx,
+      pdfPath: actualPdfPath,
+      tablesCount: tables.length,
+      durationSec
+    });
+  } else {
+    console.log('\n================================================================');
+    console.log(`🎉 PIPELINE COMPLETED SUCCESSFULLY in ${durationSec}s — Output Directory:`);
+    console.log(`   ${outputDir}`);
+    console.log('================================================================\n');
+  }
 }
 
 main().catch(err => {
-  console.error('\n❌ PIPELINE ERROR:', err.message || err);
+  if (JSON_MODE) {
+    emitResult('ERROR', {}, err.message || String(err));
+  } else {
+    console.error('\n❌ PIPELINE ERROR:', err.message || err);
+  }
   process.exit(1);
 });

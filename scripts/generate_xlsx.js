@@ -274,3 +274,23 @@ wb.SheetNames.forEach((name, i) => {
   const range = ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']) : { e: { r: 0 } };
   console.log(`  ${i + 1}. ${name} (${range.e.r} data rows)`);
 });
+
+// ── Cleanup intermediate TSV scraps ───────────────────────────────────────────
+try {
+  if (fs.existsSync(scrapsDir)) {
+    const files = fs.readdirSync(scrapsDir);
+    let cleanedCount = 0;
+    for (const file of files) {
+      if (file.endsWith('.tsv') || file.endsWith('.csv')) {
+        fs.unlinkSync(path.join(scrapsDir, file));
+        cleanedCount++;
+      }
+    }
+    if (cleanedCount > 0) {
+      console.log(`\n🧹 Cleaned up ${cleanedCount} intermediate TSV/CSV scrap files.`);
+    }
+  }
+} catch (err) {
+  console.warn(`\n⚠️  Could not clean up intermediate scraps: ${err.message}`);
+}
+

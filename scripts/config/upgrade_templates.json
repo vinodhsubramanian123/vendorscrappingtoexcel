@@ -1,0 +1,43 @@
+{
+  "version": "1.0.0",
+  "families": {
+    "ProLiant": [
+      {
+        "category": "Memory",
+        "upgrade": "1DPC Symmetrical Memory Balance (High Density RDIMMs)",
+        "sku": "P69728-B21",
+        "minSurplusUsd": 5000,
+        "estimatedCostUsd": 11044,
+        "benefit": "Populates all memory channels symmetrically for optimal 1DPC throughput"
+      },
+      {
+        "category": "Networking",
+        "upgrade": "25GbE OCP 3.0 High-Speed Adapter Upgrade",
+        "sku": "P26269-B21",
+        "minSurplusUsd": 1500,
+        "estimatedCostUsd": 2598,
+        "benefit": "Upgrades network ports to 25GbE SFP28 for low-latency cluster interconnect"
+      }
+    ],
+    "Alletra": [
+      {
+        "category": "Storage Controller / Cache",
+        "upgrade": "NVMe Storage Expansion Enclosure Kit",
+        "sku": "R4H78A",
+        "minSurplusUsd": 10000,
+        "estimatedCostUsd": 18500,
+        "benefit": "Adds expansion drive enclosure for ultra-high IOPS scale-out storage"
+      }
+    ],
+    "Synergy": [
+      {
+        "category": "Interconnect",
+        "upgrade": "Synergy 100Gb F32 Module Interconnect Upgrade",
+        "sku": "838327-B21",
+        "minSurplusUsd": 8000,
+        "estimatedCostUsd": 12000,
+        "benefit": "Upgrades blade fabric to 100Gb low-latency composable interconnect"
+      }
+    ]
+  }
+}

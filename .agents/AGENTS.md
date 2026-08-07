@@ -5,7 +5,7 @@ This workspace contains tools for scraping, parsing, and organising HPE server p
 
 ---
 
-## Pipeline State of Health (Last Updated: 2026-08-06)
+## Pipeline State of Health (Last Updated: 2026-08-07)
 
 ### ✅ Certified Products (100% Audit Pass)
 | Product | Family | Output Prefix | SKUs | Excel Sheets | QuickSpecs PDF | Status |
@@ -17,25 +17,24 @@ This workspace contains tools for scraping, parsing, and organising HPE server p
 | HPE Cray Supercomputing GX5000 Rack | Cray | `GX5000_General_RACK` | 46 | 11 | ⚠️ Advisory (No DOM link) | ✅ 100% PASS |
 | HPE Synergy VC 100Gb F32 Module | Synergy | `SY100Gb_F32_Module` | 141 | 8 | ✅ Verified (0.89 MB) | ✅ 100% PASS |
 
-**Total Portfolio Intelligence**: **2,568 unique SKUs** across 6 product lines in 5 families.
+**Total Portfolio Intelligence**: **2,568 unique SKUs** across 6 product lines in 5 families. 81/81 Test Assertions 100% Certified.
 
 ### ✅ Resolved & Certified Pipeline Health (100% Audit Pass)
 | ID | Issue / Feature | Status | Resolution / Implemented Module |
 |----|-----------------|--------|--------------------------------|
-| **G1** | Historical diff & price tracking engine | ✅ RESOLVED | Production module `scripts/lib/diff_catalog.js` computes SKU additions, removals (tombstones), and price trails |
-| **G2** | Graceful PDF existence check in tally audit | ✅ RESOLVED | `verify_excel_tally.js` handles absent QuickSpecs PDFs gracefully without crashing |
-| **G3** | Universal category sheet validation | ✅ RESOLVED | `test_pipeline_evals.js` dynamically checks core sheets across server, storage, tape, composable, supercomputing lines |
-| **G4** | Adaptive text length & post-flight audit mode | ✅ RESOLVED | `test_pipeline_evals.js` supports `--post-flight-only` and adaptive threshold assertions (`> 500` chars or `tableCount > 0`) |
-| **G5** | Cell-level Excel styling (colors & strikethroughs) | ✅ RESOLVED | `generate_xlsx.js` uses `xlsx-js-style` for Green (`#E6F4EA`) Added, Red (`#FDE7E7`) Removed, Amber (`#FFF3E0`) Price Changed |
-| **G7** | DOM section header landmark extraction | ✅ RESOLVED | `scrape_oca_solution.js` extracts explicit `sections` array with tag names, text, and class names |
-| **G8** | DRY registry updater | ✅ RESOLVED | Extracted to shared production helper `scripts/lib/registry.js` |
-| **G9** | Dynamic Category-Specific Sheet Tallies | ✅ RESOLVED | `verify_excel_tally.js` Audit 5 dynamically filters non-core sheets |
-| **G10**| CDP Connection Retry & Backoff | ✅ RESOLVED | `cdp.js` `connectWS()` includes automatic exponential backoff retries |
-| **G12**| Step Numbering Correction | ✅ RESOLVED | Console output step numbering synced with code execution stages |
-| **G13**| Centralized HPE SKU Utility & 6-Char Regex | ✅ RESOLVED | `scripts/lib/sku.js` handles `-B21`, 6-char (`C0H28A`, `Q2R32A`), and service SKUs cleanly across all checkers |
-| **G14**| Output Folder Naming Rule #15 Enforcement | ✅ RESOLVED | Enforced clean model shorthand (`SY100Gb_F32_Module`) without verbose titles or SKU IDs |
-| **G15**| Test Runner Excel Lock File Exclusion | ✅ RESOLVED | `verify_all.js` ignores `.~*_OCA_Catalog.xlsx` temporary files |
-| **G16**| Master Registry In-Place Row Update | ✅ RESOLVED | `registry.js` updates existing catalog rows in place during re-sync/re-scrape |
+| **G25/G26/G32** | Dynamic Chassis Pathing & `--chassis` Flag | ✅ RESOLVED | `eval_boq.js` and `boq_evaluator.js` accept `--chassis <dir>` flag and auto-detect target chassis from BOQ items via `autoDetectChassisDetailed()`. |
+| **G27a-e** | Machine-Parseable CLI `--json` Output | ✅ RESOLVED | `eval_boq.js`, `observability_status.js`, `verify_excel_tally.js`, `build_catalog.js`, `scrape_oca_solution.js`, and `scrape_oca_storage_solution.js` support stdout JSON mode for SSE stream ingestion. |
+| **G28** | Dynamic Notebook ID Registry | ✅ RESOLVED | `scripts/config/notebooks.json` externalizes NotebookLM notebook IDs per chassis family. |
+| **G29** | Reusable Catalog Discovery API | ✅ RESOLVED | `scripts/lib/catalog_discovery.js` provides programmatic catalog search, detail retrieval, and CDP port status. |
+| **G30** | Absolute Telemetry Directory Path | ✅ RESOLVED | `telemetry.js` anchors `pipeline_telemetry.json` relative to `__dirname` (`PROJECT_ROOT/outputs/history/`). |
+| **G31 / Q4** | Universal Dynamic Upgrade Engine | ✅ RESOLVED | `budget_optimizer.js` extracts upgrades per product line (ProLiant, Alletra, Synergy) with fallback to `scripts/config/upgrade_templates.json`. |
+| **G33** | Mandatory `outputDir` Parameter | ✅ RESOLVED | `processPortalFeedback()` requires explicit output directory parameter (no hardcoded fallback). |
+| **G36** | SSE Progress Event Emitter | ✅ RESOLVED | `scripts/lib/progress.js` provides `emitProgress()`, `emitLog()`, and `emitResult()` when `STRUCTURED_PROGRESS=1`. |
+| **G37 / Q3** | User Feedback Queue & Agent Auto-Pickup | ✅ RESOLVED | `scripts/lib/feedback_queue.js` provides `appendFeedback()`, `getNextPendingFeedback()`, and `formatAgentTaskPrompt()`. |
+| **Q2** | Low-Confidence Chassis Detection Prompting | ✅ RESOLVED | `autoDetectChassisDetailed()` computes confidence scores; if `score < 0.75`, `eval_boq.js` flags `requiresUserChassisConfirmation: true`. |
+| **D3** | Workload DNA Dynamic Resolution Scores | ✅ RESOLVED | `conflict_graph.js` computes 5-tier solution scores dynamically from workload DNA alignment and fix penalties. |
+| **D4** | Zero-Price SKU Safeguards | ✅ RESOLVED | `budget_optimizer.js` tracks `zeroPriceCount` and flags `hasZeroPriceSkus: true`. Fixed test assertions in `test_all_aspects.js`. |
+| **S1-S5** | Closed-Loop Automated Knowledge Sync | ✅ RESOLVED | `knowledge_sync.js` and `npm run sync:knowledge` automatically structure learned rules into Scope Taxonomy (`UNIVERSAL_VENDOR`, `FAMILY_GEN`, `CHASSIS_SPECIFIC`) and update Gemini NotebookLM payloads. |
 
 ### 🚀 Production Features Active
 - **Centralized HPE SKU Normalizer**: `scripts/lib/sku.js` provides single source of truth for hardware SKUs, option mode suffixes (`CTO`/`BTO`/`FIO`), and service SKUs.

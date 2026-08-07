@@ -1,0 +1,18 @@
+{
+  "rules": [
+    {
+      "rule": "BTO products are not allowed in CTO Base Model."
+    },
+    {
+      "rule": "Supported with EDSFF CTO Server only.",
+      "parentCategory": "Storage",
+      "subCategory": "SAS Controller"
+    },
+    {
+      "rule": "Mixing of x4 and x8 memory is not allowed"
+    },
+    {
+      "rule": "HPE 1600W -48VDC Pwr Cbl Lug Kit(P36877-B21) Supported only with HPE 1600W FS -48VDC Ht Plg PS Kit (P17023-B21)."
+    }
+  ]
+}

@@ -118,11 +118,30 @@ assert(payload.includes('P48820-B21'), `Direct SKU fix P48820-B21 included in RA
 console.log(`\n🔹 Test Group 7: Budget-Constrained Optimization & Golden Rule Assurance`);
 const { optimizeForBudget } = require('./lib/budget_optimizer');
 
-const budgetExceededRes = optimizeForBudget(items, evalResults, 35000.00);
+const mockCatalogData = {
+  metadata: { family: 'ProLiant' },
+  entries: [
+    {
+      skus: [
+        { 'Product #': 'P73282-B21', 'Unit Price (USD)': '5000.00' },
+        { 'Product #': 'P74573-B21', 'Unit Price (USD)': '3200.00' },
+        { 'Product #': 'P48820-B21', 'Unit Price (USD)': '450.00' },
+        { 'Product #': 'P69728-B21', 'Unit Price (USD)': '1850.00' },
+        { 'Product #': 'P47777-B21', 'Unit Price (USD)': '1200.00' },
+        { 'Product #': 'P01366-B21', 'Unit Price (USD)': '350.00' },
+        { 'Product #': 'P63829-B21', 'Unit Price (USD)': '850.00' },
+        { 'Product #': 'P03178-B21', 'Unit Price (USD)': '650.00' },
+        { 'Product #': 'P78145-B21', 'Unit Price (USD)': '45.00' }
+      ]
+    }
+  ]
+};
+
+const budgetExceededRes = optimizeForBudget(items, evalResults, 35000.00, mockCatalogData);
 assert(budgetExceededRes.isBudgetExceeded === true, `Identified budget overrun when target budget ($35,000) < mandatory cost ($${budgetExceededRes.mandatoryBomCostUsd})`);
 assert(budgetExceededRes.budgetOverrunUsd > 0, `Calculated minimum budget overrun delta (+$${budgetExceededRes.budgetOverrunUsd.toLocaleString()})`);
 
-const budgetSurplusRes = optimizeForBudget(items, evalResults, 600000.00);
+const budgetSurplusRes = optimizeForBudget(items, evalResults, 600000.00, mockCatalogData);
 assert(budgetSurplusRes.isBudgetExceeded === false, `Identified budget surplus when target budget ($600,000) >= mandatory cost ($${budgetSurplusRes.mandatoryBomCostUsd})`);
 assert(budgetSurplusRes.remainingBudgetUsd > 0, `Calculated remaining budget surplus ($${budgetSurplusRes.remainingBudgetUsd.toLocaleString()})`);
 assert(budgetSurplusRes.recommendedUpgrades.length > 0, `Generated surplus budget performance upgrade recommendations`);
