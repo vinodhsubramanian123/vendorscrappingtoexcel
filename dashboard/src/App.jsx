@@ -117,6 +117,8 @@ export default function App() {
   // Handler: Trigger Scrape
   const handleTriggerScrape = async (mode) => {
     setLogStream([]);
+    setActiveTab('scraper');
+    setEvalResults(null); // Clear stale cache
     try {
       await fetch('/api/scrape', {
         method: 'POST',
@@ -131,6 +133,8 @@ export default function App() {
   // Handler: Trigger Rebuild
   const handleTriggerRebuild = async () => {
     setLogStream([]);
+    setActiveTab('scraper');
+    setEvalResults(null); // Clear stale cache
     try {
       await fetch('/api/rebuild', { method: 'POST' });
     } catch (err) {
@@ -142,6 +146,7 @@ export default function App() {
   const handleTriggerSyncKnowledge = async () => {
     setLogStream([]);
     setActiveTab('scraper');
+    setEvalResults(null); // Clear stale cache
     try {
       await fetch('/api/sync-knowledge', { method: 'POST' });
     } catch (err) {
@@ -153,6 +158,7 @@ export default function App() {
   const handleTriggerDownloadPdf = async () => {
     setLogStream([]);
     setActiveTab('scraper');
+    setEvalResults(null);
     try {
       await fetch('/api/download-pdf', {
         method: 'POST',

@@ -347,11 +347,11 @@ app.post('/api/notebook-query', (req, res) => {
     });
   }
 
-  execFile('nlm', ['notebook', 'query', notebookId, query, '--json'], (err, stdout) => {
+  execFile('nlm', ['notebook', 'query', notebookId, query, '--json'], { timeout: 30000 }, (err, stdout) => {
     if (err) {
       return res.json({
         query,
-        answer: `NotebookLM Query Fallback: ${err.message}`,
+        answer: `NotebookLM Query Fallback: ${err.message || 'Timeout exceeded'}`,
         citations: [],
         source: 'FALLBACK'
       });
@@ -602,32 +602,47 @@ app.post('/api/export-boq', (req, res) => {
   const { evalResults, chassisId, rankTier } = req.body;
   if (!evalResults) return res.status(400).json({ error: 'evalResults payload is required' });
 
+  const XLSX = require('xlsx-js-style');
   const tier = rankTier || 1;
   const timestamp = Date.now();
   const exportDir = path.join(OUTPUTS_DIR, 'temp', 'exports');
-  fs.mkdirSync(exportDir, { recursive: true });
+  if (!fs.existsSync(exportDir)) fs.mkdirSync(exportDir, { recursive: true });
 
-  const exportFilename = `corrected_boq_rank${tier}_${chassisId || 'unknown'}_${timestamp}.json`;
+  const exportFilename = `corrected_boq_rank${tier}_${chassisId || 'unknown'}_${timestamp}.xlsx`;
   const exportPath = path.join(exportDir, exportFilename);
 
-  const exportPayload = {
-    exportedAt: new Date().toISOString(),
-    chassis: chassisId || 'Unknown',
-    appliedRank: tier,
-    conflictsSummary: evalResults.conflictGraph?.summary || null,
-    rankedSolution: evalResults.conflictGraph?.rankedSolutions?.find(s => s.rank === tier) || null,
-    workloadDna: evalResults.workloadDna || null,
-    physicalChecks: evalResults.physicalChecks || null,
-    correctedSkus: evalResults.conflictGraph?.rankedSolutions?.find(s => s.rank === tier)?.skuList || []
-  };
+  const rankedSolution = evalResults.conflictGraph?.rankedSolutions?.find(s => s.rank === tier) || null;
+  const wb = XLSX.utils.book_new();
 
-  fs.writeFileSync(exportPath, JSON.stringify(exportPayload, null, 2), 'utf-8');
+  // --- SHEET 1: Summary & Rationale ---
+  const summaryData = [
+    ['Field', 'Value'],
+    ['Chassis', chassisId || 'Unknown'],
+    ['Applied Rank', tier],
+    ['Solution Name', rankedSolution?.name || 'N/A'],
+    ['Customer Intent Match', rankedSolution?.tradeoffMetrics?.intentAlignment || 'N/A'],
+    ['Estimated CapEx', rankedSolution?.estimatedCostUsd ? `$${rankedSolution.estimatedCostUsd.toLocaleString()}` : 'N/A'],
+    ['NotebookLM RAG Reasoning', rankedSolution?.reasoning || 'N/A']
+  ];
+  const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+  XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary & Rationale');
+
+  // --- SHEET 2: Corrected BOM ---
+  const bomData = [['SKU', 'Quantity', 'Description', 'Action']];
+  const correctedSkus = rankedSolution?.skuList || [];
+  correctedSkus.forEach(sku => {
+    bomData.push([sku.sku, sku.quantity, sku.description || '', sku.isFix ? 'ADDED (FIX)' : 'ORIGINAL']);
+  });
+  const wsBom = XLSX.utils.aoa_to_sheet(bomData);
+  XLSX.utils.book_append_sheet(wb, wsBom, 'Corrected BOM');
+
+  XLSX.writeFile(wb, exportPath);
 
   res.json({
-    message: `Rank ${tier} corrected BOQ exported`,
+    message: `Rank ${tier} corrected BOQ Excel exported`,
     filename: exportFilename,
     downloadPath: `/artifacts/temp/exports/${exportFilename}`,
-    exportedAt: exportPayload.exportedAt
+    exportedAt: new Date().toISOString()
   });
 });
 
