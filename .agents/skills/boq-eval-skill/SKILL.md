@@ -1,15 +1,15 @@
 ---
 name: boq-eval-skill
-description: Use this skill for validating customer BOQs, hardware lists, Excel quotes, or proposals against HPE server specs (DL380 Gen12/Gen11, Alletra, Synergy) and running 6-aspect physical pre-checks.
+description: Use this skill for validating customer BOQs, hardware lists, Excel quotes, or proposals against vendor-agnostic product specs (HPE, Cisco, Dell, Alletra, etc.) and running 6-aspect physical pre-checks.
 ---
 
 # Pre-Flight BOQ Evaluation & Closed-Loop Feedback Skill (`boq-eval-skill`)
 
 ---
 
-## 1. Overview & Workflow Lifecycle (Mermaid Flowchart)
+## 1. Overview & Workflow Lifecycle (Workflow 2)
 
-This skill provides an automated, agentic workflow for ingesting raw customer BOQs, pre-cleaning input data, running deterministic 6-aspect physical math assertions, executing 5-level dependency conflict graph validation, profiling Workload DNA, querying Gemini Notebook RAG (`Dl 380 Spec Gen 12` - ID: `1d190853-4e9c-48df-aa70-eae66c6f2c1f`), and capturing closed-loop feedback from HPE OCA portal rejections.
+This skill provides an automated, agentic workflow representing **Workflow 2 (Pre-Flight Evaluation)** of the dual-workflow paradigm. It ingests raw customer BOQs, pre-cleans input data, runs deterministic 6-aspect physical math assertions, executes 5-level dependency conflict graph validation, profiles Workload DNA, dynamically routes to Gemini Notebook RAG via `notebooks.json`, and outputs the results to the dashboard and a dynamically generated **Corrected BOQ Excel workbook**.
 
 ```mermaid
 graph TD
@@ -62,15 +62,16 @@ graph TD
 ### Phase 3: Grounded Gemini Notebook RAG Validation
 - **Module**: [`scripts/eval_boq.js`](file:///Users/macbookaira1466/Downloads/booktoSkill/scripts/eval_boq.js)
 - **Functions**: `formatNotebookQueryPayload(items, evalResults)`
-- Queries Gemini NotebookLM (`Dl 380 Spec Gen 12` - ID: `1d190853-4e9c-48df-aa70-eae66c6f2c1f`). If `nlm` CLI is unreachable, outputs transparent ungrounded validation notice.
+- **Dynamic Routing**: Queries Gemini NotebookLM dynamically using the detected chassis variant to lookup the specific Notebook ID via `scripts/config/notebooks.json`. It guarantees cross-pollination of constraints does not occur across multi-vendor quotes.
+- If `nlm` CLI is unreachable or times out (30s), it gracefully falls back and outputs a transparent ungrounded validation notice.
 
 ### Phase 4: Budget Optimization & Golden Rule Assurance
 - **Module**: [`scripts/lib/budget_optimizer.js`](file:///Users/macbookaira1466/Downloads/booktoSkill/scripts/lib/budget_optimizer.js)
 - Enforces the Golden Rule: Mandatory buildability fixes take precedence over budget caps.
 
-### Phase 5 & 6: Report Generation & Closed-Loop Feedback Learning
-- **Report Location**: `outputs/{Family}/{Gen}/{Model}_{FormFactor}/reports/BOQ_Evaluation_{basename}.md`
-- **Dashboard Integration**: Submissions can be sent directly via `/api/eval-boq` and downloaded via `/api/export-boq`.
+### Phase 5 & 6: Dual Outputs & Closed-Loop Feedback Learning
+- **Output 1 (Dashboard API)**: Submissions can be sent directly via `/api/eval-boq` and displayed in the React frontend.
+- **Output 2 (Corrected BOQ Excel)**: Unlike Workflow 1 (which generates the *Catalog Excel*), Workflow 2 explicitly generates a multi-sheet **Corrected BOQ Excel** output (`/api/export-boq`) containing the NotebookLM Rationale Summary and the finalized, valid Bill of Materials.
 - **Feedback Module**: [`scripts/lib/feedback_loop.js`](file:///Users/macbookaira1466/Downloads/booktoSkill/scripts/lib/feedback_loop.js)
 - **Command**: `npm run eval:boq <boq_file> --simulate-portal-error "<error_text>"` or Dashboard modal.
 - Logs permanent `KnowledgeDeltas` in `outputs/history/catalog_deltas.json` and updates `_Catalog_Rules.json`.

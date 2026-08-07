@@ -7,9 +7,9 @@ description: Use this skill to live-scrape HPE OCA portal product catalogs (ProL
 
 ---
 
-## 1. Purpose & Overview
+## 1. Purpose & Overview (Workflow 1)
 
-Extract complete product catalog intelligence from the HPE OCA portal for any HPE product line (ProLiant, Synergy Composable, Alletra/Nimble/StoreOnce Storage, Aruba Networking, Cray Supercomputing). Produces a classified multi-sheet Excel workbook + companion JSON files stored under `outputs/{Family}/{Gen}/{Model}_{FormFactor}/`, suitable for Google Notebook LM, BOM comparison engines, and configuration intelligence.
+This skill represents **Workflow 1 (Intelligence Extraction)** of the dual-workflow paradigm. Its sole purpose is to extract complete product catalog intelligence from vendor portals (HPE OCA, etc.) to build the baseline rules engine. It produces a classified multi-sheet **Catalog Excel workbook** + companion JSON files stored under `outputs/{Family}/{Gen}/{Model}_{FormFactor}/`. These rules are structurally required by **Workflow 2 (Pre-Flight Evaluation)** to validate quotes.
 
 ---
 
