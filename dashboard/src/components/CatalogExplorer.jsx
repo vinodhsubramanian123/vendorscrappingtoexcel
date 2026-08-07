@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Search, DollarSign, ArrowUpRight, TrendingUp, Filter, FileSpreadsheet, X } from 'lucide-react';
+import { Search, TrendingUp, FileSpreadsheet, X, Filter } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { catalogIndexer } from '../utils/nlpSearch';
 
@@ -8,6 +8,8 @@ export default function CatalogExplorer({ catalogData, chassisName }) {
   const [searchResults, setSearchResults] = useState(null);
   const [selectedSkuTrend, setSelectedSkuTrend] = useState(null);
   const [activeCategory, setActiveCategory] = useState('ALL');
+  const [activeSubCategory, setActiveSubCategory] = useState('ALL');
+  const [activeType, setActiveType] = useState('ALL');
 
   useEffect(() => {
     if (catalogData) {
@@ -42,21 +44,42 @@ export default function CatalogExplorer({ catalogData, chassisName }) {
     entry.skus?.forEach(sku => {
       allSkus.push({
         ...sku,
-        parentCategory: entry.parentCategory,
-        subCategory: entry.subCategory,
+        parentCategory: entry.parentCategory || 'Uncategorized',
+        subCategory: entry.subCategory || 'General',
         constraint: entry.constraint,
         rules: entry.rules
       });
     });
   });
 
-  const categories = ['ALL', ...new Set(catalogData.entries?.map(e => e.parentCategory).filter(Boolean))];
+  const categories = ['ALL', ...new Set(allSkus.map(e => e.parentCategory).filter(Boolean))];
+  
+  // Available sub-categories based on selected category
+  const availableSubCategories = activeCategory === 'ALL'
+    ? ['ALL', ...new Set(allSkus.map(e => e.subCategory).filter(Boolean))]
+    : ['ALL', ...new Set(allSkus.filter(e => e.parentCategory === activeCategory).map(e => e.subCategory).filter(Boolean))];
+
+  const types = ['ALL', 'CTO', 'BTO', 'FIO', 'Service'];
 
   // Filter SKUs
   let displayedSkus = searchResults !== null ? searchResults : allSkus;
   if (activeCategory !== 'ALL') {
     displayedSkus = displayedSkus.filter(s => s.parentCategory === activeCategory);
   }
+  if (activeSubCategory !== 'ALL') {
+    displayedSkus = displayedSkus.filter(s => s.subCategory === activeSubCategory);
+  }
+  if (activeType !== 'ALL') {
+    displayedSkus = displayedSkus.filter(s => s.optionType === activeType);
+  }
+
+  // Price formatting helper
+  const formatPrice = (priceVal) => {
+    if (priceVal === undefined || priceVal === null || priceVal === '' || priceVal === 'N/A') return 'N/A';
+    const num = parseFloat(String(priceVal).replace(/[^0-9.]/g, ''));
+    if (isNaN(num)) return 'N/A';
+    return `$${num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  };
 
   return (
     <div className="space-y-6">
@@ -68,38 +91,66 @@ export default function CatalogExplorer({ catalogData, chassisName }) {
             {chassisName || 'Master Catalog'} Explorer
           </h2>
           <p className="text-xs text-slate-500">
-            Total Unique SKUs: <span className="font-semibold text-slate-800">{allSkus.length}</span> | Categories: <span className="font-semibold text-slate-800">{categories.length - 1}</span>
+            Total SKUs: <span className="font-semibold text-slate-800">{allSkus.length}</span> | Filtered: <span className="font-semibold text-blue-600">{displayedSkus.length}</span>
           </p>
         </div>
 
-        {/* Filter & Attribute Search */}
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="relative flex-1 md:w-64">
+        {/* Filter & Attribute Search Controls */}
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          {/* Instant Search input */}
+          <div className="relative flex-1 md:w-56">
             <input
               type="text"
               value={query}
               onChange={handleQueryChange}
-              placeholder="Instant attribute filter..."
+              placeholder="Search SKU ID, attribute, rules..."
               className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
             />
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
           </div>
 
+          {/* Main Category Filter */}
           <select
             value={activeCategory}
-            onChange={(e) => setActiveCategory(e.target.value)}
-            className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm focus:outline-none"
+            onChange={(e) => { setActiveCategory(e.target.value); setActiveSubCategory('ALL'); }}
+            className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm focus:outline-none max-w-[140px] truncate"
           >
-            {categories.map(cat => (
+            <option value="ALL">All Categories</option>
+            {categories.filter(c => c !== 'ALL').map(cat => (
               <option key={cat} value={cat}>{cat}</option>
             ))}
+          </select>
+
+          {/* Sub-Category Filter */}
+          <select
+            value={activeSubCategory}
+            onChange={(e) => setActiveSubCategory(e.target.value)}
+            className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm focus:outline-none max-w-[140px] truncate"
+          >
+            <option value="ALL">All Sub-Categories</option>
+            {availableSubCategories.filter(s => s !== 'ALL').map(sub => (
+              <option key={sub} value={sub}>{sub}</option>
+            ))}
+          </select>
+
+          {/* Type Filter */}
+          <select
+            value={activeType}
+            onChange={(e) => setActiveType(e.target.value)}
+            className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm focus:outline-none"
+          >
+            <option value="ALL">All Types</option>
+            <option value="CTO">CTO</option>
+            <option value="BTO">BTO</option>
+            <option value="FIO">FIO</option>
+            <option value="Service">Service</option>
           </select>
         </div>
       </div>
 
       {/* SKU Table View */}
       <div className="glass-card overflow-hidden">
-        <div className="overflow-x-auto max-h-[500px]">
+        <div className="overflow-x-auto max-h-[520px]">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold sticky top-0 z-10">
               <tr>
@@ -142,7 +193,7 @@ export default function CatalogExplorer({ catalogData, chassisName }) {
                       <td className="px-4 py-2.5 text-slate-500">{sku.subCategory}</td>
                       <td className="px-4 py-2.5 font-semibold text-slate-600">{sku.optionType || 'CTO'}</td>
                       <td className="px-4 py-2.5 font-semibold text-slate-900">
-                        {sku.listPrice ? `$${sku.listPrice}` : 'N/A'}
+                        {formatPrice(sku.listPrice)}
                       </td>
                       <td className="px-4 py-2.5 text-right">
                         {isPriceChanged && (
@@ -172,9 +223,9 @@ export default function CatalogExplorer({ catalogData, chassisName }) {
               <div>
                 <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
                   <TrendingUp className="w-5 h-5 text-amber-600" />
-                  Historical Price Trend
+                  Historical Price Elasticity & Trend
                 </h3>
-                <p className="text-xs mono text-slate-500">{selectedSkuTrend.sku}</p>
+                <p className="text-xs mono text-slate-500">{selectedSkuTrend.sku || selectedSkuTrend.partNumber}</p>
               </div>
               <button onClick={() => setSelectedSkuTrend(null)} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
@@ -184,9 +235,9 @@ export default function CatalogExplorer({ catalogData, chassisName }) {
             <div className="h-64 w-full my-4">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={[
-                  { date: '2026-06-01', price: selectedSkuTrend.listPrice * 0.9 },
-                  { date: '2026-07-01', price: selectedSkuTrend.listPrice * 0.95 },
-                  { date: '2026-08-01', price: selectedSkuTrend.listPrice }
+                  { date: '2026-06-01', price: (parseFloat(selectedSkuTrend.listPrice) || 1000) * 0.9 },
+                  { date: '2026-07-01', price: (parseFloat(selectedSkuTrend.listPrice) || 1000) * 0.95 },
+                  { date: '2026-08-01', price: parseFloat(selectedSkuTrend.listPrice) || 1000 }
                 ]}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
                   <XAxis dataKey="date" stroke="#94A3B8" fontSize={10} />

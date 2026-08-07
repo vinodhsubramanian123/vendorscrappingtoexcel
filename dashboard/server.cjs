@@ -307,11 +307,16 @@ app.post('/api/notebook-query', (req, res) => {
 
   // Resolve notebook ID from notebooks.json config
   const notebooksPath = path.join(CONFIG_DIR, 'notebooks.json');
-  let notebookId = null;
+  let notebookId = '1d190853-4e9c-48df-aa70-eae66c6f2c1f';
   if (fs.existsSync(notebooksPath)) {
     try {
-      const notebooks = JSON.parse(fs.readFileSync(notebooksPath, 'utf-8'));
-      notebookId = notebooks[chassis] || notebooks.DEFAULT || null;
+      const config = JSON.parse(fs.readFileSync(notebooksPath, 'utf-8'));
+      const chassisId = (config.notebooks && config.notebooks[chassis]);
+      if (chassisId && chassisId.trim()) {
+        notebookId = chassisId.trim();
+      } else if (config.defaultNotebookId) {
+        notebookId = config.defaultNotebookId;
+      }
     } catch {}
   }
 
