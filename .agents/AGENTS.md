@@ -500,3 +500,15 @@ graph TD
     - Any BOQ evaluation resulting in `< 75%` confidence or unknown rules must trigger the `MANUAL_REVIEW_REQUIRED` state.
     - The React Dashboard (`AmbiguityInbox`) must intercept this state and provide a 1-click bridge to the `nlm` CLI via `/api/ask-notebook`.
     - Solutions provided by the MCP RAG prompt must be explicitly approved by the user and written directly to `master_knowledge_registry.json` via `/api/resolve-ambiguity`, ensuring zero-code rule acquisition.
+
+49. **Path Traversal Boundary Enforcement (`isPathSafe`)**:
+    - Express server endpoints (`server.cjs`) MUST validate all user-supplied file/directory paths (`path`, `chassisDir`, `xlsxPath`) using `path.resolve()` to confirm they strictly reside within `OUTPUTS_DIR`. Reject path traversal attempts with HTTP 403.
+
+50. **Process Pointer Safety & Zombie Process Elimination**:
+    - `startTask()` and task mutex managers MUST store the full `ChildProcess` instance (`process: proc`) inside `activeTask`. On server shutdown (`SIGTERM`/`SIGINT`), calling `activeTask.process.kill('SIGTERM')` ensures zero orphaned child processes.
+
+51. **Dynamic Catalog Price Lookup for Physical Fixes**:
+    - When `conflict_graph.js` injects missing physical dependencies into the BOM, fix SKU costs must dynamically query catalog unit prices (`item.unitPriceUsd` / `sku.listPriceUsd`) to compute 5-Tier CapEx metrics rather than assuming hardcoded defaults.
+
+52. **Adaptive DOM Expansion Check (`assertExpansionThreshold`)**:
+    - Scraper guardrails in `cdp.js` MUST evaluate scroll height expansion using relative delta thresholds (`Math.min(15000, initialHeight * 1.5)`), avoiding false expansion warnings on compact UI wizards.

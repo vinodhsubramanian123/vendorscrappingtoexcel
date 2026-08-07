@@ -174,7 +174,14 @@ function synthesize5TierRankedSolutions(items = [], evalResults = {}, graphResul
   const dna = extractWorkloadDna(items);
   const baseCost = items.reduce((acc, it) => acc + ((it.unitPriceUsd || 500) * it.quantity), 0);
   const fixes = evalResults.missingDependencies || [];
-  const fixCost = fixes.reduce((acc, f) => acc + (f.quantity * 300), 0);
+  const fixCost = fixes.reduce((acc, f) => {
+    let unitPrice = 300;
+    if (f.sku) {
+      const match = items.find(i => cleanBaseSKU(i.sku) === cleanBaseSKU(f.sku));
+      if (match && match.unitPriceUsd) unitPrice = match.unitPriceUsd;
+    }
+    return acc + (f.quantity * unitPrice);
+  }, 0);
   const totalBuildableCost = baseCost + fixCost;
 
   // D3: Dynamic score computation based on actual workload DNA alignment

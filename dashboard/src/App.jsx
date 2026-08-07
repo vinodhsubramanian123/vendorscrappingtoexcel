@@ -60,8 +60,25 @@ export default function App() {
     }
   };
 
+  const fetchRunHistory = async () => {
+    try {
+      const res = await fetch('/api/history/runs');
+      const runs = await res.json();
+      if (Array.isArray(runs) && runs.length > 0) {
+        setTaskHistory(runs.map(r => ({
+          type: r.taskType || 'PIPELINE_ACTION',
+          status: r.exitCode === 0 ? 'COMPLETED' : 'FAILED',
+          timestamp: r.startTime || new Date().toISOString()
+        })).slice(0, 15));
+      }
+    } catch (err) {
+      console.error('Error fetching run history:', err);
+    }
+  };
+
   useEffect(() => {
     fetchAvailableCatalogs();
+    fetchRunHistory();
   }, []);
 
   // 2. Fetch active catalog JSON data when selectedChassis changes

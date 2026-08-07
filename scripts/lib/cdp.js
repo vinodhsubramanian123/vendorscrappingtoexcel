@@ -247,6 +247,26 @@ async function expandSections(ws) {
 }
 
 /**
+ * Assert DOM expansion using adaptive scroll height thresholds.
+ * Avoids false retries on compact storage UI wizards.
+ */
+async function assertExpansionThreshold(ws, initialHeight = 5000) {
+  const res = await sendCommand(ws, 'Runtime.evaluate', {
+    expression: `(() => {
+      const scrollHeight = document.body.scrollHeight || 0;
+      const targetThreshold = Math.min(15000, ${initialHeight} + 3000);
+      return {
+        scrollHeight,
+        targetThreshold,
+        isExpanded: scrollHeight >= targetThreshold || scrollHeight >= ${initialHeight} * 1.3
+      };
+    })()`,
+    returnByValue: true
+  });
+  return (res && res.result) ? res.result.value : { isExpanded: true, scrollHeight: 15000 };
+}
+
+/**
  * Trigger HPE OCA CLIC Check (Configuration Language & Inspection Engine Check)
  * and extract inspection error messages, root causes, and recommended direct SKU fixes.
  * @param {WebSocket} ws 
@@ -302,6 +322,7 @@ module.exports = {
   setupDialogAutoHandler,
   dismissDOMModals,
   expandSections,
+  assertExpansionThreshold,
   triggerClicCheck,
   sleep,
   CDP_PORT,

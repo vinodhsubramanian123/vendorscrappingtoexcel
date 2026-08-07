@@ -59,6 +59,14 @@ function broadcastSSE(data) {
   }
 }
 
+// Security helper: prevent directory traversal outside OUTPUTS_DIR
+function isPathSafe(targetPath) {
+  if (!targetPath) return false;
+  const cleanPath = targetPath.replace(/^\/artifacts\//, '');
+  const resolved = path.resolve(OUTPUTS_DIR, cleanPath);
+  return resolved.startsWith(OUTPUTS_DIR);
+}
+
 // -----------------------------------------------------------------------------
 // Task Trace Manager (Phase 3 Observability)
 // -----------------------------------------------------------------------------
@@ -66,7 +74,7 @@ function startTask(type, proc, res) {
   const runId = `run_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
   const logs = [];
 
-  activeTask = { type, runId, pid: proc.pid, startTime: Date.now() };
+  activeTask = { type, runId, pid: proc.pid, process: proc, startTime: Date.now() };
   broadcastSSE({ type: 'TASK_STARTED', task: type, runId });
 
   const handleData = (data, streamType) => {
@@ -226,6 +234,8 @@ app.get('/api/available-catalogs', (req, res) => {
 app.get('/api/catalog-data', (req, res) => {
   const relPath = req.query.path;
   if (!relPath) return res.status(400).json({ error: 'Missing path query parameter' });
+  if (!isPathSafe(relPath)) return res.status(403).json({ error: 'Access denied: Invalid path traversal' });
+
   const fullPath = path.join(OUTPUTS_DIR, relPath.replace(/^\/artifacts\//, ''));
   if (!fs.existsSync(fullPath)) return res.status(404).json({ error: 'Catalog file not found' });
   try {
@@ -240,6 +250,7 @@ app.get('/api/catalog-data', (req, res) => {
 app.get('/api/price-analytics', (req, res) => {
   const chassisDir = req.query.chassisDir;
   if (!chassisDir) return res.status(400).json({ error: 'Missing chassisDir parameter' });
+  if (!isPathSafe(chassisDir)) return res.status(403).json({ error: 'Access denied: Invalid path traversal' });
 
   const historyDir = path.join(OUTPUTS_DIR, chassisDir, 'history');
   if (!fs.existsSync(historyDir)) {
@@ -285,6 +296,7 @@ app.get('/api/price-analytics', (req, res) => {
 app.get('/api/sku-history', (req, res) => {
   const { sku, chassisDir } = req.query;
   if (!sku || !chassisDir) return res.status(400).json({ error: 'Missing sku or chassisDir parameter' });
+  if (!isPathSafe(chassisDir)) return res.status(403).json({ error: 'Access denied: Invalid path traversal' });
 
   const priceHistoryFile = path.join(OUTPUTS_DIR, chassisDir, 'history', 'price_history.json');
   if (!fs.existsSync(priceHistoryFile)) return res.json({ sku, history: [] });
@@ -566,6 +578,8 @@ app.post('/api/portal-feedback', (req, res) => {
 
 // Download QuickSpecs PDF Endpoint (Fix B4)
 app.post('/api/download-pdf', (req, res) => {
+  if (activeTask) return res.status(409).json({ error: 'Another task is currently running', task: activeTask.type });
+
   const { chassisId } = req.body;
   const pdfScript = path.join(PROJECT_ROOT, 'scripts', 'download_quickspecs_pdf.js');
   if (!fs.existsSync(pdfScript)) {
@@ -573,29 +587,20 @@ app.post('/api/download-pdf', (req, res) => {
   }
 
   const proc = spawn('node', [pdfScript], { cwd: PROJECT_ROOT, env: { ...process.env, STRUCTURED_PROGRESS: '1' } });
-  activeTask = { type: 'DOWNLOAD_PDF', pid: proc.pid, startTime: Date.now() };
-  broadcastSSE({ type: 'TASK_STARTED', task: activeTask.type });
-
-  proc.stdout.on('data', (data) => {
-    data.toString().split('\n').forEach(line => {
-      if (line.trim()) broadcastSSE({ type: 'LOG', text: line, stream: 'stdout' });
-    });
-  });
-  proc.on('close', (code) => {
-    broadcastSSE({ type: 'TASK_COMPLETED', code, task: 'DOWNLOAD_PDF' });
-    activeTask = null;
-  });
-
-  res.json({ message: 'PDF download started', pid: proc.pid });
+  startTask('DOWNLOAD_PDF', proc, res);
 });
 
 // Kill Active Task Endpoint (Enhancement U3)
 app.post('/api/kill-task', (req, res) => {
-  if (!activeTask || !activeTask.pid) {
+  if (!activeTask || (!activeTask.pid && !activeTask.process)) {
     return res.status(400).json({ error: 'No active task to kill' });
   }
   try {
-    process.kill(activeTask.pid, 'SIGTERM');
+    if (activeTask.process) {
+      activeTask.process.kill('SIGTERM');
+    } else {
+      process.kill(activeTask.pid, 'SIGTERM');
+    }
     broadcastSSE({ type: 'LOG', text: `🛑 Task ${activeTask.type} (PID ${activeTask.pid}) cancelled by user.`, stream: 'stderr' });
     broadcastSSE({ type: 'TASK_COMPLETED', code: 143, task: activeTask.type });
     activeTask = null;
@@ -645,33 +650,12 @@ app.get('/api/price-history', (req, res) => {
 // Portfolio Verification Suite Endpoint (verify_all.js)
 app.post('/api/verify-all', (req, res) => {
   if (activeTask) {
-    return res.status(409).json({ error: 'Another task is currently running' });
+    return res.status(409).json({ error: 'Another task is currently running', task: activeTask.type });
   }
 
   const verifyScript = path.join(PROJECT_ROOT, 'scripts', 'verify_all.js');
   const proc = spawn('node', [verifyScript], { cwd: PROJECT_ROOT, env: { ...process.env, STRUCTURED_PROGRESS: '1' } });
-  activeTask = { type: 'VERIFY_ALL', pid: proc.pid, startTime: Date.now() };
-
-  broadcastSSE({ type: 'TASK_STARTED', task: activeTask.type });
-
-  proc.stdout.on('data', (data) => {
-    data.toString().split('\n').forEach(line => {
-      if (line.trim()) broadcastSSE({ type: 'LOG', text: line, stream: 'stdout' });
-    });
-  });
-
-  proc.stderr.on('data', (data) => {
-    data.toString().split('\n').forEach(line => {
-      if (line.trim()) broadcastSSE({ type: 'LOG', text: line, stream: 'stderr' });
-    });
-  });
-
-  proc.on('close', (code) => {
-    broadcastSSE({ type: 'TASK_COMPLETED', code, task: activeTask.type });
-    activeTask = null;
-  });
-
-  res.json({ message: 'Portfolio verification suite started', pid: proc.pid });
+  startTask('VERIFY_ALL', proc, res);
 });
 
 // -----------------------------------------------------------------------------
