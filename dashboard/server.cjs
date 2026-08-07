@@ -12,7 +12,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
-const { spawn, exec } = require('child_process');
+const { spawn, exec, execFile } = require('child_process');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const OUTPUTS_DIR = path.join(PROJECT_ROOT, 'outputs');
@@ -89,7 +89,7 @@ app.get('/api/cdp-status', (req, res) => {
 
 app.get('/api/session-observability', (req, res) => {
   const obsScript = path.join(PROJECT_ROOT, 'scripts', 'observability_status.js');
-  exec(`node "${obsScript}" --json`, (err, stdout) => {
+  execFile('node', [obsScript, '--json'], (err, stdout) => {
     if (err) {
       return res.status(500).json({ error: err.message, status: 'OFFLINE' });
     }
@@ -284,7 +284,7 @@ app.post('/api/eval-boq', (req, res) => {
     args.push('--chassis', chassisDir);
   }
 
-  exec(`node ${args.map(a => `"${a}"`).join(' ')}`, { cwd: PROJECT_ROOT, maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
+  execFile('node', args, { cwd: PROJECT_ROOT, maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
     if (err && !stdout) {
       return res.status(500).json({ error: err.message });
     }
@@ -329,7 +329,7 @@ app.post('/api/notebook-query', (req, res) => {
     });
   }
 
-  exec(`nlm notebook query "${notebookId}" "${query.replace(/"/g, '\\"')}" --json`, (err, stdout) => {
+  execFile('nlm', ['notebook', 'query', notebookId, query, '--json'], (err, stdout) => {
     if (err) {
       return res.json({
         query,
@@ -373,7 +373,7 @@ app.post('/api/audit-catalog', (req, res) => {
   const fullXlsxPath = path.join(OUTPUTS_DIR, xlsxPath.replace(/^\/artifacts\//, ''));
 
   const verifyScript = path.join(PROJECT_ROOT, 'scripts', 'verify_excel_tally.js');
-  exec(`node "${verifyScript}" "${fullXlsxPath}" --json`, (err, stdout) => {
+  execFile('node', [verifyScript, fullXlsxPath, '--json'], (err, stdout) => {
     try {
       const result = JSON.parse(stdout);
       res.json(result);

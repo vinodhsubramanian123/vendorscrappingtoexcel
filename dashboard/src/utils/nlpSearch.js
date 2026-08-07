@@ -37,13 +37,13 @@ class NlpCatalogIndexer {
       if (entry.skus && Array.isArray(entry.skus)) {
         entry.skus.forEach(skuItem => {
           const doc = {
-            sku: skuItem.sku || skuItem.partNumber || `SKU-${count}`,
-            description: skuItem.description || skuItem.name || '',
+            sku: skuItem.sku || skuItem['Product #'] || skuItem.partNumber || `SKU-${count}`,
+            description: skuItem.description || skuItem['Description'] || skuItem.name || '',
             parentCategory: entry.parentCategory || '',
             subCategory: entry.subCategory || '',
             rules: (entry.rules || []).join(' '),
-            optionType: skuItem.optionType || 'CTO',
-            listPrice: skuItem.listPrice || 'N/A'
+            optionType: skuItem.optionType || skuItem['Option Type'] || skuItem.Type || 'CTO',
+            listPrice: skuItem.listPrice || skuItem['List Price'] || skuItem['List Price (USD)'] || 'N/A'
           };
           this.index.add(doc);
           count++;

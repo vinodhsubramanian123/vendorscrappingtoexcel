@@ -456,3 +456,24 @@ graph TD
     - **Dynamic Hardware Support Price Math**: Pointnext support list prices scale dynamically based on total node hardware list price and populated component TDP/capacity:
       $$\text{Support List Price} = \text{Base Chassis Tier} + (\text{CPU TDP Factor} \times N_{\text{CPU}}) + (\text{RAM GB Factor} \times \text{RAM}_{\text{GB}}) + \text{Storage Factor}$$
     - **Multi-Tab Extraction Mandate**: Scrapers MUST extract `Menu` (options catalog), `Services` (Pointnext Tech Care options), AND `BOM` (calculated itemized support lines `HU4A6A50C4V`, `H39VPA1 5A6`) tabs to guarantee 100% complete intelligence.
+
+---
+
+## System Hardening & Agentic Guardrails (Rules #41–44)
+
+41. **Backend Security & Command Injection Prevention**:
+    - NEVER use `exec()` in Node.js backends or bridge servers (`server.cjs`) when handling any user input (like `chassisDir` or `query`).
+    - ALWAYS use `execFile()` or `spawn()` with parameterized arrays to prevent shell injection and RCE exploits.
+
+42. **Resource Management & Zombie Process Prevention**:
+    - Browser subagents (Playwright/Puppeteer) and concurrent dev servers (`vite`) can cause severe memory leaks if orphaned.
+    - Scripts must properly handle `SIGTERM` / `SIGINT` signals to cleanly terminate all child processes. 
+    - Never use detached background tasks without strict timeout and cleanup routines.
+
+43. **Frontend Data Mapping Resilience**:
+    - UI components (`CatalogExplorer.jsx`, `nlpSearch.js`) must implement robust fallback parsing for OCA raw data schemas.
+    - Raw scraped keys often contain spaces or symbols (e.g., `sku['List Price']`, `sku['Product #']`). Frontends must map both normalized and raw keys (e.g., `sku.listPrice || sku['List Price (USD)'] || sku['List Price']`) to prevent missing data in views.
+
+44. **Agentic Browser Sandboxing**:
+    - Autonomous browser subagents must be strictly sandboxed to the target `localhost` environments when executing UI tests.
+    - Subagents are prohibited from autonomously navigating to authenticated portals (e.g., `partner.hpe.com`) during local UI testing, and must not attempt to exploit vulnerabilities to hot-patch live environments.

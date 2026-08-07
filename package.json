@@ -30,7 +30,7 @@
     "test:offline": "node tests/test_offline_pipeline.js",
     "test:all": "node tests/test_end_to_end_scenarios.js && node tests/test_conflict_graph.js && node tests/test_offline_pipeline.js && node scripts/test_all_aspects.js && node scripts/verify_all.js",
     "test:clic": "node scripts/test_live_clic.js",
-    "dashboard": "npx -y concurrently \"node dashboard/server.js\" \"npm --prefix dashboard run dev\"",
+    "dashboard": "npx -y concurrently \"node dashboard/server.cjs\" \"npm --prefix dashboard run dev\"",
     "demo:qs": "node scripts/demo_qs_vs_menu_cdp.js",
     "demo:live": "node scripts/live_visual_demo_cdp.js"
   },
