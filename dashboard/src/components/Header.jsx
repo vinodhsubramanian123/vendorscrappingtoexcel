@@ -10,7 +10,8 @@ export default function Header({
   setActiveTab,
   onSmartSearch,
   onOpenFeedbackDrawer,
-  onOpenSettings
+  onOpenSettings,
+  isTaskRunning
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -88,8 +89,14 @@ export default function Header({
           </div>
         </form>
 
-        {/* Right Section: CDP Health Indicator & Agent Feedback Drawer */}
+        {/* Right Section: CDP Health Indicator, Task Status & Agent Feedback Drawer */}
         <div className="flex items-center gap-3">
+          {isTaskRunning && (
+            <span className="badge badge-amber animate-pulse flex items-center gap-1">
+              <RefreshCw className="w-3 h-3 animate-spin" /> Task Running
+            </span>
+          )}
+
           <CdpHealthBadge />
           
           <button

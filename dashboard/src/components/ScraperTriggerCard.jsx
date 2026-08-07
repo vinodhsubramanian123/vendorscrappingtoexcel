@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Play, RefreshCw, Terminal, Download, Server, Sparkles, Loader } from 'lucide-react';
+import { Play, RefreshCw, Terminal, Download, Server, Sparkles, Loader, Square } from 'lucide-react';
 
-export default function ScraperTriggerCard({ logStream, isTaskRunning, onTriggerScrape, onTriggerRebuild, onTriggerDownloadPdf, onTriggerSyncKnowledge }) {
+export default function ScraperTriggerCard({ logStream, isTaskRunning, onTriggerScrape, onTriggerRebuild, onTriggerDownloadPdf, onTriggerSyncKnowledge, onTriggerKillTask }) {
   const [scrapeMode, setScrapeMode] = useState('solution');
 
   // Extract latest progress event if present
@@ -44,6 +44,15 @@ export default function ScraperTriggerCard({ logStream, isTaskRunning, onTrigger
           </div>
 
           <div className="flex items-center gap-2">
+            {isTaskRunning && (
+              <button
+                onClick={onTriggerKillTask}
+                className="flex items-center gap-1 text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-1 rounded-lg hover:bg-rose-100 transition-all"
+                title="Cancel running task"
+              >
+                <Square className="w-3 h-3 text-rose-600 fill-rose-600" /> Cancel Task
+              </button>
+            )}
             <span className={`badge ${isTaskRunning ? 'badge-amber animate-pulse' : 'badge-emerald'}`}>
               {isTaskRunning ? `Executing: ${progressStage}` : 'Pipeline Mutex Idle'}
             </span>

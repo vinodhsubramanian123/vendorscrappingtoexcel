@@ -1,55 +1,107 @@
 import React, { useState } from 'react';
-import { ShieldCheck, AlertTriangle, CheckCircle, Info, X, Zap, Cpu, HardDrive, Cpu as Memory, Power, Award } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Info, X, Zap, Cpu, HardDrive, Cpu as Memory, Power, Award } from 'lucide-react';
 
 export default function ConflictGraphInspector({ evalResults, chassisName }) {
   const [showClicModal, setShowClicModal] = useState(false);
 
-  // Aspect verification status list
+  // Extract dynamic physical checks from evalResults if available
+  const rawAspects = evalResults?.physicalChecks || evalResults?.aspectChecks;
+
+  const aspectIcons = [Cpu, Memory, HardDrive, Zap, Power, Award];
+
   const aspects = [
-    { id: 1, name: 'Thermal & Compute', icon: Cpu, rule: 'TDP ≥ 240W requires High-Performance Fans', status: 'PASS' },
-    { id: 2, name: 'Memory & Channel Balance', icon: Memory, rule: 'DIMMs mod 8 == 0 for optimal memory bandwidth', status: 'PASS' },
-    { id: 3, name: 'Storage & Tri-Mode Cabling', icon: HardDrive, rule: 'Tri-Mode Cable P76453-B21 required for NVMe backplane', status: 'PASS' },
-    { id: 4, name: 'PCIe Riser & Slot Alignment', icon: Zap, rule: 'Primary & Secondary Risers lane allocation check', status: 'PASS' },
-    { id: 5, name: 'Power & DC Lug Kit', icon: Power, rule: 'DC Lug Kit P36877-B21 required for -48V DC PSUs', status: 'PASS' },
-    { id: 6, name: 'Pointnext Support Taxonomy', icon: Award, rule: 'Support SLA suffix HU4A6A50C4V validated', status: 'PASS' }
-  ];
+    { id: 1, name: 'Thermal & Compute Math', icon: Cpu, rule: 'TDP ≥ 240W requires High-Performance Fan Kit (P48820-B21)' },
+    { id: 2, name: 'Memory & Channel Balance', icon: Memory, rule: 'DIMMs mod 8 == 0 for optimal multi-channel bandwidth' },
+    { id: 3, name: 'Storage & Tri-Mode Cabling', icon: HardDrive, rule: 'Tri-Mode Controller requires dedicated cable kit P76453-B21' },
+    { id: 4, name: 'PCIe Riser & Slot Alignment', icon: Zap, rule: 'Primary & Secondary Risers lane allocation & TDP check' },
+    { id: 5, name: 'Power & DC Lug Kit Math', icon: Power, rule: '-48V DC PSUs require DC Lug Kit P36877-B21' },
+    { id: 6, name: 'Pointnext Support Taxonomy', icon: Award, rule: 'Hardware SKUs require valid Tech Care SLA tier (HU4A6A50C4V)' }
+  ].map((def, idx) => {
+    const realCheck = rawAspects ? (Array.isArray(rawAspects) ? rawAspects[idx] : rawAspects[def.name]) : null;
+    const passed = realCheck ? (realCheck.passed !== false && !realCheck.error) : true;
+    const detail = realCheck?.detail || realCheck?.message || def.rule;
+    const isEvaluated = !!evalResults;
+
+    return {
+      ...def,
+      status: !isEvaluated ? 'PENDING' : (passed ? 'PASS' : 'FAIL'),
+      detail
+    };
+  });
+
+  const overallPass = evalResults ? aspects.every(a => a.status === 'PASS') : null;
 
   return (
     <div className="space-y-6">
       {/* Aspect Checklist Card */}
       <div className="glass-card p-6">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-3 mb-4 gap-2">
           <div>
             <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-emerald-600" />
               6-Aspect Physical Math Verification
             </h2>
-            <p className="text-xs text-slate-500">Automated pre-flight physical rules audit for {chassisName || 'DL380 Gen12 SFF'}</p>
+            <p className="text-xs text-slate-500">
+              Automated pre-flight physical rules audit for <span className="font-semibold text-slate-800">{chassisName || 'DL380 Gen12 SFF'}</span>
+            </p>
           </div>
 
-          <button
-            onClick={() => setShowClicModal(true)}
-            className="btn-secondary text-xs"
-          >
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-            Inspect Native CLIC Errors
-          </button>
+          <div className="flex items-center gap-2">
+            {overallPass !== null && (
+              <span className={`badge ${overallPass ? 'badge-emerald' : 'badge-amber'}`}>
+                {overallPass ? '100% VERIFIED PASS' : 'PHYSICAL CONFLICT DETECTED'}
+              </span>
+            )}
+            <button
+              onClick={() => setShowClicModal(true)}
+              className="btn-secondary text-xs"
+            >
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+              Inspect CLIC Errors
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {aspects.map(asp => {
             const Icon = asp.icon;
+            const isPass = asp.status === 'PASS';
+            const isPending = asp.status === 'PENDING';
+
             return (
-              <div key={asp.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+              <div
+                key={asp.id}
+                className={`p-4 rounded-xl border flex items-start gap-3 transition-all ${
+                  isPending
+                    ? 'bg-slate-50 border-slate-200/80'
+                    : isPass
+                    ? 'bg-emerald-50/40 border-emerald-200'
+                    : 'bg-rose-50/40 border-rose-200'
+                }`}
+              >
+                <div
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                    isPending
+                      ? 'bg-slate-200 text-slate-600'
+                      : isPass
+                      ? 'bg-emerald-100 text-emerald-600'
+                      : 'bg-rose-100 text-rose-600'
+                  }`}
+                >
                   <Icon className="w-4 h-4" />
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
                     <h4 className="font-semibold text-xs text-slate-900">{asp.id}. {asp.name}</h4>
-                    <span className="badge badge-emerald">100% PASS</span>
+                    <span
+                      className={`badge ${
+                        isPending ? 'badge-amber' : isPass ? 'badge-emerald' : 'badge-amber'
+                      }`}
+                    >
+                      {isPending ? 'PENDING EVAL' : isPass ? 'PASS' : 'VIOLATION'}
+                    </span>
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-1">{asp.rule}</p>
+                  <p className="text-[11px] text-slate-500 mt-1">{asp.detail}</p>
                 </div>
               </div>
             );
@@ -57,7 +109,7 @@ export default function ConflictGraphInspector({ evalResults, chassisName }) {
         </div>
       </div>
 
-      {/* CLIC Modal Drawer */}
+      {/* CLIC Error Modal */}
       {showClicModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl border border-slate-200">
@@ -72,14 +124,27 @@ export default function ConflictGraphInspector({ evalResults, chassisName }) {
             </div>
 
             <div className="space-y-3 py-2">
-              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900">
-                <p className="font-semibold flex items-center gap-1.5">
-                  <Info className="w-4 h-4 text-amber-600" /> CLIC Rule Audit Status:
-                </p>
-                <p className="mt-1 text-[11px] text-amber-800">
-                  Zero active CLIC portal configuration errors detected for this quote. The build passes all HPE factory constraints.
-                </p>
-              </div>
+              {evalResults?.clicErrors && evalResults.clicErrors.length > 0 ? (
+                evalResults.clicErrors.map((err, i) => (
+                  <div key={i} className="p-3 bg-rose-50 rounded-xl border border-rose-200 text-xs text-rose-900 flex items-start gap-2">
+                    <XCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold">{err.code || `CLIC Violation ${i+1}`}</p>
+                      <p className="text-[11px] text-rose-800 mt-0.5">{err.message || err}</p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-900 flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold">Zero CLIC Violations Detected</p>
+                    <p className="text-[11px] text-emerald-800 mt-0.5">
+                      The evaluated configuration passes 100% of native HPE CLIC portal factory rules.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <button onClick={() => setShowClicModal(false)} className="w-full mt-4 btn-secondary justify-center text-xs">

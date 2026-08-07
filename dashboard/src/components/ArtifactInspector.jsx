@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
-import { FileCode, ShieldCheck, RefreshCw, FileText, CheckCircle2, AlertCircle, Eye } from 'lucide-react';
+import { FileCode, ShieldCheck, RefreshCw, FileText, CheckCircle2, AlertCircle, Eye, X, BookOpen, AlertTriangle } from 'lucide-react';
 
 export default function ArtifactInspector({ currentCatalog, onAuditCatalog }) {
   const [auditResult, setAuditResult] = useState(null);
   const [isAuditing, setIsAuditing] = useState(false);
   const [viewFile, setViewFile] = useState(null);
   const [fileContent, setFileContent] = useState('');
+  const [showRegistry, setShowRegistry] = useState(false);
+  const [registryContent, setRegistryContent] = useState('');
 
   const handleRunAudit = async () => {
     if (!currentCatalog?.xlsxPath) return;
     setIsAuditing(true);
+    setAuditResult(null);
     try {
       const res = await fetch('/api/audit-catalog', {
         method: 'POST',
@@ -18,8 +21,8 @@ export default function ArtifactInspector({ currentCatalog, onAuditCatalog }) {
       });
       const data = await res.json();
       setAuditResult(data);
-    } catch {
-      setAuditResult({ passed: false, error: 'Failed to run audit script' });
+    } catch (err) {
+      setAuditResult({ passed: false, error: err.message || 'Audit execution failed' });
     }
     setIsAuditing(false);
   };
@@ -35,6 +38,26 @@ export default function ArtifactInspector({ currentCatalog, onAuditCatalog }) {
     }
   };
 
+  const handleViewRegistry = async () => {
+    setShowRegistry(true);
+    try {
+      const res = await fetch('/artifacts/SCRAPED_CATALOGS.md');
+      const text = await res.text();
+      setRegistryContent(text);
+    } catch {
+      setRegistryContent('Could not load SCRAPED_CATALOGS.md');
+    }
+  };
+
+  // Derive intermittent scrap paths from catalog path
+  const folderPath = currentCatalog?.jsonPath
+    ? currentCatalog.jsonPath.substring(0, currentCatalog.jsonPath.lastIndexOf('/'))
+    : null;
+
+  const prefix = currentCatalog?.id || 'Catalog';
+  const tsvSkusPath = folderPath ? `${folderPath}/intermittent_scraps/${prefix}_Catalog_SKUs.tsv` : null;
+  const tsvRulesPath = folderPath ? `${folderPath}/intermittent_scraps/${prefix}_Catalog_Rules.tsv` : null;
+
   return (
     <div className="space-y-6">
       {/* Header & Quality Audit Trigger */}
@@ -42,51 +65,65 @@ export default function ArtifactInspector({ currentCatalog, onAuditCatalog }) {
         <div>
           <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
             <FileCode className="w-5 h-5 text-purple-600" />
-            Pipeline Artifact & Data Quality Inspector
+            Pipeline Artifact &amp; Data Quality Inspector
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
             Full transparency into raw JSON extractions, TSVs, catalog diffs, and 7-check audit certificates.
           </p>
         </div>
 
-        <button
-          onClick={handleRunAudit}
-          disabled={isAuditing || !currentCatalog}
-          className="btn-primary text-xs disabled:opacity-50"
-        >
-          {isAuditing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
-          Run Data Quality Audit
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleViewRegistry}
+            className="btn-secondary text-xs"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-blue-600" />
+            View Master Registry
+          </button>
+          <button
+            onClick={handleRunAudit}
+            disabled={isAuditing || !currentCatalog?.xlsxPath}
+            className="btn-primary text-xs disabled:opacity-50"
+          >
+            {isAuditing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+            Run 7-Check Audit
+          </button>
+        </div>
       </div>
 
-      {/* Audit Checklist Card */}
+      {/* Audit Checklist Card — Dynamically bound to auditResult (Fix B3) */}
       {auditResult && (
-        <div className="glass-card p-6 border-l-4 border-l-emerald-500">
+        <div className={`glass-card p-6 border-l-4 ${auditResult.passed !== false ? 'border-l-emerald-500' : 'border-l-rose-500'}`}>
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Data Quality Certification Result
+              {auditResult.passed !== false
+                ? <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                : <AlertCircle className="w-4 h-4 text-rose-600" />
+              }
+              Data Quality Audit Certificate Result
             </h3>
-            <span className="badge badge-emerald">100% AUDIT PASS</span>
+            <span className={`badge ${auditResult.passed !== false ? 'badge-emerald' : 'badge-amber'}`}>
+              {auditResult.passed !== false ? '100% AUDIT PASS' : 'AUDIT AUDIT ISSUES DETECTED'}
+            </span>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-            <div className="p-2.5 bg-slate-50 rounded-lg">
-              <span className="text-slate-400 font-semibold block text-[10px]">SKU Qty Regex:</span>
-              <span className="font-bold text-emerald-600">PASS (100% Integer)</span>
+          {auditResult.checks ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+              {Object.entries(auditResult.checks).map(([checkName, checkVal]) => (
+                <div key={checkName} className="p-2.5 bg-slate-50 rounded-lg border border-slate-100">
+                  <span className="text-slate-400 font-semibold block text-[10px] uppercase truncate">{checkName}</span>
+                  <span className={`font-bold ${checkVal?.passed !== false ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {checkVal?.passed !== false ? 'PASS' : 'FAIL'}
+                  </span>
+                  {checkVal?.detail && <p className="text-[10px] text-slate-500 mt-0.5 truncate">{checkVal.detail}</p>}
+                </div>
+              ))}
             </div>
-            <div className="p-2.5 bg-slate-50 rounded-lg">
-              <span className="text-slate-400 font-semibold block text-[10px]">Hierarchy Delimiters:</span>
-              <span className="font-bold text-emerald-600">PASS (≥3 Delimiters)</span>
-            </div>
-            <div className="p-2.5 bg-slate-50 rounded-lg">
-              <span className="text-slate-400 font-semibold block text-[10px]">Excel vs JSON Tally:</span>
-              <span className="font-bold text-emerald-600">PASS (Exact Tally)</span>
-            </div>
-            <div className="p-2.5 bg-slate-50 rounded-lg">
-              <span className="text-slate-400 font-semibold block text-[10px]">QuickSpecs PDF:</span>
-              <span className="font-bold text-emerald-600">PASS (&gt; 500 KB Verified)</span>
-            </div>
-          </div>
+          ) : (
+            <p className="text-xs text-slate-600">
+              {auditResult.error || JSON.stringify(auditResult)}
+            </p>
+          )}
         </div>
       )}
 
@@ -123,7 +160,7 @@ export default function ArtifactInspector({ currentCatalog, onAuditCatalog }) {
           </div>
         )}
 
-        {currentCatalog?.pdfPath && (
+        {currentCatalog?.pdfPath ? (
           <div className="glass-card p-4 space-y-2">
             <h4 className="font-semibold text-xs text-slate-900 flex items-center gap-1.5">
               <FileText className="w-4 h-4 text-amber-600" /> HPE QuickSpecs PDF
@@ -138,8 +175,60 @@ export default function ArtifactInspector({ currentCatalog, onAuditCatalog }) {
               Open PDF
             </a>
           </div>
+        ) : (
+          <div className="glass-card p-4 space-y-2 opacity-60">
+            <h4 className="font-semibold text-xs text-slate-700 flex items-center gap-1.5">
+              <AlertTriangle className="w-4 h-4 text-amber-500" /> QuickSpecs PDF
+            </h4>
+            <p className="text-[11px] text-slate-400">PDF not cached locally yet</p>
+            <span className="text-[10px] text-slate-400 block italic">Use Scraper tab to download</span>
+          </div>
         )}
       </div>
+
+      {/* TSV Intermediary Files Section (Enhancement U6) */}
+      {folderPath && (
+        <div className="glass-card p-4 space-y-3">
+          <h4 className="font-bold text-xs text-slate-900 uppercase tracking-wider">Intermittent Scraping TSV Files:</h4>
+          <div className="flex gap-3">
+            {tsvSkusPath && (
+              <button
+                onClick={() => handleViewArtifact(tsvSkusPath)}
+                className="btn-secondary text-xs"
+              >
+                <Eye className="w-3.5 h-3.5 text-purple-600" /> View SKUs TSV
+              </button>
+            )}
+            {tsvRulesPath && (
+              <button
+                onClick={() => handleViewArtifact(tsvRulesPath)}
+                className="btn-secondary text-xs"
+              >
+                <Eye className="w-3.5 h-3.5 text-purple-600" /> View Rules TSV
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Master Registry Preview Drawer/Modal */}
+      {showRegistry && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-3xl w-full max-h-[80vh] flex flex-col shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
+              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-blue-600" /> Master Portfolio Registry (SCRAPED_CATALOGS.md)
+              </h3>
+              <button onClick={() => setShowRegistry(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <pre className="terminal-view text-[11px] flex-1 overflow-y-auto p-4">
+              {registryContent}
+            </pre>
+          </div>
+        </div>
+      )}
 
       {/* Artifact Content Viewer */}
       {viewFile && (

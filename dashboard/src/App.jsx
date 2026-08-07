@@ -149,6 +149,30 @@ export default function App() {
     }
   };
 
+  // Handler: Download QuickSpecs PDF (Fix B4)
+  const handleTriggerDownloadPdf = async () => {
+    setLogStream([]);
+    setActiveTab('scraper');
+    try {
+      await fetch('/api/download-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chassisId: selectedChassis })
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Handler: Kill Active Task (Enhancement U3)
+  const handleTriggerKillTask = async () => {
+    try {
+      await fetch('/api/kill-task', { method: 'POST' });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   // Handler: Evaluate BOQ
   const handleEvaluateBoq = async (boqInput) => {
     try {
@@ -180,6 +204,7 @@ export default function App() {
         onSmartSearch={handleSmartSearch}
         onOpenFeedbackDrawer={() => setIsFeedbackDrawerOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        isTaskRunning={isTaskRunning}
       />
 
       {/* Main Content Body */}
@@ -212,7 +237,7 @@ export default function App() {
         {/* BOQ Evaluator Tab */}
         {activeTab === 'boq' && (
           <div className="space-y-6">
-            <BoqUploader onEvaluateBoq={handleEvaluateBoq} />
+            <BoqUploader onEvaluateBoq={handleEvaluateBoq} evalResults={evalResults} />
             {evalResults && <WorkloadDnaCard dnaData={evalResults.workloadDna} />}
           </div>
         )}
@@ -249,8 +274,9 @@ export default function App() {
             isTaskRunning={isTaskRunning}
             onTriggerScrape={handleTriggerScrape}
             onTriggerRebuild={handleTriggerRebuild}
-            onTriggerDownloadPdf={() => {}}
+            onTriggerDownloadPdf={handleTriggerDownloadPdf}
             onTriggerSyncKnowledge={handleTriggerSyncKnowledge}
+            onTriggerKillTask={handleTriggerKillTask}
           />
         )}
 

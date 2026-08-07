@@ -363,6 +363,55 @@ app.post('/api/feedback-submit', (req, res) => {
   res.json({ entry, agentPrompt });
 });
 
+// Alias for FeedbackModal (Fix B1)
+app.post('/api/portal-feedback', (req, res) => {
+  const { rank, title, feedbackText } = req.body;
+  const text = `[Portal Feedback Rank ${rank} - ${title}] ${feedbackText}`;
+  const entry = feedbackQueue.appendFeedback(text, 'portal_feedback', { rank, title });
+  res.json({ success: true, entry });
+});
+
+// Download QuickSpecs PDF Endpoint (Fix B4)
+app.post('/api/download-pdf', (req, res) => {
+  const { chassisId } = req.body;
+  const pdfScript = path.join(PROJECT_ROOT, 'scripts', 'download_quickspecs_pdf.js');
+  if (!fs.existsSync(pdfScript)) {
+    return res.status(404).json({ error: 'download_quickspecs_pdf.js not found' });
+  }
+
+  const proc = spawn('node', [pdfScript], { cwd: PROJECT_ROOT, env: { ...process.env, STRUCTURED_PROGRESS: '1' } });
+  activeTask = { type: 'DOWNLOAD_PDF', pid: proc.pid, startTime: Date.now() };
+  broadcastSSE({ type: 'TASK_STARTED', task: activeTask.type });
+
+  proc.stdout.on('data', (data) => {
+    data.toString().split('\n').forEach(line => {
+      if (line.trim()) broadcastSSE({ type: 'LOG', text: line, stream: 'stdout' });
+    });
+  });
+  proc.on('close', (code) => {
+    broadcastSSE({ type: 'TASK_COMPLETED', code, task: 'DOWNLOAD_PDF' });
+    activeTask = null;
+  });
+
+  res.json({ message: 'PDF download started', pid: proc.pid });
+});
+
+// Kill Active Task Endpoint (Enhancement U3)
+app.post('/api/kill-task', (req, res) => {
+  if (!activeTask || !activeTask.pid) {
+    return res.status(400).json({ error: 'No active task to kill' });
+  }
+  try {
+    process.kill(activeTask.pid, 'SIGTERM');
+    broadcastSSE({ type: 'LOG', text: `🛑 Task ${activeTask.type} (PID ${activeTask.pid}) cancelled by user.`, stream: 'stderr' });
+    broadcastSSE({ type: 'TASK_COMPLETED', code: 143, task: activeTask.type });
+    activeTask = null;
+    res.json({ message: 'Task cancelled successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // -----------------------------------------------------------------------------
 // 8. Data Quality Audit Endpoint
 // -----------------------------------------------------------------------------
