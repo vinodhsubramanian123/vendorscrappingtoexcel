@@ -60,32 +60,63 @@ function broadcastSSE(data) {
 }
 
 // -----------------------------------------------------------------------------
-// 1. CDP Session & Observability Endpoints
+// Task Trace Manager (Phase 3 Observability)
 // -----------------------------------------------------------------------------
+function startTask(type, proc, res) {
+  const runId = `run_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+  const logs = [];
 
-app.get('/api/cdp-status', (req, res) => {
-  const reqCdp = http.get('http://localhost:9222/json', (cdpRes) => {
-    let raw = '';
-    cdpRes.on('data', chunk => raw += chunk);
-    cdpRes.on('end', () => {
-      try {
-        const targets = JSON.parse(raw);
-        const ocaTarget = targets.find(t => t.url && t.url.includes('oca.ext.hpe.com') && t.type === 'page');
-        res.json({
-          online: true,
-          activeSession: !!ocaTarget,
-          target: ocaTarget || null,
-          totalTargets: targets.length
-        });
-      } catch (err) {
-        res.json({ online: true, activeSession: false, target: null, error: err.message });
+  activeTask = { type, runId, pid: proc.pid, startTime: Date.now() };
+  broadcastSSE({ type: 'TASK_STARTED', task: type, runId });
+
+  const handleData = (data, streamType) => {
+    const lines = data.toString().split('\n');
+    lines.forEach(line => {
+      if (line.trim()) {
+        const logEntry = { timestamp: new Date().toISOString(), stream: streamType, text: line };
+        logs.push(logEntry);
+
+        try {
+          const parsed = JSON.parse(line);
+          if (parsed.type === 'progress' || parsed.type === 'log') {
+            broadcastSSE({ ...parsed, type: parsed.type.toUpperCase(), stream: streamType });
+            return;
+          }
+        } catch {}
+
+        broadcastSSE({ type: 'LOG', text: line, stream: streamType });
       }
     });
+  };
+
+  proc.stdout.on('data', data => handleData(data, 'stdout'));
+  proc.stderr.on('data', data => handleData(data, 'stderr'));
+
+  proc.on('close', (code) => {
+    const durationMs = Date.now() - activeTask.startTime;
+    broadcastSSE({ type: 'TASK_COMPLETED', code, task: type, runId, durationMs });
+    
+    // Persist trace log
+    const traceDir = path.join(OUTPUTS_DIR, 'history', 'runs');
+    if (!fs.existsSync(traceDir)) fs.mkdirSync(traceDir, { recursive: true });
+    fs.writeFileSync(path.join(traceDir, `${runId}.json`), JSON.stringify({
+      runId,
+      taskType: type,
+      startTime: new Date(activeTask.startTime).toISOString(),
+      durationMs,
+      exitCode: code,
+      logs
+    }, null, 2));
+
+    activeTask = null;
   });
-  reqCdp.on('error', () => {
-    res.json({ online: false, activeSession: false, target: null });
-  });
-});
+
+  res.json({ message: `${type} task started`, runId, pid: proc.pid });
+}
+
+// -----------------------------------------------------------------------------
+// 1. Session Observability Endpoints
+// -----------------------------------------------------------------------------
 
 app.get('/api/session-observability', (req, res) => {
   const obsScript = path.join(PROJECT_ROOT, 'scripts', 'observability_status.js');
@@ -103,8 +134,42 @@ app.get('/api/session-observability', (req, res) => {
 });
 
 // -----------------------------------------------------------------------------
-// 2. Catalog & Discovery Endpoints
+// 2. CDP State & Catalog Discovery
 // -----------------------------------------------------------------------------
+
+app.get('/api/cdp-status', async (req, res) => {
+  try {
+    const response = await fetch('http://127.0.0.1:9222/json');
+    if (!response.ok) throw new Error('CDP port not responding');
+    
+    const targets = await response.json();
+    const pages = targets.filter(t => t.type === 'page');
+    
+    // Find active OCA page
+    const ocaPage = pages.find(t => t.url.includes('oca.ext.hpe.com'));
+    
+    if (ocaPage) {
+      const isSolutionRoot = ocaPage.url.includes('extended_overview_components') || ocaPage.url.includes('alletra_5000_wizard');
+      return res.json({ 
+        status: 'READY', 
+        title: ocaPage.title, 
+        url: ocaPage.url,
+        isSolutionRoot
+      });
+    }
+
+    // Check if on login page
+    const loginPage = pages.find(t => t.url.includes('login.hpe.com') || t.url.includes('partner.hpe.com'));
+    if (loginPage) {
+      return res.json({ status: 'AUTHENTICATING', title: loginPage.title });
+    }
+
+    res.json({ status: 'NAVIGATING', message: 'OCA not found in open tabs' });
+
+  } catch (err) {
+    res.json({ status: 'DISCONNECTED', error: err.message });
+  }
+});
 
 app.get('/api/available-catalogs', (req, res) => {
   const registryFile = path.join(OUTPUTS_DIR, 'SCRAPED_CATALOGS.md');
@@ -172,6 +237,66 @@ app.get('/api/catalog-data', (req, res) => {
   }
 });
 
+app.get('/api/price-analytics', (req, res) => {
+  const chassisDir = req.query.chassisDir;
+  if (!chassisDir) return res.status(400).json({ error: 'Missing chassisDir parameter' });
+
+  const historyDir = path.join(OUTPUTS_DIR, chassisDir, 'history');
+  if (!fs.existsSync(historyDir)) {
+    return res.json({ snapshots: [], priceHistory: {}, summary: { totalSnapshots: 0 } });
+  }
+
+  try {
+    const priceHistoryFile = path.join(historyDir, 'price_history.json');
+    const priceHistory = fs.existsSync(priceHistoryFile)
+      ? JSON.parse(fs.readFileSync(priceHistoryFile, 'utf-8'))
+      : {};
+
+    const snapshots = fs.readdirSync(historyDir)
+      .filter(f => f.startsWith('catalog_') && f.endsWith('.json'))
+      .sort()
+      .map(f => {
+        const filePath = path.join(historyDir, f);
+        try {
+          const content = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+          return {
+            filename: f,
+            scrapeDate: content.metadata?.scrapeDate || f.replace('catalog_', '').replace('.json', ''),
+            totalSKUs: content.metadata?.totalUniqueSKUs || 0,
+            diffSummary: content.metadata?.diffSummary || null,
+            priceAnalytics: content.metadata?.priceAnalytics || null
+          };
+        } catch {
+          return { filename: f, error: 'Failed to parse snapshot' };
+        }
+      });
+
+    res.json({
+      chassisDir,
+      totalSnapshots: snapshots.length,
+      snapshots,
+      priceHistory
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/sku-history', (req, res) => {
+  const { sku, chassisDir } = req.query;
+  if (!sku || !chassisDir) return res.status(400).json({ error: 'Missing sku or chassisDir parameter' });
+
+  const priceHistoryFile = path.join(OUTPUTS_DIR, chassisDir, 'history', 'price_history.json');
+  if (!fs.existsSync(priceHistoryFile)) return res.json({ sku, history: [] });
+
+  try {
+    const priceHistory = JSON.parse(fs.readFileSync(priceHistoryFile, 'utf-8'));
+    res.json({ sku, history: priceHistory[sku] || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // -----------------------------------------------------------------------------
 // 3. Real-Time Log Terminal (Server-Sent Events)
 // -----------------------------------------------------------------------------
@@ -195,62 +320,22 @@ app.get('/api/stream-logs', (req, res) => {
 // -----------------------------------------------------------------------------
 
 app.post('/api/scrape', (req, res) => {
-  if (activeTask) {
-    return res.status(409).json({ error: 'Another task is currently running', task: activeTask.type });
-  }
+  if (activeTask) return res.status(409).json({ error: 'Another task is currently running', task: activeTask.type });
 
   const { mode } = req.body; // 'solution' or 'storage'
   const scriptName = mode === 'storage' ? 'scrape_oca_storage_solution.js' : 'scrape_oca_solution.js';
   const scriptPath = path.join(PROJECT_ROOT, 'scripts', scriptName);
 
   const proc = spawn('node', [scriptPath], { cwd: PROJECT_ROOT, env: { ...process.env, STRUCTURED_PROGRESS: '1' } });
-  activeTask = { type: `SCRAPE_${mode.toUpperCase()}`, pid: proc.pid, startTime: Date.now() };
-
-  broadcastSSE({ type: 'TASK_STARTED', task: activeTask.type });
-
-  proc.stdout.on('data', (data) => {
-    const lines = data.toString().split('\n');
-    lines.forEach(line => {
-      if (line.trim()) broadcastSSE({ type: 'LOG', text: line, stream: 'stdout' });
-    });
-  });
-
-  proc.stderr.on('data', (data) => {
-    const lines = data.toString().split('\n');
-    lines.forEach(line => {
-      if (line.trim()) broadcastSSE({ type: 'LOG', text: line, stream: 'stderr' });
-    });
-  });
-
-  proc.on('close', (code) => {
-    broadcastSSE({ type: 'TASK_COMPLETED', code, task: activeTask.type });
-    activeTask = null;
-  });
-
-  res.json({ message: 'Scrape task started', pid: proc.pid });
+  startTask(`SCRAPE_${mode.toUpperCase()}`, proc, res);
 });
 
 app.post('/api/rebuild', (req, res) => {
-  if (activeTask) {
-    return res.status(409).json({ error: 'Another task is currently running' });
-  }
+  if (activeTask) return res.status(409).json({ error: 'Another task is currently running' });
 
   const scriptPath = path.join(PROJECT_ROOT, 'scripts', 'rebuild_all.js');
   const proc = spawn('node', [scriptPath], { cwd: PROJECT_ROOT });
-  activeTask = { type: 'REBUILD_ALL', pid: proc.pid, startTime: Date.now() };
-
-  broadcastSSE({ type: 'TASK_STARTED', task: activeTask.type });
-
-  proc.stdout.on('data', (data) => {
-    broadcastSSE({ type: 'LOG', text: data.toString(), stream: 'stdout' });
-  });
-
-  proc.on('close', (code) => {
-    broadcastSSE({ type: 'TASK_COMPLETED', code, task: activeTask.type });
-    activeTask = null;
-  });
-
-  res.json({ message: 'Rebuild task started', pid: proc.pid });
+  startTask('REBUILD_ALL', proc, res);
 });
 
 // -----------------------------------------------------------------------------
@@ -275,8 +360,25 @@ app.post('/api/eval-boq', (req, res) => {
     fs.writeFileSync(targetPath, rawText, 'utf-8');
   }
 
+  const runId = `run_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+  const logs = [];
+
   if (!targetPath || !fs.existsSync(targetPath)) {
-    return res.status(400).json({ error: 'Valid BOQ file or text input is required' });
+    const errorMsg = 'Valid BOQ file or text input is required';
+    logs.push({ timestamp: new Date().toISOString(), stream: 'stderr', text: errorMsg });
+    
+    // Write failed trace to history
+    const traceDir = path.join(OUTPUTS_DIR, 'history', 'runs');
+    if (!fs.existsSync(traceDir)) fs.mkdirSync(traceDir, { recursive: true });
+    fs.writeFileSync(path.join(traceDir, `${runId}.json`), JSON.stringify({
+      runId, taskType: 'EVAL_BOQ', startTime: new Date().toISOString(), durationMs: 0, exitCode: 1, logs
+    }, null, 2));
+
+    broadcastSSE({ type: 'TASK_STARTED', task: 'EVAL_BOQ', runId });
+    broadcastSSE({ type: 'LOG', text: errorMsg, stream: 'stderr' });
+    broadcastSSE({ type: 'TASK_COMPLETED', code: 1, task: 'EVAL_BOQ', runId, durationMs: 0 });
+
+    return res.status(400).json({ error: errorMsg });
   }
 
   const evalScript = path.join(PROJECT_ROOT, 'scripts', 'eval_boq.js');
@@ -286,29 +388,63 @@ app.post('/api/eval-boq', (req, res) => {
   }
 
   const proc = spawn('node', args, { cwd: PROJECT_ROOT, env: { ...process.env, STRUCTURED_PROGRESS: '1' } });
-  activeTask = { type: 'EVAL_BOQ', pid: proc.pid, startTime: Date.now() };
-  broadcastSSE({ type: 'TASK_STARTED', task: activeTask.type });
+  activeTask = { type: 'EVAL_BOQ', runId, pid: proc.pid, startTime: Date.now() };
+  broadcastSSE({ type: 'TASK_STARTED', task: activeTask.type, runId });
 
   let stdoutBuffer = '';
 
-  proc.stdout.on('data', (data) => {
-    stdoutBuffer += data.toString();
-  });
-
-  proc.stderr.on('data', (data) => {
+  const handleData = (data, streamType) => {
     const lines = data.toString().split('\n');
     lines.forEach(line => {
-      if (line.trim()) broadcastSSE({ type: 'LOG', text: line, stream: 'stderr' });
+      if (line.trim()) {
+        logs.push({ timestamp: new Date().toISOString(), stream: streamType, text: line });
+        if (streamType === 'stdout') stdoutBuffer += line + '\n';
+        
+        try {
+          const parsed = JSON.parse(line);
+          if (parsed.type === 'progress' || parsed.type === 'log') {
+            broadcastSSE({ ...parsed, type: parsed.type.toUpperCase(), stream: streamType });
+            return;
+          }
+        } catch {}
+        
+        broadcastSSE({ type: 'LOG', text: line, stream: streamType });
+      }
     });
-  });
+  };
+
+  proc.stdout.on('data', data => handleData(data, 'stdout'));
+  proc.stderr.on('data', data => handleData(data, 'stderr'));
 
   proc.on('close', (code) => {
-    broadcastSSE({ type: 'TASK_COMPLETED', code, task: 'EVAL_BOQ' });
+    const durationMs = Date.now() - activeTask.startTime;
+    broadcastSSE({ type: 'TASK_COMPLETED', code, task: 'EVAL_BOQ', runId, durationMs });
+    
+    // Persist trace log
+    const traceDir = path.join(OUTPUTS_DIR, 'history', 'runs');
+    if (!fs.existsSync(traceDir)) fs.mkdirSync(traceDir, { recursive: true });
+    fs.writeFileSync(path.join(traceDir, `${runId}.json`), JSON.stringify({
+      runId,
+      taskType: 'EVAL_BOQ',
+      startTime: new Date(activeTask.startTime).toISOString(),
+      durationMs,
+      exitCode: code,
+      logs
+    }, null, 2));
+
     activeTask = null;
 
     try {
-      const data = JSON.parse(stdoutBuffer);
-      res.json(data);
+      // Find the final JSON payload block by checking the last valid JSON output
+      const jsonStrMatch = stdoutBuffer.match(/\{[\s\S]*\}/);
+      if (!jsonStrMatch) throw new Error('No JSON output found');
+      
+      const data = JSON.parse(jsonStrMatch[0]);
+      if (data.status === 'SUCCESS' && data.data) {
+        res.json(data.data);
+      } else {
+        res.json(data);
+      }
     } catch {
       res.json({ rawOutput: stdoutBuffer, error: 'Failed to parse evaluator JSON' });
     }
@@ -363,6 +499,45 @@ app.post('/api/notebook-query', (req, res) => {
       res.json({ query, answer: stdout, citations: [], source: 'NOTEBOOK_LM_RAW' });
     }
   });
+});
+
+app.get('/api/test-notebooklm', (req, res) => {
+  const testScript = path.join(PROJECT_ROOT, 'scripts', 'test_notebooklm_mcp.js');
+  if (!fs.existsSync(testScript)) {
+    return res.status(404).json({ error: 'test_notebooklm_mcp.js not found' });
+  }
+
+  execFile('node', [testScript], { cwd: PROJECT_ROOT }, (err, stdout, stderr) => {
+    try {
+      const outputLines = stdout.split('\n');
+      const jsonStart = outputLines.findIndex(l => l.trim().startsWith('{'));
+      if (jsonStart !== -1) {
+        const jsonStr = outputLines.slice(jsonStart).join('\n');
+        return res.json(JSON.parse(jsonStr));
+      }
+      res.json({ status: err ? 'DEGRADED' : 'HEALTHY', raw: stdout });
+    } catch {
+      res.json({ status: err ? 'DEGRADED' : 'HEALTHY', raw: stdout });
+    }
+  });
+});
+
+app.get('/api/notebooklm-consultations', (req, res) => {
+  // Read telemetry file which stores NLM consultation counts and metrics
+  const telemetryFile = path.join(OUTPUTS_DIR, 'history', 'pipeline_telemetry.json');
+  if (!fs.existsSync(telemetryFile)) {
+    return res.json({ totalQueries: 0, citationMatches: 0, log: [] });
+  }
+  try {
+    const data = JSON.parse(fs.readFileSync(telemetryFile, 'utf-8'));
+    res.json({
+      totalQueries: data.nlmTotalQueries || 0,
+      citationMatches: data.nlmCitationMatches || 0,
+      log: data.nlmConsultations || []
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // -----------------------------------------------------------------------------
@@ -500,8 +675,13 @@ app.post('/api/verify-all', (req, res) => {
 });
 
 // -----------------------------------------------------------------------------
-// 8. Data Quality Audit Endpoint
+// 8. Data Quality Audit & Telemetry Endpoints (Fix G14)
 // -----------------------------------------------------------------------------
+
+app.get('/api/telemetry', (req, res) => {
+  const telemetry = require(path.join(PROJECT_ROOT, 'scripts', 'lib', 'telemetry.js'));
+  res.json(telemetry.loadTelemetry());
+});
 
 app.post('/api/audit-catalog', (req, res) => {
   const { xlsxPath } = req.body;
@@ -519,41 +699,105 @@ app.post('/api/audit-catalog', (req, res) => {
   });
 });
 
+app.get('/api/history/runs', (req, res) => {
+  const runsDir = path.join(OUTPUTS_DIR, 'history', 'runs');
+  if (!fs.existsSync(runsDir)) return res.json([]);
+  try {
+    const files = fs.readdirSync(runsDir).filter(f => f.endsWith('.json'));
+    const runs = files.map(f => {
+      try {
+        const data = JSON.parse(fs.readFileSync(path.join(runsDir, f), 'utf-8'));
+        // Return summary only
+        return { runId: data.runId, taskType: data.taskType, startTime: data.startTime, durationMs: data.durationMs, exitCode: data.exitCode };
+      } catch { return null; }
+    }).filter(Boolean).sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
+    res.json(runs);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/history/runs/:id', (req, res) => {
+  const { id } = req.params;
+  const runFile = path.join(OUTPUTS_DIR, 'history', 'runs', `${id}.json`);
+  if (!fs.existsSync(runFile)) return res.status(404).json({ error: 'Run trace not found' });
+  try {
+    res.json(JSON.parse(fs.readFileSync(runFile, 'utf-8')));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // -----------------------------------------------------------------------------
 // 9. Knowledge Sync — Push learned rules to NotebookLM (SSE streamed)
 // -----------------------------------------------------------------------------
 
 app.post('/api/sync-knowledge', (req, res) => {
-  if (activeTask) {
-    return res.status(409).json({ error: 'Another task is currently running', task: activeTask.type });
-  }
+  if (activeTask) return res.status(409).json({ error: 'Another task is currently running', task: activeTask.type });
 
   const syncScript = path.join(PROJECT_ROOT, 'scripts', 'lib', 'knowledge_sync.js');
   if (!fs.existsSync(syncScript)) {
     return res.status(404).json({ error: 'knowledge_sync.js not found' });
   }
 
-  const proc = spawn('node', [syncScript], { cwd: PROJECT_ROOT, env: { ...process.env, STRUCTURED_PROGRESS: '1' } });
-  activeTask = { type: 'KNOWLEDGE_SYNC', pid: proc.pid, startTime: Date.now() };
-  broadcastSSE({ type: 'TASK_STARTED', task: activeTask.type });
-
-  proc.stdout.on('data', (data) => {
-    data.toString().split('\n').forEach(line => {
-      if (line.trim()) broadcastSSE({ type: 'LOG', text: line, stream: 'stdout' });
-    });
-  });
-  proc.stderr.on('data', (data) => {
-    data.toString().split('\n').forEach(line => {
-      if (line.trim()) broadcastSSE({ type: 'LOG', text: line, stream: 'stderr' });
-    });
-  });
-  proc.on('close', (code) => {
-    broadcastSSE({ type: 'TASK_COMPLETED', code, task: 'KNOWLEDGE_SYNC' });
-    activeTask = null;
-  });
-
-  res.json({ message: 'Knowledge sync started', pid: proc.pid });
+  const proc = spawn('node', [syncScript, '--auto-upload-nlm'], { cwd: PROJECT_ROOT, env: { ...process.env, STRUCTURED_PROGRESS: '1' } });
+  startTask('KNOWLEDGE_SYNC', proc, res);
 });
+
+// -----------------------------------------------------------------------------
+// 10. Ambiguity Resolution & NotebookLM Chat MCP Bridge
+// -----------------------------------------------------------------------------
+
+app.post('/api/ask-notebook', (req, res) => {
+  const { prompt } = req.body;
+  if (!prompt) return res.status(400).json({ error: 'prompt is required' });
+
+  // Use the NotebookLM MCP CLI (nlm) for the query
+  const nlmCommand = `nlm chat "${prompt.replace(/"/g, '\\"')}"`;
+  
+  execFile('npx', ['nlm', 'chat', prompt], { cwd: PROJECT_ROOT }, (err, stdout, stderr) => {
+    if (err) {
+      // Mock fallback if nlm CLI isn't globally available but MCP is used in the agent context
+      return res.json({ 
+        answer: `[Mock NotebookLM Response] To resolve this ambiguity: You should inject a physical fixing rule for the requested SKUs. Ensure you specify the dependency clearly. (Error launching nlm CLI locally: ${err.message})` 
+      });
+    }
+    res.json({ answer: stdout.trim() });
+  });
+});
+
+app.post('/api/resolve-ambiguity', (req, res) => {
+  const { ruleUpdate, chassis, affectedSku, requiredDependencySku } = req.body;
+  if (!ruleUpdate) return res.status(400).json({ error: 'ruleUpdate is required' });
+
+  const registryFile = path.join(OUTPUTS_DIR, 'history', 'master_knowledge_registry.json');
+  const deltaFile = path.join(OUTPUTS_DIR, 'history', 'catalog_deltas.json');
+
+  const deltaId = `NLM-RES-${Date.now().toString().slice(-6)}`;
+  const newDelta = {
+    deltaId,
+    timestamp: new Date().toISOString(),
+    chassis: chassis || 'UNKNOWN',
+    errorType: 'MANUAL_NOTEBOOKLM_RESOLUTION',
+    ruleUpdate,
+    affectedSku,
+    requiredDependencySku,
+    source: 'dashboard_human_in_loop'
+  };
+
+  // Append to catalog_deltas.json (the active rules engine file used by conflict_graph)
+  let deltas = [];
+  if (fs.existsSync(deltaFile)) {
+    try { deltas = JSON.parse(fs.readFileSync(deltaFile, 'utf-8')); } catch {}
+  }
+  deltas.push(newDelta);
+  fs.mkdirSync(path.dirname(deltaFile), { recursive: true });
+  fs.writeFileSync(deltaFile, JSON.stringify(deltas, null, 2));
+
+  // Note: the master_knowledge_registry.json will be rebuilt on the next sync:knowledge run.
+  res.json({ success: true, deltaId, message: 'Resolution logged successfully' });
+});
+
 
 // -----------------------------------------------------------------------------
 // 10. Simulate Portal Rejection — Injects an error into the learning engine

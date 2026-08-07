@@ -124,9 +124,35 @@ export default function BoqUploader({ onEvaluateBoq, evalResults, logStream }) {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Or paste raw SKU text BOM:
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-semibold text-slate-700">
+                Or paste raw SKU text BOM:
+              </label>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-slate-400 font-medium">Presets:</span>
+                <button
+                  type="button"
+                  onClick={() => setRawText('1x P49057-B21 (Intel Xeon 8580), 16x P69728-B21 (64GB DDR5), 2x P47777-B21 (800W PSU)')}
+                  className="px-1.5 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] font-semibold rounded border border-blue-200 transition-colors"
+                >
+                  DL380 Gen12
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRawText('1x Alletra 9000 Base Enclosure, 24x 1.92TB NVMe SSD Media Pack, 2x 100Gb F32 Interconnect')}
+                  className="px-1.5 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-semibold rounded border border-indigo-200 transition-colors"
+                >
+                  Alletra
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRawText('1x P52560-B21 (Intel Xeon 6430), 8x P38620-B21 (32GB DDR5), 2x P38620-B21')}
+                  className="px-1.5 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-semibold rounded border border-emerald-200 transition-colors"
+                >
+                  DL380 Gen11
+                </button>
+              </div>
+            </div>
             <textarea
               rows={3}
               value={rawText}

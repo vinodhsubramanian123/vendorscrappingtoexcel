@@ -1,16 +1,55 @@
-# React + Vite
+# HPE OCA Catalog Intelligence — Control Center Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A modern, high-performance React + Express control center dashboard for managing scraping operations, inspecting catalog data, running BOQ evaluations, viewing 5-Tier solution matrix reports, querying NotebookLM RAG, and monitoring system telemetry.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## ⚡ Quick Start
 
-## React Compiler
+```bash
+# 1. Install dependencies
+npm install
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+# 2. Start Express server bridge & Vite React frontend concurrently
+npm run dev
 
-## Expanding the Oxlint configuration
+# 3. Open dashboard in browser
+http://localhost:5173
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+- **Frontend**: React 18 + Vite (Port 5173) with Tailwind/Glassmorphism styling
+- **Backend Bridge**: Express.js (Port 3001) connecting UI to native Node.js pipeline scripts
+- **Real-Time Streaming**: Server-Sent Events (SSE) via `/api/stream-logs`
+
+---
+
+## 🧭 Dashboard Tabs & Components
+
+| Tab | Component | Description |
+|-----|-----------|-------------|
+| **Executive Dashboard** | [`CatalogOverviewCard`](file:///Users/macbookaira1466/Downloads/booktoSkill/dashboard/src/components/CatalogOverviewCard.jsx), [`TaskHistoryCard`](file:///Users/macbookaira1466/Downloads/booktoSkill/dashboard/src/components/TaskHistoryCard.jsx) | Selected chassis metadata, scrape date, historical diff breakdown (`+Added`, `-Removed`, `Price Delta`), interactive task history timeline |
+| **Master Excel Catalog** | [`CatalogExplorer`](file:///Users/macbookaira1466/Downloads/booktoSkill/dashboard/src/components/CatalogExplorer.jsx) | Client-side NLP FlexSearch, 3-tier category filters, color-coded status badges, real-time price trend modal |
+| **BOQ Evaluator & DNA** | [`BoqUploader`](file:///Users/macbookaira1466/Downloads/booktoSkill/dashboard/src/components/BoqUploader.jsx), [`WorkloadDnaCard`](file:///Users/macbookaira1466/Downloads/booktoSkill/dashboard/src/components/WorkloadDnaCard.jsx) | Drag-and-drop BOQ upload (.xlsx, .csv, .json, .txt), Workload DNA profiler, live SSE stdout terminal |
+| **6-Aspect Math & CLIC** | [`ConflictGraphInspector`](file:///Users/macbookaira1466/Downloads/booktoSkill/dashboard/src/components/ConflictGraphInspector.jsx) | Physical pre-flight verification checklist + CLIC error inspector |
+| **5-Tier Resolution Matrix** | [`ResolutionMatrix`](file:///Users/macbookaira1466/Downloads/booktoSkill/dashboard/src/components/ResolutionMatrix.jsx) | Ranked buildable solutions, intent match %, per-SKU technical swap rationale, NotebookLM RAG Second Opinion badge |
+| **Artifacts & Quality Audit** | [`ArtifactInspector`](file:///Users/macbookaira1466/Downloads/booktoSkill/dashboard/src/components/ArtifactInspector.jsx) | Multi-sheet XLSX download, catalog JSON viewer, QuickSpecs PDF opener, master registry viewer, 7-check audit certificate |
+| **System Telemetry** | [`TelemetryCard`](file:///Users/macbookaira1466/Downloads/booktoSkill/dashboard/src/components/TelemetryCard.jsx) | Real-time KPI metrics (`GET /api/telemetry`), average confidence score, total learned deltas, run history ledger |
+| **Live CDP Scraper** | [`ScraperTriggerCard`](file:///Users/macbookaira1466/Downloads/booktoSkill/dashboard/src/components/ScraperTriggerCard.jsx) | Handshake over port 9222, task mutex lock with cancel button, live SSE terminal streaming |
+
+---
+
+## 📡 Server REST & SSE Endpoints (`server.cjs`)
+
+- `GET /api/cdp-status` — Probes Chrome DevTools Protocol port 9222
+- `GET /api/available-catalogs` — Enumerates scraped catalog JSONs in `outputs/`
+- `GET /api/catalog-data?path=...` — Serves catalog JSON content
+- `GET /api/telemetry` — Serves pipeline telemetry metrics and run history
+- `GET /api/price-history?sku=...` — Serves cumulative SKU price history trail
+- `GET /api/stream-logs` — Server-Sent Events stream for real-time process logs
+- `POST /api/scrape` — Triggers `scrape_oca_solution.js` or `scrape_oca_storage_solution.js`
+- `POST /api/rebuild` — Triggers `rebuild_all.js`
+- `POST /api/eval-boq` — Runs `eval_boq.js` with stdout JSON unwrap
+- `POST /api/export-boq` — Generates multi-sheet corrected BOQ Excel workbook
+- `POST /api/sync-knowledge` — Pushes learned rules to NotebookLM RAG
+- `POST /api/simulate-error` — Logs portal rejection as `KnowledgeDelta`
+- `POST /api/kill-task` — Cancels running child process via SIGTERM

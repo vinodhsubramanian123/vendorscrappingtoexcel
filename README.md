@@ -60,10 +60,13 @@ Navigate to the target chassis or solution in OCA, then run:
 
 ```bash
 # For ProLiant / Synergy / Compute Server Solutions:
-npm run scrape
+npm run scrape:auto
 
 # For Alletra / Nimble / StoreOnce / MSA Storage Solutions:
-npm run scrape:storage
+npm run scrape:auto --storage
+
+# For Multi-Sheet Parallel BOQ Evaluation:
+npm run eval:multi outputs/your_boq.xlsx
 ```
 
 **These single commands automatically:**
@@ -122,6 +125,16 @@ node scripts/verify_excel_tally.js \
 node scripts/test_pipeline_evals.js \
   outputs/ProLiant/Gen12/DL380_Gen12_SFF/DL380_Gen12_SFF_OCA_Catalog.xlsx
 ```
+
+---
+
+## ⚡ Master Command CLI (`cli_tools.js`)
+These commands interact directly with the running Dashboard Backend:
+- `npm run scrape:auto` - Trigger CDP handshake and autonomous scrape sequence.
+- `npm run probe:cdp` - Check Chrome DevTools active target session.
+- `npm run eval:multi <file.xlsx>` - Spawn parallel evaluation engines for multi-sheet config analysis.
+- `npm run trace:view <runId>` - Open local terminal replay of any historical task's stdout/stderr.
+- `npm run resolve:ambiguity <chassis> <sku> "<rule>"` - Direct injection of rules via NotebookLM MCP resolutions.
 
 ---
 
@@ -206,11 +219,35 @@ outputs/{Family}/{Gen}/{Model}_{FormFactor}/
 | 16 | Start Date | Availability start | `02/24/2025` |
 | 17 | Discontinued Date | End of availability | `06/30/2029` |
 
-**Planned diff fields (18-22)**: `Diff Status`, `Previous List Price (USD)`, `Price Change (USD)`, `Price Change (%)`, `Price History Trail`
+**Active Production Diff Fields (18-22)**: `Diff Status`, `Previous List Price (USD)`, `Price Change (USD)`, `Price Change (%)`, `Price History Trail`
 
 ---
 
-## 🧪 Test Suite & Observability Dashboard Commands
+## 💻 Web Intelligence Dashboard & Control Center
+
+Launch the full interactive React + Express control center dashboard:
+
+```bash
+# 1. Start Express server bridge & Vite React frontend
+cd dashboard && npm run dev
+
+# 2. Open dashboard in browser
+http://localhost:5173
+```
+
+### Dashboard Tabs & Features:
+1. **Executive Dashboard**: Selected chassis metadata, scrape date, historical diff breakdown badges (`+Added`, `-Removed`, `Price Delta`), interactive task history timeline.
+2. **Master Excel Catalog**: Client-side NLP FlexSearch, cascading category/type filters, color-coded status badges, real-time price trend modal.
+3. **BOQ Evaluator & DNA**: File upload / text paste, 6-aspect physical checks, Workload DNA profiler, live SSE stdout terminal.
+4. **6-Aspect Math & CLIC**: Physical pre-flight verification checklist + CLIC error inspector. **Includes Ambiguity Inbox** (NotebookLM MCP bridge) for `< 75%` confidence runs.
+5. **5-Tier Resolution Matrix**: Ranked buildable solutions, workload intent match %, per-SKU technical swap rationale, NotebookLM RAG Second Opinion badge.
+6. **Artifacts & Quality Audit**: Multi-sheet XLSX download, catalog JSON viewer, QuickSpecs PDF opener, master registry viewer, 7-check audit certificate.
+7. **System Telemetry**: Real-time KPI metrics (`GET /api/telemetry`), average confidence score, total learned deltas, run history ledger.
+8. **Live CDP Scraper & Trace Ledger**: Handshake over port 9222, task mutex lock, and **Side-by-Side Trace Ledger** for replaying historical `run_id` logs.
+
+---
+
+## 🧪 Test Suite & Observability Commands
 
 ```bash
 # 1. Comprehensive End-to-End Scenarios & Workload DNA Test (19/19)

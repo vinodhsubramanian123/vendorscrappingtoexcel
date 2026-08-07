@@ -289,8 +289,6 @@ async function main() {
   });
 
   try {
-    const { buildMasterKnowledgeRegistry } = require('./lib/knowledge_sync');
-    buildMasterKnowledgeRegistry();
   } catch (_) {}
 
   const durationSec = ((Date.now() - pipelineStart) / 1000).toFixed(1);

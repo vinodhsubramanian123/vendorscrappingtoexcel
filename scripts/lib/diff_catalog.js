@@ -224,9 +224,49 @@ function processCatalogDiff(catalogData, historyDir) {
   fs.writeFileSync(currentSnapshotPath, JSON.stringify(catalogData, null, 2));
   fs.writeFileSync(priceHistoryPath, JSON.stringify(priceHistory, null, 2));
 
-  // Update metadata with diff summary
+  // Compute Category & Subcategory Price Variance Analytics
+  const categoryAnalytics = {};
+  for (const entry of catalogData.entries) {
+    const cat = entry.parentCategory || 'Other';
+    if (!categoryAnalytics[cat]) {
+      categoryAnalytics[cat] = { totalSKUs: 0, totalPrice: 0, minPrice: Infinity, maxPrice: 0, subcategories: {} };
+    }
+    const subcat = entry.subCategory || 'General';
+    if (!categoryAnalytics[cat].subcategories[subcat]) {
+      categoryAnalytics[cat].subcategories[subcat] = { totalSKUs: 0, totalPrice: 0 };
+    }
+    for (const sku of entry.skus || []) {
+      const price = parsePrice(sku['Unit Price (USD)'] || sku['Price (USD)']);
+      if (price > 0) {
+        categoryAnalytics[cat].totalSKUs++;
+        categoryAnalytics[cat].totalPrice += price;
+        if (price < categoryAnalytics[cat].minPrice) categoryAnalytics[cat].minPrice = price;
+        if (price > categoryAnalytics[cat].maxPrice) categoryAnalytics[cat].maxPrice = price;
+
+        categoryAnalytics[cat].subcategories[subcat].totalSKUs++;
+        categoryAnalytics[cat].subcategories[subcat].totalPrice += price;
+      }
+    }
+  }
+
+  // Format averages and handle Infinity
+  Object.keys(categoryAnalytics).forEach(cat => {
+    const c = categoryAnalytics[cat];
+    c.avgPrice = c.totalSKUs > 0 ? (c.totalPrice / c.totalSKUs) : 0;
+    if (c.minPrice === Infinity) c.minPrice = 0;
+    Object.keys(c.subcategories).forEach(sub => {
+      const s = c.subcategories[sub];
+      s.avgPrice = s.totalSKUs > 0 ? (s.totalPrice / s.totalSKUs) : 0;
+    });
+  });
+
+  // Update metadata with diff summary & price analytics
   catalogData.metadata.diffSummary = diffSummary;
   catalogData.metadata.historySnapshot = path.basename(currentSnapshotPath);
+  catalogData.metadata.priceAnalytics = {
+    scrapeDate,
+    categoryBreakdown: categoryAnalytics
+  };
 
   console.log(`\n--- Stage 7: Catalog Diff Engine Summary ---`);
   console.log(`  Scrape Date:    ${scrapeDate}`);

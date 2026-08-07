@@ -193,7 +193,7 @@ rulesWS['!cols'] = [
 enableSheetUsability(rulesWS);
 XLSX.utils.book_append_sheet(wb, rulesWS, 'Rules & Constraints');
 
-// Sheet 4: Catalog Diff & History (Dedicated diff sheet — ONLY when diffs exist)
+// Sheet 4: Catalog Diff (Dedicated diff sheet — ONLY when diffs exist)
 const diffRows = skuData.data.filter(r =>
   r['Diff Status'] === 'ADDED' || r['Diff Status'] === 'REMOVED' || r['Diff Status'] === 'PRICE_CHANGED'
 );
@@ -203,8 +203,34 @@ if (diffRows.length > 0) {
   diffWS['!cols'] = SKU_COL_WIDTHS;
   applyDiffStyles(diffWS, diffRows);
   enableSheetUsability(diffWS);
-  XLSX.utils.book_append_sheet(wb, diffWS, 'Catalog Diff & History');
+  XLSX.utils.book_append_sheet(wb, diffWS, 'Catalog Diffs');
 }
+
+// Sheet 5: Price History Timeline (Dedicated sheet for viewing the complete timeline of all SKUs)
+const timelineWS = XLSX.utils.json_to_sheet(skuData.data.map(r => ({
+  'Main Category': r['Main Category'],
+  'Sub-Category': r['Sub-Category'],
+  'Product #': r['Product #'],
+  'Description': r['Description'],
+  'Current Price (USD)': r['Unit Price (USD)'],
+  'Diff Status': r['Diff Status'],
+  'Price History Trail': r['Price History Trail']
+})));
+
+timelineWS['!cols'] = [
+  { wch: 25 }, // Main Category
+  { wch: 35 }, // Sub-Category
+  { wch: 16 }, // Product #
+  { wch: 70 }, // Description
+  { wch: 18 }, // Current Price (USD)
+  { wch: 16 }, // Diff Status
+  { wch: 100 } // Price History Trail (wider for timeline readability)
+];
+
+// Apply same diff styles based on 'Diff Status'
+applyDiffStyles(timelineWS, skuData.data);
+enableSheetUsability(timelineWS);
+XLSX.utils.book_append_sheet(wb, timelineWS, 'Price History Timeline');
 
 // Sheets 5+: Category drill-downs — dynamically discovered from SKU data
 const REQUIRED_CATEGORIES = [

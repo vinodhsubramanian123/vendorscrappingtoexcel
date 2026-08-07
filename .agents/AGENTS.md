@@ -22,25 +22,23 @@ This workspace contains tools for scraping, parsing, and organising HPE server p
 ### ✅ Resolved & Certified Pipeline Health (100% Audit Pass)
 | ID | Issue / Feature | Status | Resolution / Implemented Module |
 |----|-----------------|--------|--------------------------------|
-| **G25/G26/G32** | Dynamic Chassis Pathing & `--chassis` Flag | ✅ RESOLVED | `eval_boq.js` and `boq_evaluator.js` accept `--chassis <dir>` flag and auto-detect target chassis from BOQ items via `autoDetectChassisDetailed()`. |
-| **G27a-e** | Machine-Parseable CLI `--json` Output | ✅ RESOLVED | `eval_boq.js`, `observability_status.js`, `verify_excel_tally.js`, `build_catalog.js`, `scrape_oca_solution.js`, and `scrape_oca_storage_solution.js` support stdout JSON mode for SSE stream ingestion. |
-| **G28** | Dynamic Notebook ID Registry | ✅ RESOLVED | `scripts/config/notebooks.json` externalizes NotebookLM notebook IDs per chassis family. |
-| **G29** | Reusable Catalog Discovery API | ✅ RESOLVED | `scripts/lib/catalog_discovery.js` provides programmatic catalog search, detail retrieval, and CDP port status. |
-| **G30** | Absolute Telemetry Directory Path | ✅ RESOLVED | `telemetry.js` anchors `pipeline_telemetry.json` relative to `__dirname` (`PROJECT_ROOT/outputs/history/`). |
-| **G31 / Q4** | Universal Dynamic Upgrade Engine | ✅ RESOLVED | `budget_optimizer.js` extracts upgrades per product line (ProLiant, Alletra, Synergy) with fallback to `scripts/config/upgrade_templates.json`. |
-| **G33** | Mandatory `outputDir` Parameter | ✅ RESOLVED | `processPortalFeedback()` requires explicit output directory parameter (no hardcoded fallback). |
-| **G36** | SSE Progress Event Emitter | ✅ RESOLVED | `scripts/lib/progress.js` provides `emitProgress()`, `emitLog()`, and `emitResult()` when `STRUCTURED_PROGRESS=1`. |
-| **G37 / Q3** | User Feedback Queue & Agent Auto-Pickup | ✅ RESOLVED | `scripts/lib/feedback_queue.js` provides `appendFeedback()`, `getNextPendingFeedback()`, and `formatAgentTaskPrompt()`. |
-| **Q2** | Low-Confidence Chassis Detection Prompting | ✅ RESOLVED | `autoDetectChassisDetailed()` computes confidence scores; if `score < 0.75`, `eval_boq.js` flags `requiresUserChassisConfirmation: true`. |
-| **D3** | Workload DNA Dynamic Resolution Scores | ✅ RESOLVED | `conflict_graph.js` computes 5-tier solution scores dynamically from workload DNA alignment and fix penalties. |
-| **D4** | Zero-Price SKU Safeguards | ✅ RESOLVED | `budget_optimizer.js` tracks `zeroPriceCount` and flags `hasZeroPriceSkus: true`. Fixed test assertions in `test_all_aspects.js`. |
-| **S1-S5** | Closed-Loop Automated Knowledge Sync | ✅ RESOLVED | `knowledge_sync.js` and `npm run sync:knowledge` automatically structure learned rules into Scope Taxonomy (`UNIVERSAL_VENDOR`, `FAMILY_GEN`, `CHASSIS_SPECIFIC`) and update Gemini NotebookLM payloads. |
+| **G15** | Closed-Loop Learned Delta Auto-Injection | ✅ RESOLVED | `loadLearnedKnowledgeDeltas()` in `conflict_graph.js` automatically loads `master_knowledge_registry.json` and `catalog_deltas.json` during evaluation, merging learned rules into pre-checks. |
+| **G11 / G14** | System Telemetry API & Observability Dashboard | ✅ RESOLVED | `server.cjs` exposes `GET /api/telemetry` via `telemetry.js` and `TelemetryCard.jsx` visualizes evaluations count, avg confidence, learned deltas, and run history ledger. |
+| **G18** | NotebookLM RAG Evaluation Integration | ✅ RESOLVED | `server.cjs` unwraps `eval_boq.js` stdout JSON so `ragAnswer` and QuickSpecs citations are directly exposed to the dashboard. |
+| **G22** | NotebookLM "Second Opinion" Certification | ✅ RESOLVED | `synthesize5TierRankedSolutions` in `conflict_graph.js` attaches `ragSecondOpinion` and `ResolutionMatrix.jsx` renders a visual Sparkles badge. |
+| **G26** | Catalog Overview & Historical Diff Summary Card | ✅ RESOLVED | `CatalogOverviewCard.jsx` renders selected chassis metadata, scrape date, downloads, and diff breakdown (`+Added`, `-Removed`, `Price Delta`). |
+| **G25** | Pipeline Task History Action Log Timeline | ✅ RESOLVED | `TaskHistoryCard.jsx` records SSE events and renders an interactive task execution timeline. |
+| **G8 / G8b** | Stale State Cleanup & Dynamic Executive Dashboard | ✅ RESOLVED | Switching chassis clears eval state; Executive Dashboard cleanly renders `CatalogOverviewCard`, CTA banner, and `TaskHistoryCard` when no BOQ is evaluated. |
+| **G2 / G3** | Post-Scrape Registry Refresh & Auto-Navigation | ✅ RESOLVED | Completing a scrape or rebuild task automatically refreshes catalogs and navigates user to the Master Catalog tab. |
+| **G4** | SKU Count Normalization | ✅ RESOLVED | `CatalogExplorer.jsx` explicitly displays total catalog entries and unique SKU count matching the header dropdown. |
+| **G21** | Per-SKU Swap Technical Rationale | ✅ RESOLVED | `ResolutionMatrix.jsx` renders explicit per-SKU technical rationale from `conflictGraph.resolvedFixes`. |
 
 ### 🚀 Production Features Active
 - **Centralized HPE SKU Normalizer**: `scripts/lib/sku.js` provides single source of truth for hardware SKUs, option mode suffixes (`CTO`/`BTO`/`FIO`), and service SKUs.
 - **Catalog Diff & Price Tracking Engine**: `scripts/lib/diff_catalog.js` saves date-stamped snapshots in `history/catalog_{YYYY-MM-DD}.json` and logs cumulative price trails in `price_history.json`.
 - **Master Catalog Registry Auto-Synchronizer**: `scripts/lib/sync_registry.js` (`npm run registry:sync`) automatically scans and updates `outputs/SCRAPED_CATALOGS.md`.
 - **WebLogic & Legacy UI Modal Interceptor**: Auto-accepts JS alert dialogs (`Page.handleJavaScriptDialog`) and session extension popups (`dismissDOMModals`).
+- **Closed-Loop Feedback & Telemetry Engine**: `feedback_loop.js` and `telemetry.js` track quantitative confidence, learned rules, and run history.
 
 ---
 
@@ -102,6 +100,8 @@ booktoSkill/
 ```
 
 > **Rule — NO FILES AT PROJECT ROOT**: Output JSON, Excel, TSV, and PDF files MUST NEVER be written to the project root. All outputs go inside `outputs/{Family}/{Gen}/{Model}/`.
+
+> **Rule — ALWAYS REFERENCE DATA DICTIONARY**: Before reading or modifying pipeline JSON schemas (`catalog.json`, `evalResults`, `telemetry`), AI agents MUST read `.agents/DATA_DICTIONARY.md` to understand the data contracts and prevent token waste. Do not reverse-engineer schemas from source code.
 
 ---
 
@@ -331,8 +331,6 @@ graph TD
 
     subgraph "Quality Layer"
         I["verify_excel_tally.js (7-check Audit)"]
-        J["test_pipeline_evals.js (Pre/In/Post Evals)"]
-        K["download_quickspecs_pdf.js (MD5 Cache)"]
     end
 
     B --> F
@@ -342,6 +340,11 @@ graph TD
     H --> I
     B --> K
     C --> K
+    L -.-> B
+    L -.-> M
+    M --> J
+    J --> O
+    N -.-> L
 ```
 
 ### Data Flow Per Script
@@ -481,3 +484,19 @@ graph TD
 45. **Dynamic UI State & Payload Fidelity Mandate**:
     - Dashboard components (e.g., `ConflictGraphInspector`, `ArtifactInspector`, `WorkloadDnaCard`) MUST NOT render static or hardcoded "PASS" badges or mock confidence scores.
     - All UI badges, physical aspect checklists, and audit certificates must dynamically bind to live JSON payloads (`evalResults.physicalChecks`, `auditResult.checks[]`, `workloadDna.confidence`) returned from backend API endpoints. Fallbacks must explicitly indicate "Pending Evaluation" or "No Data" rather than misleading fake passes.
+
+46. **Observability Trace Ledger (Phase 3 Hardening)**:
+    - All background tasks spawned via `server.cjs` MUST be wrapped in the `startTask()` helper.
+    - Every run is assigned a unique `run_id`.
+    - Both `stdout` and `stderr` streams are multiplexed and persisted as JSON arrays in `outputs/history/runs/{run_id}.json`.
+    - UI consumers (`TaskHistoryCard`) fetch these ledgers to provide side-by-side terminal replay of historical runs without requiring a live SSE connection.
+
+47. **Scalable Multi-Config Parallel Evaluation (Phase 4 Hardening)**:
+    - `scripts/eval_multi_boq.js` serves as the master evaluator for massive multi-node deployments.
+    - The engine must parse `.xlsx` workbooks, discover multiple independent config sheets dynamically, and spawn `child_process` evaluators (`eval_boq.js --sheet <name>`) in parallel.
+    - Output must be a unified JSON array aggregating all parallel evaluations, mapping each config to its respective chassis.
+
+48. **NotebookLM MCP Ambiguity Loop (Phase 2 Hardening)**:
+    - Any BOQ evaluation resulting in `< 75%` confidence or unknown rules must trigger the `MANUAL_REVIEW_REQUIRED` state.
+    - The React Dashboard (`AmbiguityInbox`) must intercept this state and provide a 1-click bridge to the `nlm` CLI via `/api/ask-notebook`.
+    - Solutions provided by the MCP RAG prompt must be explicitly approved by the user and written directly to `master_knowledge_registry.json` via `/api/resolve-ambiguity`, ensuring zero-code rule acquisition.

@@ -12,6 +12,7 @@ const xlsx = require('xlsx-js-style');
 const { cleanBaseSKU, isValidHpeSKU, HPE_SKU_EXTRACT_REGEX } = require('./sku');
 const { calculateConfidenceScore } = require('./feedback_loop');
 const { classifyComponentRole } = require('./product_meta');
+const { emitProgress } = require('./progress');
 
 /**
  * High TDP threshold requiring High-Performance Fan Kits
@@ -336,58 +337,81 @@ function evalSupportManufacturing(items, catalogData = null) {
  * @returns {object} Evaluation results
  */
 function evaluatePhysicalMath(items, catalogData = null, targetDir = '') {
+  emitProgress(2, 10, 'Compute & Thermal Profiling', 'in_progress', `Analyzing ${items.length} SKUs for high-TDP processor constraints and heatsink counts.`);
   const compute = evalComputeThermal(items, catalogData);
+  
+  emitProgress(3, 10, 'Memory Channel Math', 'in_progress', `Validating 1DPC / 2DPC symmetry and balanced memory population.`);
   const memory = evalMemoryChannel(items, compute.cpuCount, catalogData);
+  
+  emitProgress(4, 10, 'Storage Tri-Mode Validation', 'in_progress', `Verifying NVMe/SAS/SATA drive cages, controllers, and backplane capacities.`);
   const storage = evalStorageTriMode(items, catalogData);
+  
+  emitProgress(5, 10, 'Networking & PCIe Constraints', 'in_progress', `Analyzing OCP NICs and PCIe Riser slot math.`);
   const network = evalNetworkingOcp(items, catalogData);
   const pcie    = evalPcieRiserSlots(items); // Doesn't need strict taxonomy given specific part descriptions
+  
+  emitProgress(6, 10, 'Power & Infrastructure Checking', 'in_progress', `Verifying DC power lug kits and redundancy.`);
   const power = evalPowerEnvironment(items, catalogData);
   const support = evalSupportManufacturing(items, catalogData);
 
   const errors = [];
   const warnings = [];
   const missingDependencies = [];
+  const mathDeductions = [];
 
   // Rule: PCIe Slot Capacity vs Riser Math
   if (pcie.requiredPcieCards > pcie.totalSlotsAvailable) {
-    warnings.push(`PCIe expansion cards count (${pcie.requiredPcieCards}) exceeds available chassis/riser PCIe slots (${pcie.totalSlotsAvailable}). Additional Riser Kit required.`);
+    const reason = `PCIe Math Failed: ${pcie.requiredPcieCards} required cards exceeds ${pcie.totalSlotsAvailable} available slots.`;
+    warnings.push(reason);
+    mathDeductions.push(reason);
   }
 
   // Rule: CPU 2 PCIe Lane Allocation requirement for Secondary/Tertiary Risers
   if ((pcie.secondaryRiserCount > 0 || pcie.tertiaryRiserCount > 0) && compute.cpuCount < 2) {
-    errors.push(`Secondary/Tertiary Riser configured with only 1 CPU socket populated. Secondary PCIe bus lines require 2nd CPU socket.`);
+    const reason = `Compute/PCIe Math Failed: Secondary/Tertiary Risers require 2nd CPU socket. Only 1 CPU found.`;
+    errors.push(reason);
+    mathDeductions.push(reason);
   }
 
   // Rule 1: High TDP thermal requirement
   if (compute.maxCpuTdpWatts >= HIGH_TDP_THRESHOLD_WATTS && !compute.hasHighPerfFans) {
-    errors.push(`High TDP Processor configured (${compute.maxCpuTdpWatts}W >= ${HIGH_TDP_THRESHOLD_WATTS}W threshold) without High-Performance Fan Kit.`);
+    const reason = `Thermal Math Failed: ${compute.maxCpuTdpWatts}W processor exceeds ${HIGH_TDP_THRESHOLD_WATTS}W limit without High-Performance Fan Kit.`;
+    errors.push(reason);
+    mathDeductions.push(reason);
     missingDependencies.push({
       rule: 'High TDP Thermal Cooling Rule',
       sku: MANDATORY_SKUS.HIGH_PERF_FAN_KIT.sku,
       description: MANDATORY_SKUS.HIGH_PERF_FAN_KIT.name,
-      quantity: 1
+      quantity: 1,
+      reasoning: reason
     });
   }
 
   // Rule 2: Drive-less server requirement
   if (storage.driveCount === 0 && !storage.hasNoDriveKit) {
-    warnings.push(`Drive-less server configuration detected (0 storage drives). Requires HPE No Drive Configuration FIO Kit to clear layout block.`);
+    const reason = `Storage Math Failed: 0 drives detected. Requires HPE No Drive Configuration FIO Kit.`;
+    warnings.push(reason);
+    mathDeductions.push(reason);
     missingDependencies.push({
       rule: 'Drive-less Chassis Configuration Rule',
       sku: MANDATORY_SKUS.NO_DRIVE_FIO_KIT.sku,
       description: MANDATORY_SKUS.NO_DRIVE_FIO_KIT.name,
-      quantity: 1
+      quantity: 1,
+      reasoning: reason
     });
   }
 
   // Rule 3: DC Power Supply Lug Kit requirement
   if (power.hasDcPowerSupply && !power.hasDcLugKit) {
-    errors.push(`-48VDC Power Supply configured without matching DC Power Cable Lug Kit.`);
+    const reason = `Power Math Failed: -48VDC Power Supply requires DC Power Cable Lug Kit.`;
+    errors.push(reason);
+    mathDeductions.push(reason);
     missingDependencies.push({
       rule: 'DC Power Supply Cable Rule',
       sku: MANDATORY_SKUS.DC_LUG_KIT.sku,
       description: MANDATORY_SKUS.DC_LUG_KIT.name,
-      quantity: 1
+      quantity: 1,
+      reasoning: reason
     });
   }
 
@@ -397,29 +421,37 @@ function evaluatePhysicalMath(items, catalogData = null, targetDir = '') {
   const hasDriveCageKit = items.some(it => cleanBaseSKU(it.sku) === 'P75741-B21' || cleanBaseSKU(it.sku) === 'P76449-B21');
 
   if (hasBaseChassis && storage.driveCount === 0 && !hasNoDriveFioKit && !hasDriveCageKit) {
+    const reason = 'CLIC Rule 81392308: P73282-B21 chassis without drives requires 873763-B21 FIO Kit.';
+    mathDeductions.push(reason);
     missingDependencies.push({
       rule: 'CLIC Rule 81392308: 8SFF Front Cage / No Drive FIO Requirement',
       sku: '873763-B21',
       description: '873763-B21 FIO HPE 8SFF Front Remove SPEC Perf FIO (or 8SFF Front Cage Kit P75741-B21)',
       quantity: 1,
-      reason: 'UNBUILDABLE CONFIGURATION (Rule 81392308): P73282-B21 DL380 Gen12 SFF NC chassis ordered without drives requires 873763-B21 FIO Kit or an explicit 8SFF Front Drive Cage Kit.'
+      reason: 'UNBUILDABLE CONFIGURATION (Rule 81392308): P73282-B21 DL380 Gen12 SFF NC chassis ordered without drives requires 873763-B21 FIO Kit or an explicit 8SFF Front Drive Cage Kit.',
+      reasoning: reason
     });
   }
 
   // Rule 4: Controller Smart Storage Battery requirement
   if (storage.hasStorageController && !storage.hasSmartBattery) {
-    warnings.push(`Storage controller configured without Smart Storage Battery to protect write cache.`);
+    const reason = `Storage Math Failed: Storage controller requires Smart Storage Battery to protect write cache.`;
+    warnings.push(reason);
+    mathDeductions.push(reason);
     missingDependencies.push({
       rule: 'Controller Cache Protection Rule',
       sku: MANDATORY_SKUS.SMART_STORAGE_BATTERY.sku,
       description: MANDATORY_SKUS.SMART_STORAGE_BATTERY.name,
-      quantity: 1
+      quantity: 1,
+      reasoning: reason
     });
   }
 
   // Rule 5: Memory Channel Balance requirement
   if (memory.memoryCount > 0 && !memory.isBalancedChannel) {
-    warnings.push(`Memory count (${memory.memoryCount} DIMMs across ${compute.cpuCount || 2} CPUs) is not populated symmetrically across 8 memory channels per CPU socket.`);
+    const reason = `Memory Math Failed: ${memory.memoryCount} DIMMs across ${compute.cpuCount || 2} CPUs is not balanced.`;
+    warnings.push(reason);
+    mathDeductions.push(reason);
   }
 
   const evalSummary = {
@@ -443,12 +475,15 @@ function evaluatePhysicalMath(items, catalogData = null, targetDir = '') {
     hasSupportService: support.hasSupportService,
     errors,
     warnings,
+    mathDeductions,
     missingDependencies
   };
 
-  // Step 2.5: Run 5-Level Dependency Conflict Graph Validation
+  // Step 7: Run 5-Level Dependency Conflict Graph Validation
   // G26: Use provided targetDir or auto-detect from items (no hardcoded path)
   const { validateConflictGraph } = require('./conflict_graph');
+  const { autoDetectChassisDetailed } = require('./catalog_discovery');
+  emitProgress(7, 10, 'Validating Conflict Graph', 'in_progress', 'Resolving dependencies and checking for architectural conflicts.');
   const resolvedDir = targetDir || 'outputs/ProLiant/Gen12/DL380_Gen12_SFF';
   const graphResults = validateConflictGraph(items, missingDependencies, resolvedDir);
   evalSummary.conflictGraph = graphResults;

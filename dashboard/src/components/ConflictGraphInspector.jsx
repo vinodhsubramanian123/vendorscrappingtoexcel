@@ -9,22 +9,43 @@ export default function ConflictGraphInspector({ evalResults, chassisName }) {
 
   const aspectIcons = [Cpu, Memory, HardDrive, Zap, Power, Award];
 
-  const aspects = [
-    { id: 1, name: 'Thermal & Compute Math', icon: Cpu, defaultRule: 'TDP thermal envelope vs High-Performance Fan Kit population rules' },
-    { id: 2, name: 'Memory & Channel Balance', icon: Memory, defaultRule: 'Interleaving mod 8 channel balance & 1DPC/2DPC population rules' },
-    { id: 3, name: 'Storage & Tri-Mode Cabling', icon: HardDrive, defaultRule: 'Tri-Mode storage controller, drive cage & dedicated cable kit checks' },
-    { id: 4, name: 'PCIe Riser & Slot Alignment', icon: Zap, defaultRule: 'Primary, Secondary & Tertiary Risers lane allocation & TDP check' },
-    { id: 5, name: 'Power & DC Lug Kit Math', icon: Power, rule: 'Power supply redundancy rating & DC Lug Kit requirement checks' },
-    { id: 6, name: 'Vendor Support Taxonomy', icon: Award, defaultRule: 'Hardware SKU validation against mandatory Pointnext / Tech Care SLA tiers' }
-  ].map((def, idx) => {
-    const realCheck = rawAspects ? (Array.isArray(rawAspects) ? rawAspects[idx] : rawAspects[def.name]) : null;
-    const passed = realCheck ? (realCheck.passed !== false && !realCheck.error) : true;
-    const detail = realCheck?.detail || realCheck?.message || realCheck?.rule || def.defaultRule;
+  // Dynamic 6-aspect definitions — reads from eval payload when available (Fix G7)
+  const defaultAspects = [
+    { id: 1, name: 'Thermal & Compute Math', icon: Cpu, defaultRule: 'CPU TDP thermal envelope vs cooling kit population rules' },
+    { id: 2, name: 'Memory & Channel Balance', icon: Memory, defaultRule: 'Memory interleaving, channel balance & population rules' },
+    { id: 3, name: 'Storage & Controller Cabling', icon: HardDrive, defaultRule: 'Storage controller, drive cage & cable kit compatibility checks' },
+    { id: 4, name: 'PCIe Riser & Slot Alignment', icon: Zap, defaultRule: 'Riser lane allocation, slot population & TDP compliance' },
+    { id: 5, name: 'Power & Redundancy Math', icon: Power, defaultRule: 'Power supply redundancy rating & auxiliary kit requirements' },
+    { id: 6, name: 'Vendor Support Taxonomy', icon: Award, defaultRule: 'Hardware SKU validation against mandatory support SLA tiers' }
+  ];
+
+  const aspects = defaultAspects.map((def, idx) => {
     const isEvaluated = !!evalResults;
+    let passed = true;
+    let detail = def.defaultRule;
+    let status = !isEvaluated ? 'PENDING' : 'PASS';
+
+    // If we have mathDeductions from the backend, map them to the UI aspects
+    if (isEvaluated && evalResults.mathDeductions) {
+      const keyword = def.name.split(' ')[0]; // e.g., "Thermal", "Memory", "Storage", "PCIe", "Power", "Vendor"
+      const matchedDeduction = evalResults.mathDeductions.find(d => 
+        d.includes(keyword) || 
+        (keyword === 'Thermal' && d.includes('Compute')) ||
+        (keyword === 'Vendor' && d.includes('Support')) ||
+        (keyword === 'PCIe' && d.includes('PCIe'))
+      );
+
+      if (matchedDeduction) {
+        passed = false;
+        status = 'FAIL';
+        detail = matchedDeduction;
+      }
+    }
 
     return {
       ...def,
-      status: !isEvaluated ? 'PENDING' : (passed ? 'PASS' : 'FAIL'),
+      name: def.name,
+      status,
       detail
     };
   });
@@ -34,7 +55,7 @@ export default function ConflictGraphInspector({ evalResults, chassisName }) {
   return (
     <div className="space-y-6">
       {/* Aspect Checklist Card */}
-      <div className="glass-card p-6">
+      <div className="glass-card p-6 animate-fade-in-up delay-200">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-3 mb-4 gap-2">
           <div>
             <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
@@ -101,7 +122,7 @@ export default function ConflictGraphInspector({ evalResults, chassisName }) {
                       {isPending ? 'PENDING EVAL' : isPass ? 'PASS' : 'VIOLATION'}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-1">{asp.detail}</p>
+                  <p className={`text-[11px] mt-1 ${isPass || isPending ? 'text-slate-500' : 'text-rose-600 font-medium'}`}>{asp.detail}</p>
                 </div>
               </div>
             );

@@ -23,7 +23,7 @@ export default function WorkloadDnaCard({ dnaData }) {
   const confidenceScore = dna.confidence ? `${Math.round(dna.confidence * (dna.confidence <= 1 ? 100 : 1))}%` : '95%';
 
   return (
-    <div className="glass-card p-6 space-y-4">
+    <div className="glass-card p-6 space-y-4 animate-fade-in-up delay-100">
       <div className="flex items-center justify-between border-b border-slate-100 pb-3">
         <div>
           <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">

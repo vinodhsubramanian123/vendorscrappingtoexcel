@@ -126,6 +126,7 @@ export default function Header({
           { id: 'conflict', label: '6-Aspect Math & CLIC' },
           { id: 'matrix', label: '5-Tier Resolution Matrix' },
           { id: 'artifacts', label: 'Artifacts & Quality Audit' },
+          { id: 'telemetry', label: 'System Telemetry' },
           { id: 'scraper', label: 'Live CDP Scraper' }
         ].map(tab => (
           <button

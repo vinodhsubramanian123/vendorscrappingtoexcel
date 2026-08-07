@@ -113,6 +113,15 @@ function buildMasterKnowledgeRegistry() {
 function generateNotebookSyncPayload(chassisName = 'DL380_Gen12_SFF') {
   const registry = buildMasterKnowledgeRegistry();
 
+  // Load latest catalog if available
+  const catalogPath = path.join(OUTPUTS_ROOT, 'ProLiant', 'Gen12', chassisName, `${chassisName}_Catalog.json`);
+  let catalogData = null;
+  if (fs.existsSync(catalogPath)) {
+    try {
+      catalogData = JSON.parse(fs.readFileSync(catalogPath, 'utf-8'));
+    } catch {}
+  }
+
   let md = `# HPE OCA Catalog Intelligence — Synchronized Knowledge & Rules Charter\n\n`;
   md += `**Target Chassis**: \`${chassisName}\`  \n`;
   md += `**Sync Timestamp**: ${new Date().toISOString()}  \n`;
@@ -152,6 +161,31 @@ function generateNotebookSyncPayload(chassisName = 'DL380_Gen12_SFF') {
       md += `${idx + 1}. **[${r.deltaId}] ${r.chassis}**: ${r.ruleUpdate} *(Required Dependency: ${r.requiredDependencySku || 'N/A'})*\n`;
     });
     md += `\n`;
+  }
+
+  if (catalogData && catalogData.entries) {
+    md += `## 📦 4. Complete SKU Catalog & Historical Price Variance\n\n`;
+    md += `The following table details every valid SKU, its current list price, diff status against historical scrapes, and the entire price history trail. NotebookLM should use this to answer all pricing, historical variance, and product description questions.\n\n`;
+    
+    catalogData.entries.forEach(entry => {
+      const subCat = entry.subCategory || 'General';
+      if (!entry.skus || entry.skus.length === 0) return;
+      
+      md += `### Sub-Category: ${subCat} (Category: ${entry.parentCategory})\n\n`;
+      md += `| Product # | Description | Current Price (USD) | Diff Status | Price History Trail |\n`;
+      md += `|-----------|-------------|---------------------|-------------|---------------------|\n`;
+      
+      entry.skus.forEach(sku => {
+        const pn = sku['Product #'] || sku.sku || 'N/A';
+        const desc = (sku['Description'] || sku.description || '').replace(/\|/g, '-').replace(/\n/g, ' ').trim();
+        const price = sku['Unit Price (USD)'] || sku['Price (USD)'] || 'N/A';
+        const status = sku['Diff Status'] || 'UNCHANGED';
+        const trail = (sku['Price History Trail'] || '').replace(/\|/g, '-');
+        
+        md += `| \`${pn}\` | ${desc} | $${price} | **${status}** | ${trail} |\n`;
+      });
+      md += '\n';
+    });
   }
 
   md += `---\n*Generated automatically by HPE Knowledge Sync Engine.*  \n`;

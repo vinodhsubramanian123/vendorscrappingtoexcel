@@ -270,8 +270,6 @@ async function main() {
   });
 
   try {
-    const { buildMasterKnowledgeRegistry } = require('./lib/knowledge_sync');
-    buildMasterKnowledgeRegistry();
   } catch (_) {}
 
   if (JSON_MODE) {

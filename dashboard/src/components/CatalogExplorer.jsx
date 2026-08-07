@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, TrendingUp, FileSpreadsheet, X, Filter } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { catalogIndexer } from '../utils/nlpSearch';
+import PriceAnalyticsCard from './PriceAnalyticsCard';
 
 export default function CatalogExplorer({ catalogData, chassisName }) {
   const [query, setQuery] = useState('');
@@ -78,6 +79,11 @@ export default function CatalogExplorer({ catalogData, chassisName }) {
     displayedSkus = displayedSkus.filter(s => s.optionType === activeType);
   }
 
+  const [viewMode, setViewMode] = useState('table'); // 'table' or 'analytics'
+
+  // Derive chassisDir from catalogData.metadata if available or chassisName
+  const chassisDir = catalogData?.metadata?.chassisDir || (chassisName ? chassisName.replace(/ /g, '_') : '');
+
   // Price formatting helper
   const formatPrice = (priceVal) => {
     if (priceVal === undefined || priceVal === null || priceVal === '' || priceVal === 'N/A') return 'N/A';
@@ -94,7 +100,7 @@ export default function CatalogExplorer({ catalogData, chassisName }) {
     setLoadingHistory(true);
     const skuId = sku.sku || sku.partNumber;
     try {
-      const res = await fetch(`/api/price-history?sku=${encodeURIComponent(skuId)}&chassis=${encodeURIComponent(chassisName || '')}`);
+      const res = await fetch(`/api/sku-history?sku=${encodeURIComponent(skuId)}&chassisDir=${encodeURIComponent(chassisDir)}`);
       const data = await res.json();
       if (data.history && data.history.length > 0) {
         setRealPriceTrail(data.history);
@@ -118,64 +124,77 @@ export default function CatalogExplorer({ catalogData, chassisName }) {
             {chassisName || 'Master Catalog'} Explorer
           </h2>
           <p className="text-xs text-slate-500">
-            Total SKUs: <span className="font-semibold text-slate-800">{allSkus.length}</span> | Filtered: <span className="font-semibold text-blue-600">{displayedSkus.length}</span>
+            Total Entries: <span className="font-semibold text-slate-800">{allSkus.length}</span> | Unique SKUs: <span className="font-semibold text-emerald-600">{catalogData.metadata?.totalUniqueSKUs || new Set(allSkus.map(s => s.sku)).size}</span> | Filtered: <span className="font-semibold text-blue-600">{displayedSkus.length}</span>
           </p>
         </div>
 
-        {/* Filter & Attribute Search Controls */}
+        {/* View Mode Toggle & Filters */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          {/* Instant Search input */}
-          <div className="relative flex-1 md:w-56">
-            <input
-              type="text"
-              value={query}
-              onChange={handleQueryChange}
-              placeholder="Search SKU ID, attribute, rules..."
-              className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-            />
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+          {/* View Mode Switcher */}
+          <div className="flex items-center p-1 bg-slate-100 rounded-lg border border-slate-200">
+            <button
+              onClick={() => setViewMode('table')}
+              className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                viewMode === 'table' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              SKU Table View
+            </button>
+            <button
+              onClick={() => setViewMode('analytics')}
+              className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                viewMode === 'analytics' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Price Variance & History
+            </button>
           </div>
 
-          {/* Main Category Filter */}
-          <select
-            value={activeCategory}
-            onChange={(e) => { setActiveCategory(e.target.value); setActiveSubCategory('ALL'); }}
-            className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm focus:outline-none max-w-[140px] truncate"
-          >
-            <option value="ALL">All Categories</option>
-            {categories.filter(c => c !== 'ALL').map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
+          {viewMode === 'table' && (
+            <>
+              {/* Instant Search input */}
+              <div className="relative flex-1 md:w-48">
+                <input
+                  type="text"
+                  value={query}
+                  onChange={handleQueryChange}
+                  placeholder="Search SKUs..."
+                  className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                />
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+              </div>
 
-          {/* Sub-Category Filter */}
-          <select
-            value={activeSubCategory}
-            onChange={(e) => setActiveSubCategory(e.target.value)}
-            className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm focus:outline-none max-w-[140px] truncate"
-          >
-            <option value="ALL">All Sub-Categories</option>
-            {availableSubCategories.filter(s => s !== 'ALL').map(sub => (
-              <option key={sub} value={sub}>{sub}</option>
-            ))}
-          </select>
+              {/* Main Category Filter */}
+              <select
+                value={activeCategory}
+                onChange={(e) => { setActiveCategory(e.target.value); setActiveSubCategory('ALL'); }}
+                className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm focus:outline-none max-w-[130px] truncate"
+              >
+                <option value="ALL">All Categories</option>
+                {categories.filter(c => c !== 'ALL').map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
 
-          {/* Type Filter */}
-          <select
-            value={activeType}
-            onChange={(e) => setActiveType(e.target.value)}
-            className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm focus:outline-none"
-          >
-            <option value="ALL">All Types</option>
-            <option value="CTO">CTO</option>
-            <option value="BTO">BTO</option>
-            <option value="FIO">FIO</option>
-            <option value="Service">Service</option>
-          </select>
+              {/* Sub-Category Filter */}
+              <select
+                value={activeSubCategory}
+                onChange={(e) => setActiveSubCategory(e.target.value)}
+                className="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm focus:outline-none max-w-[130px] truncate"
+              >
+                <option value="ALL">All Sub-Categories</option>
+                {availableSubCategories.filter(s => s !== 'ALL').map(sub => (
+                  <option key={sub} value={sub}>{sub}</option>
+                ))}
+              </select>
+            </>
+          )}
         </div>
       </div>
 
-      {/* SKU Table View */}
+      {viewMode === 'analytics' ? (
+        <PriceAnalyticsCard selectedChassis={chassisName} chassisDir={chassisDir} />
+      ) : (
       <div className="glass-card overflow-hidden">
         <div className="overflow-x-auto max-h-[520px]">
           <table className="w-full text-left text-xs">
@@ -239,6 +258,7 @@ export default function CatalogExplorer({ catalogData, chassisName }) {
           </table>
         </div>
       </div>
+      )}
 
       {/* Historical Price Trend Modal */}
       {selectedSkuTrend && (

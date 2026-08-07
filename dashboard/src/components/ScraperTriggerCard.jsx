@@ -1,8 +1,29 @@
-import React, { useState } from 'react';
-import { Play, RefreshCw, Terminal, Download, Server, Sparkles, Loader, Square } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Play, RefreshCw, Terminal, Download, Server, Sparkles, Loader, Square, ShieldAlert, CheckCircle, Navigation, KeyRound } from 'lucide-react';
 
 export default function ScraperTriggerCard({ logStream, isTaskRunning, onTriggerScrape, onTriggerRebuild, onTriggerDownloadPdf, onTriggerSyncKnowledge, onTriggerKillTask }) {
   const [scrapeMode, setScrapeMode] = useState('solution');
+  const [cdpState, setCdpState] = useState({ status: 'CHECKING', message: 'Probing browser...' });
+
+  useEffect(() => {
+    // Poll CDP state every 3 seconds if no task is running
+    let interval;
+    const checkCDP = async () => {
+      try {
+        const res = await fetch('/api/cdp-status');
+        const data = await res.json();
+        setCdpState(data);
+      } catch (err) {
+        setCdpState({ status: 'DISCONNECTED', error: 'Backend unreachable' });
+      }
+    };
+    
+    checkCDP();
+    if (!isTaskRunning) {
+      interval = setInterval(checkCDP, 3000);
+    }
+    return () => clearInterval(interval);
+  }, [isTaskRunning]);
 
   // Extract latest progress event if present
   const latestProgressLog = logStream.slice().reverse().find(l => {
@@ -27,6 +48,9 @@ export default function ScraperTriggerCard({ logStream, isTaskRunning, onTrigger
     progressPercent = 45;
     progressStage = 'IN_PROGRESS';
   }
+
+  // Determine Scrape button state based on CDP
+  const canScrape = cdpState.status === 'READY';
 
   return (
     <div className="space-y-6">
@@ -59,6 +83,40 @@ export default function ScraperTriggerCard({ logStream, isTaskRunning, onTrigger
           </div>
         </div>
 
+        {/* CDP Handshake Banner */}
+        {!isTaskRunning && (
+          <div className={`p-3 rounded-lg border mb-5 flex items-center justify-between text-xs font-medium ${
+            cdpState.status === 'READY' 
+              ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+              : cdpState.status === 'AUTHENTICATING'
+                ? 'bg-amber-50 text-amber-800 border-amber-200'
+                : 'bg-slate-50 text-slate-700 border-slate-200'
+          }`}>
+            <div className="flex items-center gap-2">
+              {cdpState.status === 'READY' ? <CheckCircle className="w-4 h-4 text-emerald-600" />
+               : cdpState.status === 'AUTHENTICATING' ? <KeyRound className="w-4 h-4 text-amber-600" />
+               : cdpState.status === 'DISCONNECTED' ? <ShieldAlert className="w-4 h-4 text-rose-500" />
+               : <Navigation className="w-4 h-4 text-slate-500 animate-pulse" />}
+               
+              <span>
+                <strong>Browser State:</strong> {
+                  cdpState.status === 'READY' ? `Ready on ${cdpState.title.substring(0,40)}...`
+                  : cdpState.status === 'AUTHENTICATING' ? 'Waiting for HPE Partner Login...'
+                  : cdpState.status === 'NAVIGATING' ? 'Navigate to an OCA Solution or Chassis page...'
+                  : cdpState.status === 'DISCONNECTED' ? 'CDP Disconnected (Port 9222 closed)'
+                  : 'Probing...'
+                }
+              </span>
+            </div>
+            {cdpState.status === 'READY' && !cdpState.isSolutionRoot && (
+               <span className="text-[10px] bg-emerald-100 px-2 py-0.5 rounded text-emerald-700">Sub-Menu Detected</span>
+            )}
+            {cdpState.status === 'READY' && cdpState.isSolutionRoot && (
+               <span className="text-[10px] bg-emerald-100 px-2 py-0.5 rounded text-emerald-700 font-bold">Solution Root Detected</span>
+            )}
+          </div>
+        )}
+
         {/* Visual Progress Bar when task is running */}
         {isTaskRunning && (
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6 space-y-2">
@@ -79,9 +137,9 @@ export default function ScraperTriggerCard({ logStream, isTaskRunning, onTrigger
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           
           {/* Live Scrape Action */}
-          <div className="bg-slate-50/80 rounded-xl p-4 border border-slate-200/80">
+          <div className={`rounded-xl p-4 border transition-all ${canScrape ? 'bg-blue-50/50 border-blue-200/80 shadow-sm ring-1 ring-blue-50' : 'bg-slate-50/80 border-slate-200/80 opacity-60'}`}>
             <h4 className="font-bold text-slate-800 text-xs mb-1 flex items-center gap-1.5">
-              <Server className="w-4 h-4 text-emerald-600" /> Live Scrape Portal
+              <Server className={`w-4 h-4 ${canScrape ? 'text-blue-600' : 'text-slate-400'}`} /> Live Scrape Portal
             </h4>
             <p className="text-[11px] text-slate-500 mb-3">Target active OCA browser session to extract full SKU catalog.</p>
             
@@ -93,6 +151,7 @@ export default function ScraperTriggerCard({ logStream, isTaskRunning, onTrigger
                   value="solution"
                   checked={scrapeMode === 'solution'}
                   onChange={() => setScrapeMode('solution')}
+                  disabled={!canScrape}
                 />
                 Server E2E
               </label>
@@ -103,6 +162,7 @@ export default function ScraperTriggerCard({ logStream, isTaskRunning, onTrigger
                   value="storage"
                   checked={scrapeMode === 'storage'}
                   onChange={() => setScrapeMode('storage')}
+                  disabled={!canScrape}
                 />
                 Storage Wizard
               </label>
@@ -110,11 +170,12 @@ export default function ScraperTriggerCard({ logStream, isTaskRunning, onTrigger
 
             <button
               onClick={() => onTriggerScrape(scrapeMode)}
-              disabled={isTaskRunning}
-              className="w-full btn-primary justify-center text-xs disabled:opacity-50"
+              disabled={isTaskRunning || !canScrape}
+              className={`w-full justify-center text-xs ${canScrape ? 'btn-primary' : 'bg-slate-200 text-slate-400 font-semibold py-2 px-4 rounded-lg cursor-not-allowed'}`}
+              title={canScrape ? "Start Scraping" : "Navigate browser to OCA to unlock"}
             >
               {isTaskRunning ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-              Start Scrape
+              {canScrape ? 'Start Scrape' : 'Waiting for Browser...'}
             </button>
           </div>
 

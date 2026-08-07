@@ -17,7 +17,8 @@ const os = require('os');
 const { execSync } = require('child_process');
 const { parseAndConsolidateBOQ, evaluatePhysicalMath, formatNotebookQueryPayload } = require('./lib/boq_evaluator');
 const { calculateConfidenceScore, processPortalFeedback } = require('./lib/feedback_loop');
-const { autoDetectChassisDir } = require('./lib/catalog_discovery');
+const { autoDetectChassisDetailed } = require('./lib/catalog_discovery');
+const { emitProgress } = require('./lib/progress');
 
 /**
  * Load notebook ID from config file or use hardcoded fallback.
@@ -82,6 +83,7 @@ Examples:
   // Auto-detection happens after BOQ parsing (below) if chassisDir is still empty
 
   // Parse BOQ first so we can use items for auto-detection
+  emitProgress(1, 10, 'Extracting Workload DNA & BOQ Items', 'in_progress', `Parsing input file: ${path.basename(inputFile)}`);
   const rawContent = fs.readFileSync(inputFile, 'utf-8');
   const items = parseAndConsolidateBOQ(rawContent, inputFile);
 
@@ -228,6 +230,7 @@ Examples:
   }
 
   // Step 3: Format Payload & Query Gemini Notebook
+  emitProgress(8, 10, 'Grounded Gemini Notebook Validation', 'in_progress', `Querying Gemini Notebook RAG with conflict context.`);
   const queryPayload = formatNotebookQueryPayload(items, evalResults);
   const isNlmAvailable = checkNlmAvailable();
 
@@ -287,6 +290,7 @@ ${evalResults.warnings.length === 0 ? '' : evalResults.warnings.map(w => `- тЪая
   const budgetOpt = optimizeForBudget(items, evalResults, targetBudgetUsd, catalogData);
 
   // Step 5: Synthesize Final Markdown Report
+  emitProgress(9, 10, 'Strategic Matrix Synthesis', 'in_progress', 'Generating 5-Tier resolution matrix and tradeoff constraints.');
   const reportDir = path.dirname(outputPath);
   if (!fs.existsSync(reportDir)) fs.mkdirSync(reportDir, { recursive: true });
 
@@ -449,6 +453,7 @@ ${evalResults.warnings.length === 0 ? '' : evalResults.warnings.map(w => `- тЪая
         durationMs: Date.now() - startTime
       }
     };
+    emitProgress(10, 10, 'Generation Complete', 'completed', 'Analysis finished successfully.');
     process.stdout.write(JSON.stringify(jsonResult));
   } else {
     console.log(`\n===============================================================`);

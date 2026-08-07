@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Award, Check, MessageSquare, Download, AlertTriangle, X, Loader } from 'lucide-react';
+import { Award, Check, MessageSquare, Download, AlertTriangle, X, Loader, Sparkles } from 'lucide-react';
 
 export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback, selectedChassis }) {
   const [exportingRank, setExportingRank] = useState(null);
@@ -12,20 +12,28 @@ export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback, se
   const rankedFromEval = evalResults?.conflictGraph?.rankedSolutions;
 
   const tiers = (rankedFromEval && rankedFromEval.length > 0)
-    ? rankedFromEval.map(sol => ({
-        rank: sol.rank,
-        title: sol.name,
-        subtitle: sol.workloadDnaMatch || `Rank ${sol.rank} Solution`,
-        intentMatch: sol.tradeoffMetrics?.intentAlignment || `${Math.round(sol.score * 100)}%`,
-        capex: sol.estimatedCostUsd ? `$${sol.estimatedCostUsd.toLocaleString()}` : 'Pricing N/A',
-        badgeClass: sol.rank === 1 ? 'badge-emerald' : sol.rank <= 3 ? 'badge-blue' : 'badge-amber',
-        rationale: sol.reasoning,
-        swaps: sol.tradeoffMetrics ? [
-          `Modifications: ${sol.tradeoffMetrics.skuModifications}`,
-          `Cost Delta: ${sol.tradeoffMetrics.costDeltaUsd}`,
-          `Expansion: ${sol.tradeoffMetrics.capacityExpansion}`
-        ] : ['Standard physical fix injected']
-      }))
+    ? rankedFromEval.map(sol => {
+        const resolvedFixes = evalResults?.conflictGraph?.resolvedFixes || [];
+        const detailedSwaps = resolvedFixes.length > 0
+          ? resolvedFixes.map(f => `${f.sku}: ${f.reasoning || f.action}`)
+          : [
+              `Modifications: ${sol.tradeoffMetrics?.skuModifications || '0 fixes'}`,
+              `Cost Delta: ${sol.tradeoffMetrics?.costDeltaUsd || '$0'}`,
+              `Expansion: ${sol.tradeoffMetrics?.capacityExpansion || 'Standard'}`
+            ];
+
+        return {
+          rank: sol.rank,
+          title: sol.name,
+          subtitle: sol.workloadDnaMatch || `Rank ${sol.rank} Solution`,
+          intentMatch: sol.tradeoffMetrics?.intentAlignment || `${Math.round(sol.score * 100)}%`,
+          capex: sol.estimatedCostUsd ? `$${sol.estimatedCostUsd.toLocaleString()}` : 'Pricing N/A',
+          badgeClass: sol.rank === 1 ? 'badge-emerald' : sol.rank <= 3 ? 'badge-blue' : 'badge-amber',
+          rationale: sol.reasoning,
+          ragSecondOpinion: sol.ragSecondOpinion,
+          swaps: detailedSwaps
+        };
+      })
     : [];
 
   const handleExport = async (tier) => {
@@ -73,16 +81,52 @@ export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback, se
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in-up delay-300">
       <div className="glass-card p-6">
-        <div className="border-b border-slate-100 pb-3 mb-4">
-          <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <Award className="w-5 h-5 text-emerald-600" />
-            5-Tier Strategic Resolution Matrix
-          </h2>
-          <p className="text-xs text-slate-500">
-            Multi-tiered buildable candidates. Apply fixes and export a corrected BOQ, or report a portal rejection to train the engine.
-          </p>
+        <div className="border-b border-slate-100 pb-3 mb-4 flex justify-between items-start">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <Award className="w-5 h-5 text-emerald-600" />
+              5-Tier Strategic Resolution Matrix
+            </h2>
+            <p className="text-xs text-slate-500">
+              Multi-tiered buildable candidates. Apply fixes and export a corrected BOQ, or report a portal rejection to train the engine.
+            </p>
+          </div>
+          {evalResults?.confidence && (
+            <div className="group relative flex items-center">
+              <div className={`px-3 py-1.5 rounded-full border text-xs font-bold cursor-help ${
+                evalResults.confidence.isHitlTriggered 
+                  ? 'bg-amber-50 border-amber-200 text-amber-700' 
+                  : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+              }`}>
+                Confidence: {Math.round(evalResults.confidence.score * 100)}%
+              </div>
+              
+              {/* Tooltip / Popover */}
+              <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl shadow-xl border border-slate-200 p-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+                <p className="text-xs font-bold text-slate-800 mb-2 border-b border-slate-100 pb-2">Score Breakdown</p>
+                <div className="space-y-1.5">
+                  <p className="text-[11px] flex justify-between text-emerald-600">
+                    <span>Base Intent Match</span>
+                    <span className="font-mono">1.00</span>
+                  </p>
+                  {(evalResults.confidence.deductions || []).map((deduction, i) => (
+                    <p key={i} className="text-[11px] flex justify-between text-amber-600">
+                      <span className="truncate pr-2">{deduction.replace(/ \(-[0-9.]+\)$/, '')}</span>
+                      <span className="font-mono">
+                        {deduction.match(/\((-[0-9.]+)\)$/) ? deduction.match(/\((-[0-9.]+)\)$/)[1] : ''}
+                      </span>
+                    </p>
+                  ))}
+                  <div className="pt-2 mt-2 border-t border-slate-100 flex justify-between font-bold text-xs">
+                    <span className="text-slate-800">Final Score</span>
+                    <span className="font-mono text-slate-900">{evalResults.confidence.score.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -90,7 +134,19 @@ export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback, se
             <div className="col-span-full text-center py-12 text-slate-400">
               <Award className="w-10 h-10 text-slate-300 mx-auto mb-3" />
               <p className="text-sm font-semibold text-slate-600">No Resolution Tiers Available</p>
-              <p className="text-xs text-slate-400 mt-1">Evaluate a BOQ quote in the BOQ Evaluator tab to generate ranked buildable candidates.</p>
+              <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                Evaluate a BOQ quote in the BOQ Evaluator tab to generate 5-tier ranked buildable candidates.
+              </p>
+              <button
+                onClick={() => {
+                  const boqTabBtn = document.querySelector('button[data-tab="boq"]') || document.querySelectorAll('nav button')[2];
+                  if (boqTabBtn) boqTabBtn.click();
+                }}
+                className="mt-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all inline-flex items-center gap-2"
+              >
+                <Sparkles className="w-4 h-4" />
+                Go to BOQ Evaluator &amp; Test Sample Quote
+              </button>
             </div>
           ) : tiers.map(tier => (
             <div
@@ -105,7 +161,14 @@ export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback, se
               </div>
 
               <h3 className="font-bold text-slate-900 text-sm mb-1">{tier.title}</h3>
-              <p className="text-xs text-slate-500 mb-3">{tier.rationale}</p>
+              <p className="text-xs text-slate-500 mb-2">{tier.rationale}</p>
+
+              {tier.ragSecondOpinion && (
+                <div className="bg-emerald-50/80 border border-emerald-200 rounded-lg p-2 mb-3 text-[11px] font-semibold text-emerald-800 flex items-center gap-1.5 shadow-sm">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>{tier.ragSecondOpinion}</span>
+                </div>
+              )}
 
               <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 mb-4">
                 <div className="flex justify-between items-center text-xs">

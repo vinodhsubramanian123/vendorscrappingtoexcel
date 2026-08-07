@@ -36,6 +36,7 @@ graph TD
 - **Functions**: `parseAndConsolidateBOQ(rawContent, filePath)`
 - **Capabilities**:
   - Multi-sheet Excel workbook inspection using `xlsx`.
+  - Multi-Config Parallel Evaluation (`npm run eval:multi`) using `scripts/eval_multi_boq.js` to dynamically spin up independent `child_process` evaluators for massive scale.
   - Line separator normalization (`/`, `|`, `;`, `+`, `--`, tab columns).
   - Multi-part inline SKU extraction via `isValidHpeSKU()` filtering.
   - Chassis multiplier math (`serverQty * chassisMultiplier = totalConsolidatedQty`).
@@ -51,27 +52,29 @@ graph TD
   5. **Power & Ambient**: -48VDC Lug Kits ([`P36877-B21`](file:///Users/macbookaira1466/Downloads/booktoSkill/scripts/lib/boq_evaluator.js)), Titanium 96% PSUs, AC/DC cord filtering.
   6. **Support & Services**: Hardware SKUs vs mandatory Tech Care Support tiers.
 
-### Phase 2.5: 5-Level Dependency Conflict Graph & Workload DNA Profiling
+### Phase 2.5: 5-Level Dependency Conflict Graph & Closed-Loop Delta Auto-Injection
 - **Module**: [`scripts/lib/conflict_graph.js`](file:///Users/macbookaira1466/Downloads/booktoSkill/scripts/lib/conflict_graph.js) & [`scripts/lib/catalog_rules.js`](file:///Users/macbookaira1466/Downloads/booktoSkill/scripts/lib/catalog_rules.js)
-- **Functions**: `validateConflictGraph()`, `extractWorkloadDna()`, `synthesize5TierRankedSolutions()`
+- **Functions**: `validateConflictGraph()`, `loadLearnedKnowledgeDeltas()`, `extractWorkloadDna()`, `synthesize5TierRankedSolutions()`
+- **Closed-Loop Delta Auto-Injection**: `loadLearnedKnowledgeDeltas()` scans `master_knowledge_registry.json` and `catalog_deltas.json` during evaluation, automatically merging learned portal rejection rules into pre-checks.
 - **Dual Safety Net**: Loads `<prefix>_Catalog_Rules.json` first, falls back to `<prefix>_Catalog.json`.
-- **5 Rule Levels**: `VENDOR`, `CHASSIS`, `CATEGORY`, `SUBCATEGORY`, `SKU`.
+- **5 Rule Levels**: `VENDOR`, `CHASSIS`, `CATEGORY`, `SUBCATEGORY`, `SKU` + `LEARNED_DELTA`.
 - **Workload DNA Extraction**: Infers `VDI_AI_GRAPHICS`, `DATABASE_IN_MEMORY`, `STORAGE_HIGH_IOPS`, or `VIRTUALIZATION_DENSE` profile.
 - **Top 5 Resolution Matrix**: **Rank 1 strictly matches customer workload intent** (neither over- nor under-provisioned).
 
-### Phase 3: Grounded Gemini Notebook RAG Validation
+### Phase 3: Grounded Gemini Notebook RAG Validation & Second Opinion
 - **Module**: [`scripts/eval_boq.js`](file:///Users/macbookaira1466/Downloads/booktoSkill/scripts/eval_boq.js)
 - **Functions**: `formatNotebookQueryPayload(items, evalResults)`
 - **Dynamic Routing**: Queries Gemini NotebookLM dynamically using the detected chassis variant to lookup the specific Notebook ID via `scripts/config/notebooks.json`. It guarantees cross-pollination of constraints does not occur across multi-vendor quotes.
+- **RAG Second Opinion**: Attaches `ragSecondOpinion` certification to synthesized solution tiers and renders a visual Sparkles badge on Rank 1 solution cards.
 - If `nlm` CLI is unreachable or times out (30s), it gracefully falls back and outputs a transparent ungrounded validation notice.
 
 ### Phase 4: Budget Optimization & Golden Rule Assurance
 - **Module**: [`scripts/lib/budget_optimizer.js`](file:///Users/macbookaira1466/Downloads/booktoSkill/scripts/lib/budget_optimizer.js)
 - Enforces the Golden Rule: Mandatory buildability fixes take precedence over budget caps.
 
-### Phase 5 & 6: Dual Outputs & Closed-Loop Feedback Learning
-- **Output 1 (Dashboard API)**: Submissions can be sent directly via `/api/eval-boq` and displayed in the React frontend.
-- **Output 2 (Corrected BOQ Excel)**: Unlike Workflow 1 (which generates the *Catalog Excel*), Workflow 2 explicitly generates a multi-sheet **Corrected BOQ Excel** output (`/api/export-boq`) containing the NotebookLM Rationale Summary and the finalized, valid Bill of Materials.
+### Phase 5 & 6: Dual Outputs, Telemetry & Closed-Loop Feedback Learning
+- **Output 1 (Dashboard API & Telemetry)**: Submissions sent via `/api/eval-boq` display in React frontend and automatically log execution metrics to `pipeline_telemetry.json` via [`scripts/lib/telemetry.js`](file:///Users/macbookaira1466/Downloads/booktoSkill/scripts/lib/telemetry.js).
+- **Output 2 (Corrected BOQ Excel)**: Generates a multi-sheet **Corrected BOQ Excel** output (`/api/export-boq`) containing NotebookLM Rationale Summary and finalized BOM.
 - **Feedback Module**: [`scripts/lib/feedback_loop.js`](file:///Users/macbookaira1466/Downloads/booktoSkill/scripts/lib/feedback_loop.js)
 - **Command**: `npm run eval:boq <boq_file> --simulate-portal-error "<error_text>"` or Dashboard modal.
 - Logs permanent `KnowledgeDeltas` in `outputs/history/catalog_deltas.json` and updates `_Catalog_Rules.json`.

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Sparkles } from 'lucide-react';
 import Header from './components/Header';
 import CatalogExplorer from './components/CatalogExplorer';
 import ScraperTriggerCard from './components/ScraperTriggerCard';
@@ -8,6 +9,10 @@ import ConflictGraphInspector from './components/ConflictGraphInspector';
 import ResolutionMatrix from './components/ResolutionMatrix';
 import NotebookRagDrawer from './components/NotebookRagDrawer';
 import ArtifactInspector from './components/ArtifactInspector';
+import TelemetryCard from './components/TelemetryCard';
+import CatalogOverviewCard from './components/CatalogOverviewCard';
+import TaskHistoryCard from './components/TaskHistoryCard';
+import AmbiguityInbox from './components/AmbiguityInbox';
 import UserFeedbackDrawer from './components/UserFeedbackDrawer';
 import FeedbackModal from './components/FeedbackModal';
 import SettingsDrawer from './components/SettingsDrawer';
@@ -21,6 +26,8 @@ export default function App() {
   // Real-time SSE Log Stream State
   const [logStream, setLogStream] = useState([]);
   const [isTaskRunning, setIsTaskRunning] = useState(false);
+  const [taskHistory, setTaskHistory] = useState([]);
+  const [activeProgress, setActiveProgress] = useState(null);
   
   // BOQ & Evaluation State
   const [evalResults, setEvalResults] = useState(null);
@@ -58,8 +65,12 @@ export default function App() {
   }, []);
 
   // 2. Fetch active catalog JSON data when selectedChassis changes
+  //    Also clear stale eval/RAG state (Fix G8: prevents ProLiant results showing on Alletra)
   useEffect(() => {
     if (!selectedChassis) return;
+    setEvalResults(null);
+    setRagData(null);
+    setLogStream([]);
     const cat = catalogs.find(c => c.id === selectedChassis);
     if (cat && cat.jsonPath) {
       fetch(`/api/catalog-data?path=${encodeURIComponent(cat.jsonPath)}`)
@@ -78,9 +89,29 @@ export default function App() {
         const payload = JSON.parse(event.data);
         if (payload.type === 'TASK_STARTED') {
           setIsTaskRunning(true);
+          setActiveProgress({ task: payload.task, currentStep: 0, totalSteps: 0, action: 'Starting...', status: 'started' });
         } else if (payload.type === 'TASK_COMPLETED') {
           setIsTaskRunning(false);
+          setActiveProgress(null);
           fetchAvailableCatalogs(); // Refresh catalog registry after scrape/rebuild
+          setTaskHistory(prev => [{
+            type: payload.task || 'PIPELINE_ACTION',
+            status: payload.code === 0 ? 'COMPLETED' : 'FAILED',
+            timestamp: new Date().toISOString()
+          }, ...prev.slice(0, 15)]);
+          if (payload.task?.includes('SCRAPE') || payload.task?.includes('REBUILD')) {
+            setActiveTab('catalog'); // G2+G3: Auto-navigate to Master Catalog tab
+          }
+        } else if (payload.type === 'PROGRESS') {
+          setActiveProgress({
+            task: payload.task || 'RUNNING',
+            currentStep: payload.step,
+            totalSteps: payload.total,
+            action: payload.action,
+            status: payload.status,
+            detail: payload.detail
+          });
+          setLogStream(prev => [...prev.slice(-200), payload]);
         } else if (payload.type === 'LOG') {
           setLogStream(prev => [...prev.slice(-200), payload]);
         }
@@ -221,16 +252,48 @@ export default function App() {
         {/* Executive Overview Tab */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
-            <WorkloadDnaCard dnaData={evalResults?.workloadDna} />
-            <ResolutionMatrix
-              evalResults={evalResults}
-              onOpenPortalFeedback={setSelectedCardForFeedback}
-              selectedChassis={selectedChassis}
-            />
-            <ConflictGraphInspector
-              evalResults={evalResults}
-              chassisName={currentCatObj?.chassis}
-            />
+            {currentCatObj && (
+              <CatalogOverviewCard
+                catalog={currentCatObj}
+                catalogData={catalogData}
+                onNavigate={setActiveTab}
+              />
+            )}
+
+            {evalResults ? (
+              <>
+                <WorkloadDnaCard dnaData={evalResults.workloadDna} />
+                <ResolutionMatrix
+                  evalResults={evalResults}
+                  onOpenPortalFeedback={setSelectedCardForFeedback}
+                  selectedChassis={selectedChassis}
+                />
+                <ConflictGraphInspector
+                  evalResults={evalResults}
+                  chassisName={currentCatObj?.chassis}
+                />
+              </>
+            ) : (
+              <div className="glass-card p-6 border-l-4 border-l-blue-500 flex flex-col md:flex-row items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-blue-600" />
+                    Unlock 5-Tier Resolution &amp; 6-Aspect Verification
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Upload a customer BOQ quote (.xlsx, .csv, .json) or paste raw text to extract Workload DNA, audit physical rules, and rank buildable solutions.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab('boq')}
+                  className="btn-primary text-xs shrink-0"
+                >
+                  Evaluate BOQ Quote &rarr;
+                </button>
+              </div>
+            )}
+
+            <TaskHistoryCard tasks={taskHistory} activeProgress={activeProgress} isTaskRunning={isTaskRunning} />
           </div>
         )}
 
@@ -256,10 +319,16 @@ export default function App() {
 
         {/* 6-Aspect Math & CLIC Tab */}
         {activeTab === 'conflict' && (
-          <ConflictGraphInspector
-            evalResults={evalResults}
-            chassisName={currentCatObj?.chassis}
-          />
+          <div className="space-y-6">
+            <AmbiguityInbox 
+              evalResults={evalResults} 
+              chassisContext={evalResults?.chassisDetection?.chassisDir?.split('/').pop() || 'Unknown'} 
+            />
+            <ConflictGraphInspector
+              evalResults={evalResults}
+              chassisName={currentCatObj?.chassis}
+            />
+          </div>
         )}
 
         {/* 5-Tier Matrix Tab */}
@@ -277,6 +346,11 @@ export default function App() {
             currentCatalog={currentCatObj}
             onAuditCatalog={() => {}}
           />
+        )}
+
+        {/* System Telemetry & Observability Tab */}
+        {activeTab === 'telemetry' && (
+          <TelemetryCard />
         )}
 
         {/* Live Scraper & SSE Terminal Tab */}
