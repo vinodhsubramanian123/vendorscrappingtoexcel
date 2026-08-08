@@ -38,7 +38,16 @@ chromium-browser --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug 
   --deny-permission-prompts --disable-notifications --disable-popup-blocking
 ```
 
-**Windows (PowerShell):**
+**Windows (PowerShell or cmd.exe):**
+```cmd
+chcp 65001
+"C:\Program Files\Google\Chrome\Application\chrome.exe" ^
+  --remote-debugging-port=9222 --user-data-dir="%TEMP%\chrome-debug" ^
+  --deny-permission-prompts --disable-notifications --disable-popup-blocking
+```
+
+> **Note**: Log into the HPE Partner Portal (`https://partner.hpe.com`) in the launched browser window, then navigate to your target chassis configuration quote in OCA.
+
 ### 3. Hands-Free Portal Auto-Navigator & Search Entry (CDP Port 9222)
 
 Instead of fragile Playwright test scripts, use the lightweight **CDP Auto-Navigator** (`scripts/lib/navigate_oca.js`):
@@ -49,16 +58,6 @@ Instead of fragile Playwright test scripts, use the lightweight **CDP Auto-Navig
 # Auto-navigate to any chassis in OCA portal
 node scripts/lib/navigate_oca.js "DL380 Gen12"
 ```
-
-**Windows (cmd.exe):**
-```cmd
-chcp 65001
-"C:\Program Files\Google\Chrome\Application\chrome.exe" ^
-  --remote-debugging-port=9222 --user-data-dir="%TEMP%\chrome-debug" ^
-  --deny-permission-prompts --disable-notifications --disable-popup-blocking
-```
-
-> **Note**: Log into the HPE Partner Portal (`https://partner.hpe.com`) in the launched browser window, then navigate to your target chassis configuration quote in OCA.
 
 ### 3. Single-Command Integrated Run
 Navigate to the target chassis or solution in OCA, then run:
