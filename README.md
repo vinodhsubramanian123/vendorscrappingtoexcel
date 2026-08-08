@@ -150,7 +150,7 @@ This workspace is governed by a macro-architecture known as the **6-Stage Contin
 1. **Ingestion (Live Scraping)**: `oca-catalog-scraper` extracts live data via CDP.
 2. **Knowledge Sync & Delta Tracking**: JSON/Excel outputs are historically versioned and synced to Google Drive/NotebookLM (`nlm-skill`).
 3. **BOQ Upload & Pre-Flight**: User uploads a BOM. The `boq-eval-skill` runs physical/math checks and handles ambiguous user intent loosely by generating Ranked Solutions with stated assumptions.
-4. **Notebook Validations (RAG)**: The agent queries NotebookLM to cross-reference constraints and solve BOM gaps.
+4. **Asynchronous Notebook Validations (RAG)**: The dashboard fires parallel, non-blocking background queries to NotebookLM to cross-reference constraints and provide a verified second opinion on the generated solutions.
 5. **HITL Portal Trial**: The user manually tries the AI's top-ranked solution in the live vendor OCA portal.
 6. **Feedback & Automation Learning**: If rejected, the user provides the error. The agent logs a `KnowledgeDelta` (`npm run eval:boq --simulate-portal-error`), closing the loop so the system autonomously learns the rule for next time.
 

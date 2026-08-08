@@ -49,6 +49,8 @@ http://localhost:5173
 - `POST /api/scrape` — Triggers `scrape_oca_solution.js` or `scrape_oca_storage_solution.js`
 - `POST /api/rebuild` — Triggers `rebuild_all.js`
 - `POST /api/eval-boq` — Runs `eval_boq.js` with stdout JSON unwrap
+- `POST /api/notebook-query-async` — Initiates non-blocking NotebookLM RAG query (returns jobId)
+- `GET /api/notebook-query-status/:jobId` — Polls status of async NotebookLM query
 - `POST /api/export-boq` — Generates multi-sheet corrected BOQ Excel workbook
 - `POST /api/sync-knowledge` — Pushes learned rules to NotebookLM RAG
 - `POST /api/simulate-error` — Logs portal rejection as `KnowledgeDelta`
