@@ -78,8 +78,8 @@ graph TD
 ### 4. Grounded Gemini Notebook Validation (RAG) & Dashboard Command Center
 - **Actor**: [`nlm-skill`](file:///Users/macbookaira1466/Downloads/booktoSkill/.agents/skills/nlm-skill/SKILL.md) & **React Dashboard** (`http://localhost:5173`)
 - **Action**: 
-  - Programmatically queries Gemini NotebookLM (`Dl 380 Spec Gen 12` - ID: `1d190853-4e9c-48df-aa70-eae66c6f2c1f`) to cross-reference identified constraints against synced spec sheet documentation.
-  - The React Dashboard provides a full Command-and-Control hub for triggering Knowledge Sync, exporting corrected BOQs, logging portal rejection KnowledgeDeltas, and managing the NotebookLM registry.
+  - Initiates parallel, non-blocking asynchronous queries to Gemini NotebookLM to cross-reference identified physical constraints against vendor spec sheets.
+  - The React Dashboard provides a full Command-and-Control hub for triggering Knowledge Sync, exporting corrected BOQs, logging portal rejection KnowledgeDeltas, and managing the async RAG status polling (`GET /api/notebook-query-status/:jobId`).
 
 ### 5. Human-in-the-Loop (HITL) Portal Trial & Ambiguity Resolution
 - **Actor**: Human Sales Engineer / User & Dashboard `AmbiguityInbox`
@@ -114,7 +114,7 @@ graph TD
 When AI Agents (like Antigravity IDE) or the Node.js Dashboard interact with Gemini NotebookLM, they MUST adhere to the following architecture rules to prevent token burn and timeouts:
 
 ### 1. Dual-Routing (CLI vs. MCP Server)
-- **The Node.js Dashboard / Pipeline Scripts**: Uses the stateless, on-demand `nlm` CLI binary (e.g., `nlm query ... --json`) in a fire-and-forget execution loop. This requires NO persistent background server.
+- **The Node.js Dashboard / Pipeline Scripts**: Uses the stateless `nlm` CLI binary invoked asynchronously via `child_process` (handled gracefully by the `/api/notebook-query-async` Express route). This prevents UI blocking and protects against zombie processes via strict iteration limits.
 - **The AI Agents (Antigravity IDE / Gemini Spark)**: Interact directly with the long-lived **MCP Server** (`mcp__gemini-notebook-mcp__*` tools). The same local MCP installation handles both routes transparently.
 
 ### 2. Asynchronous "Fire-and-Forget" Pattern for Studio Artifacts

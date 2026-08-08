@@ -48,6 +48,11 @@ chcp 65001
 
 > **Note**: Log into the HPE Partner Portal (`https://partner.hpe.com`) in the launched browser window, then navigate to your target chassis configuration quote in OCA.
 
+> [!WARNING]
+> **Why do I need to do this manually? (Why does the Scraper get "Stuck"?)**
+> This pipeline does **not** use headless bots or agent CLIs (like `agy`). Because HPE Partner Portal uses strict SSO and Multi-Factor Authentication (MFA), the scraper is designed to piggyback on *your* active session via the Chrome DevTools Protocol.
+> If you click "Start Scraping" before launching the browser with port 9222 and navigating to the page, the script will hang or fail because it cannot find the active session. This is an intentional security bypass design!
+
 ### 3. Hands-Free Portal Auto-Navigator & Search Entry (CDP Port 9222)
 
 Instead of fragile Playwright test scripts, use the lightweight **CDP Auto-Navigator** (`scripts/lib/navigate_oca.js`):
