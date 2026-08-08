@@ -509,45 +509,30 @@ function evaluatePhysicalMath(items, catalogData = null, targetDir = '') {
  */
 function formatNotebookQueryPayload(items, evalResults) {
   const graph = evalResults.conflictGraph || {};
-  const chassis = graph.chassisInfo || { model: 'DL380 Gen12 SFF', formFactor: 'SFF' };
+  const chassis = graph.chassisInfo || { model: 'HPE ProLiant DL380 Gen12 SFF', formFactor: 'SFF' };
 
-  let prompt = `Perform grounded 5-tier whole-solution buildability analysis and architectural validation for the following ${chassis.model} BOQ:\n\n`;
-  prompt += `CONSOLIDATED HARDWARE BOQ ITEMS:\n`;
-  items.forEach(it => {
-    prompt += `- SKU: ${it.sku} | Qty: ${it.quantity} | Description: ${it.description}\n`;
-  });
-  prompt += `\nPRE-FLIGHT PHYSICAL MATH & CONFLICT GRAPH ASSERTIONS:\n`;
-  prompt += `- Chassis Model & Form Factor: ${chassis.model} (${chassis.formFactor})\n`;
-  prompt += `- Total Processors: ${evalResults.cpuCount} (Max TDP: ${evalResults.maxCpuTdpWatts}W)\n`;
-  prompt += `- Total Memory: ${evalResults.memoryCount} DIMMs (${evalResults.totalMemoryGb} GB Total)\n`;
-  prompt += `- Total Storage Drives: ${evalResults.driveCount}\n`;
-  prompt += `- Whole-Solution Buildability: ${graph.isWholeSolutionValid ? '✅ PASSED' : '❌ CONFLICTS DETECTED'}\n`;
-  prompt += `- Total Catalog Rules Evaluated: ${graph.totalRulesEvaluated || 33}\n`;
-  prompt += `- Quantitative Confidence Score: ${evalResults.confidence ? evalResults.confidence.score : '1.0'}\n\n`;
+  // Format 100% of BOQ hardware items into clean natural language text
+  const itemSummaries = items.map(it => {
+    const qtyStr = it.quantity > 1 ? `${it.quantity}x ` : '1x ';
+    const descStr = it.description ? ` (${it.description})` : '';
+    return `${qtyStr}${it.sku}${descStr}`;
+  }).filter(Boolean);
 
-  if (evalResults.missingDependencies.length > 0) {
-    prompt += `MISSING MANDATORY PHYSICAL DEPENDENCIES TO INJECT:\n`;
-    evalResults.missingDependencies.forEach(dep => {
-      prompt += `- Add SKU: ${dep.sku} (Qty ${dep.quantity}) — ${dep.description} [Rule: ${dep.rule}]\n`;
-    });
-    prompt += `\n`;
+  const partsListStr = itemSummaries.length > 0 ? itemSummaries.join('; ') : 'standard server components';
+
+  let prompt = `Validate whole-solution physical buildability, mandatory cable kits, thermal rules, and QuickSpecs requirements for ${chassis.model}.\n\n`;
+  prompt += `CONSOLIDATED BILL OF MATERIALS (100% PARTS INCLUDED):\n${partsListStr}.\n\n`;
+
+  if (evalResults.missingDependencies && evalResults.missingDependencies.length > 0) {
+    const deps = evalResults.missingDependencies.map(d => `${d.quantity || 1}x ${d.sku} — ${d.description || 'required cable/accessory'}`).join('; ');
+    prompt += `PHYSICAL PRE-CHECKS IDENTIFIED MISSING DEPENDENCIES:\n${deps}.\n\n`;
   }
 
-  if (graph.resolvedFixes && graph.resolvedFixes.length > 0) {
-    prompt += `RESOLVED CASCADING FIXES & REASONING:\n`;
-    graph.resolvedFixes.forEach(rf => {
-      prompt += `- SKU ${rf.sku}: ${rf.action} — ${rf.reasoning}\n`;
-    });
-    prompt += `\n`;
+  if (evalResults.errors && evalResults.errors.length > 0) {
+    prompt += `CURRENT CONFIGURATION VALIDATION WARNINGS:\n${evalResults.errors.join('; ')}.\n\n`;
   }
 
-  prompt += `REQUIREMENTS:\n`;
-  prompt += `1. Verify that the ENTIRE solution (original BOQ + all injected fixes) is 100% buildable as a single cohesive system without any breaking conflicts.\n`;
-  prompt += `2. Synthesize a 5-Tier Strategic Resolution Matrix (Rank 1: Intent Preserved to Rank 5: Dense I/O).\n`;
-  prompt += `3. For Rank 1, include exact list price citations from the catalog data.\n`;
-  prompt += `4. Include technical attribute filters (e.g., Memory capacity > 32GB matching 64GB/96GB/128GB RDIMMs).\n`;
-  prompt += `5. Provide complete backtrackable rationale so a human reviewer can verify or override any architectural assumptions.\n`;
-
+  prompt += `Please evaluate if all listed SKUs, quantities, and injected accessories form a 100% buildable solution without any breaking physical, thermal, or power envelope conflicts.`;
   return prompt;
 }
 

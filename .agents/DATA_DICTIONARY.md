@@ -154,3 +154,68 @@ Emitted via stdout by scripts using `emitProgress`. Read by `/api/stream-logs`.
   "detail": "Analyzing 15 SKUs for high-TDP processor constraints and heatsink counts."
 }
 ```
+
+## 5. KnowledgeDelta Learned Rule Schema (`catalog_deltas.json`)
+
+Stores learned rules, human engineer rationale, and 4-tier scope taxonomy.
+
+```json
+{
+  "deltaId": "NLM-RES-123456",
+  "timestamp": "2026-08-08T01:00:00.000Z",
+  "chassis": "DL380_Gen12_SFF",
+  "errorType": "MANUAL_NOTEBOOKLM_RESOLUTION",
+  "ruleUpdate": "Storage Controller MR416i-p requires P76453-B21 Box 1/2 Cable Kit.",
+  "affectedSku": "P47777-B21",
+  "requiredDependencySku": "P76453-B21",
+  "humanReasoning": "Box 1 and Box 2 share a SAS expander backplane under Gen12 dual-controller setups.",
+  "scopeTaxonomy": "CHASSIS_SPECIFIC", // UNIVERSAL_VENDOR | FAMILY_GEN | SOLUTION_TYPE | CHASSIS_SPECIFIC
+  "solutionType": "General Server",
+  "source": "dashboard_human_in_loop"
+}
+```
+
+## 6. Vendor BOM Cross-Verification Audit Report Schema (`POST /api/verify-vendor-bom`)
+
+Returned by `verifyVendorBOM` when bi-directionally cross-verifying official Vendor Quote BOMs.
+
+```json
+{
+  "chassisModel": "DL380_Gen12_SFF",
+  "proposedRank": 1,
+  "totalVendorSkus": 12,
+  "totalProposedSkus": 12,
+  "is100PercentMatch": false,
+  "requiresFreshScrape": true,
+  "discrepancies": {
+    "addedByVendor": [
+      {
+        "sku": "AF559A",
+        "quantity": 2,
+        "description": "HPE Power Cord",
+        "reason": "Vendor Partner Portal automatically inserted this SKU into the quote."
+      }
+    ],
+    "removedByVendor": [],
+    "priceDeltas": [
+      {
+        "sku": "P47777-B21",
+        "proposedPriceUsd": 5999,
+        "vendorPriceUsd": 6200,
+        "priceDeltaUsd": 201,
+        "percentChange": "+3.35%"
+      }
+    ],
+    "uncatalogedSkus": [
+      {
+        "sku": "P99999-B21",
+        "quantity": 1,
+        "description": "HPE Live Portal Adapter",
+        "reason": "SKU present in Vendor Portal BOM but missing from local scraped catalog JSON."
+      }
+    ],
+    "exactMatches": []
+  },
+  "verificationTimestamp": "2026-08-08T01:00:00.000Z"
+}
+```

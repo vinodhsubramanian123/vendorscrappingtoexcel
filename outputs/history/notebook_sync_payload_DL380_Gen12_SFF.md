@@ -1,8 +1,8 @@
 # HPE OCA Catalog Intelligence — Synchronized Knowledge & Rules Charter
 
 **Target Chassis**: `DL380_Gen12_SFF`  
-**Sync Timestamp**: 2026-08-07T12:42:26.724Z  
-**Total Synced KnowledgeDeltas**: `0`  
+**Sync Timestamp**: 2026-08-07T19:33:45.723Z  
+**Total Synced KnowledgeDeltas**: `8`  
 
 This source file ensures Gemini NotebookLM RAG reasoning stays 100% synchronized with local Antigravity AI physical pre-checks and learned vendor portal feedback.
 
@@ -10,13 +10,20 @@ This source file ensures Gemini NotebookLM RAG reasoning stays 100% synchronized
 
 ## 🌐 1. Universal Vendor Rules (Applies Across All HPE Product Lines)
 
-*No universal vendor restrictions logged yet. Baseline CTO/BTO mode rules active.*
+1. **[DELTA-1786131042736]**: Portal validation flagged restriction on P38997-B21. *(Type: PERMANENT_PHYSICAL_DEPENDENCY)*
+2. **[DELTA-1786131042782]**: Portal validation flagged restriction on P99999-B21. *(Type: PERMANENT_PHYSICAL_DEPENDENCY)*
+3. **[DELTA-1786131053548]**: Portal validation flagged restriction on P38997-B21. *(Type: PERMANENT_PHYSICAL_DEPENDENCY)*
+4. **[DELTA-1786131053593]**: Portal validation flagged restriction on P99999-B21. *(Type: PERMANENT_PHYSICAL_DEPENDENCY)*
+5. **[DELTA-1786131062609]**: Portal validation flagged restriction on P38997-B21. *(Type: PERMANENT_PHYSICAL_DEPENDENCY)*
+6. **[DELTA-1786131062656]**: Portal validation flagged restriction on P99999-B21. *(Type: PERMANENT_PHYSICAL_DEPENDENCY)*
+7. **[DELTA-1786131225658]**: Portal validation flagged restriction on P38997-B21. *(Type: PERMANENT_PHYSICAL_DEPENDENCY)*
+8. **[DELTA-1786131225705]**: Portal validation flagged restriction on P99999-B21. *(Type: PERMANENT_PHYSICAL_DEPENDENCY)*
 
 ## 🏛️ 2. Family & Generation Rules (ProLiant / Alletra / Synergy)
 
 *No family/generation-level rules logged yet. Symmetric memory & power supply mixing rules active.*
 
-## 🎯 3. Chassis-Specific Rules & Physical Gotchas (DL380_Gen12_SFF)
+## 🎯 3. Chassis & Solution-Type Gotchas (DL380_Gen12_SFF)
 
 *No specific gotchas logged for DL380_Gen12_SFF. Baseline chassis layout rules active.*
 

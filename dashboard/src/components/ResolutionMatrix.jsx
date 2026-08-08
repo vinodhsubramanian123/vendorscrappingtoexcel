@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { Award, Check, MessageSquare, Download, AlertTriangle, X, Loader, Sparkles } from 'lucide-react';
+import { Award, Check, MessageSquare, Download, AlertTriangle, X, Loader, Sparkles, ShieldCheck } from 'lucide-react';
+import VendorBomVerificationModal from './VendorBomVerificationModal';
 
 export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback, selectedChassis }) {
   const [exportingRank, setExportingRank] = useState(null);
   const [exportedFiles, setExportedFiles] = useState({});
   const [rejectionModal, setRejectionModal] = useState(null);
+  const [vendorVerificationModal, setVendorVerificationModal] = useState(null);
   const [rejectionText, setRejectionText] = useState('');
   const [isSubmittingRejection, setIsSubmittingRejection] = useState(false);
   const [rejectionConfirmed, setRejectionConfirmed] = useState(null);
@@ -215,10 +217,19 @@ export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback, se
               {/* Report Portal Rejection */}
               <button
                 onClick={() => setRejectionModal(tier)}
-                className="w-full btn-secondary justify-center text-xs"
+                className="w-full btn-secondary justify-center text-xs mb-2"
               >
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
                 Report Portal Rejection
+              </button>
+
+              {/* Verify Official Vendor BOM */}
+              <button
+                onClick={() => setVendorVerificationModal(tier.rank)}
+                className="w-full btn-secondary justify-center text-xs text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100/50 border-indigo-200"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+                Verify Official Vendor BOM
               </button>
 
               {/* Log Feedback */}
@@ -287,6 +298,15 @@ export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback, se
           </div>
         </div>
       )}
+
+      {/* Vendor Partner Portal BOM Cross-Verification Modal */}
+      <VendorBomVerificationModal
+        isOpen={vendorVerificationModal !== null}
+        onClose={() => setVendorVerificationModal(null)}
+        selectedRank={vendorVerificationModal}
+        selectedChassis={selectedChassis}
+        evalResults={evalResults}
+      />
     </div>
   );
 }

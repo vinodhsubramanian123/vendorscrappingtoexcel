@@ -19,6 +19,7 @@ const { parseAndConsolidateBOQ, evaluatePhysicalMath, formatNotebookQueryPayload
 const { calculateConfidenceScore, processPortalFeedback } = require('./lib/feedback_loop');
 const { autoDetectChassisDetailed } = require('./lib/catalog_discovery');
 const { emitProgress } = require('./lib/progress');
+const { executeNotebookQuery } = require('./lib/notebook_query_utils');
 
 /**
  * Load notebook ID from config file or use hardcoded fallback.
@@ -237,26 +238,11 @@ Examples:
   let ragAnswer = '';
   if (isNlmAvailable) {
     if (!JSON_MODE) console.log(`\n🤖 Phase 3: Querying Gemini Notebook RAG (${notebookId})...`);
-    const tmpOutFile = path.join(os.tmpdir(), 'boq_rag_response.json');
-    const tmpPromptFile = path.join(os.tmpdir(), 'boq_prompt_clean.txt');
-    fs.writeFileSync(tmpPromptFile, queryPayload.replace(/"/g, "'"), 'utf-8');
-
     try {
-      const cleanPrompt = queryPayload.replace(/["$`\\]/g, ' ');
-      const envPath = process.platform === 'win32' ? '' : `export PATH="$HOME/.local/bin:$PATH"; `;
-      const cmd = `${envPath} nlm notebook query ${notebookId} "${cleanPrompt}" --json`;
-      const execOut = execSync(cmd, { encoding: 'utf-8', timeout: 15000, maxBuffer: 10 * 1024 * 1024 });
-      fs.writeFileSync(tmpOutFile, execOut, 'utf-8');
-
-      if (execOut) {
-        try {
-          const parsed = JSON.parse(execOut);
-          if (parsed.answer) ragAnswer = parsed.answer;
-          else if (execOut.trim()) ragAnswer = execOut.trim();
-        } catch (_) {
-          if (execOut.trim()) ragAnswer = execOut.trim();
-        }
-      }
+      const res = await executeNotebookQuery(notebookId, queryPayload, {
+        context: { chassis: path.basename(chassisDir) }
+      });
+      ragAnswer = res.answer || '';
     } catch (err) {
       if (!JSON_MODE) console.warn(`  ⚠️ Notebook RAG query execution error: ${err.message}`);
     }

@@ -32,6 +32,11 @@ This workspace contains tools for scraping, parsing, and organising HPE server p
 | **G2 / G3** | Post-Scrape Registry Refresh & Auto-Navigation | ✅ RESOLVED | Completing a scrape or rebuild task automatically refreshes catalogs and navigates user to the Master Catalog tab. |
 | **G4** | SKU Count Normalization | ✅ RESOLVED | `CatalogExplorer.jsx` explicitly displays total catalog entries and unique SKU count matching the header dropdown. |
 | **G21** | Per-SKU Swap Technical Rationale | ✅ RESOLVED | `ResolutionMatrix.jsx` renders explicit per-SKU technical rationale from `conflictGraph.resolvedFixes`. |
+| **G27** | NL NotebookLM Query Pre/Post-Processor | ✅ RESOLVED | `notebook_query_utils.js` strips code keywords (`const fs`, `require`), sanitizes prompts to text, and parses structured output safely. |
+| **G28** | Async Non-Blocking Notebook Query & Status Polling | ✅ RESOLVED | `server.cjs` exposes `POST /api/notebook-query-async` and `GET /api/notebook-query-status/:jobId` eliminating UI wait times. |
+| **G29** | Gemini Notebook RAG Consultation & Action Ledger | ✅ RESOLVED | `TelemetryCard.jsx` visualizes queries, responses, QuickSpecs citations, agreement scores, and automated actions taken. |
+| **G30** | Human Engineer Rationale Capture & 4-Level Scope Taxonomy Tagging | ✅ RESOLVED | `AmbiguityInbox.jsx` captures `humanReasoning` and tags deltas across `UNIVERSAL_VENDOR`, `FAMILY_GEN`, `SOLUTION_TYPE`, `CHASSIS_SPECIFIC`. |
+| **G31** | Post-Build Vendor BOM Re-Ingestion & Cross-Verification | ✅ RESOLVED | `vendor_bom_verifier.js` & `VendorBomVerificationModal.jsx` cross-verify official Vendor Quote BOMs against proposed ranks, flag deltas, and trigger fresh CDP scrapes. |
 
 ### 🚀 Production Features Active
 - **Centralized HPE SKU Normalizer**: `scripts/lib/sku.js` provides single source of truth for hardware SKUs, option mode suffixes (`CTO`/`BTO`/`FIO`), and service SKUs.
@@ -39,6 +44,8 @@ This workspace contains tools for scraping, parsing, and organising HPE server p
 - **Master Catalog Registry Auto-Synchronizer**: `scripts/lib/sync_registry.js` (`npm run registry:sync`) automatically scans and updates `outputs/SCRAPED_CATALOGS.md`.
 - **WebLogic & Legacy UI Modal Interceptor**: Auto-accepts JS alert dialogs (`Page.handleJavaScriptDialog`) and session extension popups (`dismissDOMModals`).
 - **Closed-Loop Feedback & Telemetry Engine**: `feedback_loop.js` and `telemetry.js` track quantitative confidence, learned rules, and run history.
+- **Natural Language Notebook Query Utilities**: `scripts/lib/notebook_query_utils.js` pre-processes queries, executes safely via `execFile`, and post-processes RAG results.
+- **Post-Build Vendor Partner Portal BOM Re-Ingestion**: `scripts/lib/vendor_bom_verifier.js` and `VendorBomVerificationModal.jsx` cross-verify HPE Partner Portal quotes.
 
 ---
 
@@ -51,6 +58,7 @@ booktoSkill/
 │   └── skills/
 │       ├── orchestrator-workflow-skill/   ← macro 6-stage lifecycle orchestration
 │       ├── oca-catalog-scraper/           ← step-by-step scraping skill
+│       ├── oca-portal-navigator/          ← hands-free partner portal & oca navigator skill
 │       ├── boq-eval-skill/                ← BOQ validation & pre-flight skill
 │       └── nlm-skill/                     ← Gemini NotebookLM RAG integration
 ├── scripts/                               ← ALL Node.js scripts live here
@@ -60,10 +68,14 @@ booktoSkill/
 │   │   ├── dom_extract.js                 ← DOM text & table extraction helpers
 │   │   ├── fs_compat.js                   ← cross-platform file move & cleanup helpers
 │   │   ├── logger.js                      ← standardized console logger
+│   │   ├── navigate_oca.js                ← smart partner portal & oca auto-navigator
+│   │   ├── notebook_query_utils.js        ← natural language query pre/post-processor
 │   │   ├── product_meta.js                ← universal product family & model parser
 │   │   ├── registry.js                    ← shared registry table updater (DRY)
 │   │   ├── sku.js                         ← centralized HPE SKU regex & normalization
-│   │   └── sync_registry.js               ← master registry auto-synchronizer
+│   │   ├── sync_registry.js               ← master registry auto-synchronizer
+│   │   ├── telemetry.js                   ← pipeline telemetry & action ledger engine
+│   │   └── vendor_bom_verifier.js         ← vendor BOM cross-verification & scrape trigger
 │   ├── scrape_oca.js                      ← CDP raw data extractor
 │   ├── expand_and_rescrape.js             ← expand DOM then re-scrape
 │   ├── scrape_oca_solution.js             ← generic E2E server & solution scraper

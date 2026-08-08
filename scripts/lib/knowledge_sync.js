@@ -18,7 +18,7 @@
 
 const fs   = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execSync, execFileSync } = require('child_process');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
 const OUTPUTS_ROOT = path.join(PROJECT_ROOT, 'outputs');
@@ -149,7 +149,7 @@ function generateNotebookSyncPayload(chassisName = 'DL380_Gen12_SFF') {
     md += `\n`;
   }
 
-  md += `## 🎯 3. Chassis-Specific Rules & Physical Gotchas (${chassisName})\n\n`;
+  md += `## 🎯 3. Chassis & Solution-Type Gotchas (${chassisName})\n\n`;
   const relevantChassisRules = registry.chassisSpecificRules.filter(r =>
     !chassisName || r.chassis.toLowerCase().includes(chassisName.toLowerCase()) || chassisName.toLowerCase().includes(r.chassis.toLowerCase())
   );
@@ -158,7 +158,13 @@ function generateNotebookSyncPayload(chassisName = 'DL380_Gen12_SFF') {
     md += `*No specific gotchas logged for ${chassisName}. Baseline chassis layout rules active.*\n\n`;
   } else {
     relevantChassisRules.forEach((r, idx) => {
-      md += `${idx + 1}. **[${r.deltaId}] ${r.chassis}**: ${r.ruleUpdate} *(Required Dependency: ${r.requiredDependencySku || 'N/A'})*\n`;
+      md += `${idx + 1}. **[${r.deltaId}] ${r.chassis}** (Taxonomy: \`${r.scopeTaxonomy || 'CHASSIS_SPECIFIC'}\` | Solution: \`${r.solutionType || 'General Server'}\`):\n`;
+      md += `   - **Rule**: ${r.ruleUpdate}\n`;
+      md += `   - **Affected SKU**: \`${r.affectedSku || 'N/A'}\` | **Required Dependency**: \`${r.requiredDependencySku || 'N/A'}\` \n`;
+      if (r.humanReasoning) {
+        md += `   - 💡 **Human Engineer Rationale**: *"${r.humanReasoning}"*\n`;
+      }
+      md += `\n`;
     });
     md += `\n`;
   }
@@ -196,10 +202,19 @@ function generateNotebookSyncPayload(chassisName = 'DL380_Gen12_SFF') {
   const payloadPath = path.join(payloadDir, `notebook_sync_payload_${chassisName}.md`);
   fs.writeFileSync(payloadPath, md, 'utf-8');
 
+  // Real-Time Auto-Sync: Automatically sync to Gemini NotebookLM
+  let uploadResult = null;
+  const cfg = readNotebookConfig();
+  const notebookId = (cfg.notebooks && cfg.notebooks[chassisName]) || cfg.defaultNotebookId;
+  if (notebookId) {
+    uploadResult = syncToNotebookLM(notebookId, payloadPath);
+  }
+
   return {
     payloadPath,
     markdownText: md,
-    deltaCount: registry.totalLearnedRules
+    deltaCount: registry.totalLearnedRules,
+    uploadResult
   };
 }
 
@@ -210,13 +225,17 @@ function generateNotebookSyncPayload(chassisName = 'DL380_Gen12_SFF') {
  * @returns {object} { success, message }
  */
 function syncToNotebookLM(notebookId, payloadPath) {
-  // 1. Try nlm CLI first
+  // 1. Try nlm CLI first via execFile (avoiding shell string interpolation)
   try {
-    const envPath = process.platform === 'win32' ? '' : `export PATH="$HOME/.local/bin:$PATH"; `;
-    execSync(`${envPath} nlm --version`, { stdio: 'ignore', timeout: 3000 });
+    const envPath = process.env.PATH || '';
+    const homeBin = path.join(process.env.HOME || '', '.local', 'bin');
+    const extendedPath = `${homeBin}:${envPath}`;
 
-    const cmd = `${envPath} nlm source add ${notebookId} --file "${payloadPath}"`;
-    execSync(cmd, { encoding: 'utf-8', timeout: 15000 });
+    const stdout = execFileSync('nlm', ['source', 'add', notebookId, '--file', payloadPath], {
+      encoding: 'utf-8',
+      timeout: 30000,
+      env: { ...process.env, PATH: extendedPath }
+    });
     return { success: true, mode: 'CLI', message: `Successfully synchronized payload to NotebookLM (${notebookId}) via nlm CLI.` };
   } catch (cliErr) {
     // 2. Return fallback metadata indicating MCP tool source_add can be invoked

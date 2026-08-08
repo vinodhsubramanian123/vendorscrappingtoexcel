@@ -39,10 +39,15 @@ chromium-browser --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug 
 ```
 
 **Windows (PowerShell):**
-```powershell
-& "C:\Program Files\Google\Chrome\Application\chrome.exe" `
-  --remote-debugging-port=9222 --user-data-dir="$env:TEMP\chrome-debug" `
-  --deny-permission-prompts --disable-notifications --disable-popup-blocking
+### 3. Hands-Free Portal Auto-Navigator & Search Entry (CDP Port 9222)
+
+Instead of fragile Playwright test scripts, use the lightweight **CDP Auto-Navigator** (`scripts/lib/navigate_oca.js`):
+- Automates passage through `partner.hpe.com` SSO session cookies (retained in `--user-data-dir`).
+- Searches target chassis (e.g. `DL380 Gen12`, `Alletra 9000`), extracts base chassis list prices, selects standard Non-TAA CTO variants, and enters the `Menu` components page hands-free.
+
+```bash
+# Auto-navigate to any chassis in OCA portal
+node scripts/lib/navigate_oca.js "DL380 Gen12"
 ```
 
 **Windows (cmd.exe):**
@@ -239,10 +244,10 @@ http://localhost:5173
 1. **Executive Dashboard**: Selected chassis metadata, scrape date, historical diff breakdown badges (`+Added`, `-Removed`, `Price Delta`), interactive task history timeline.
 2. **Master Excel Catalog**: Client-side NLP FlexSearch, cascading category/type filters, color-coded status badges, real-time price trend modal.
 3. **BOQ Evaluator & DNA**: File upload / text paste, 6-aspect physical checks, Workload DNA profiler, live SSE stdout terminal.
-4. **6-Aspect Math & CLIC**: Physical pre-flight verification checklist + CLIC error inspector. **Includes Ambiguity Inbox** (NotebookLM MCP bridge) for `< 75%` confidence runs.
-5. **5-Tier Resolution Matrix**: Ranked buildable solutions, workload intent match %, per-SKU technical swap rationale, NotebookLM RAG Second Opinion badge.
+4. **6-Aspect Math & CLIC**: Physical pre-flight verification checklist + CLIC error inspector. **Includes Ambiguity Inbox** (NotebookLM MCP bridge) with **Human Engineer Rationale Capture** & **4-Level Scope Taxonomy Tagging** (`UNIVERSAL_VENDOR`, `FAMILY_GEN`, `SOLUTION_TYPE`, `CHASSIS_SPECIFIC`).
+5. **5-Tier Resolution Matrix**: Ranked buildable solutions, workload intent match %, per-SKU technical swap rationale, NotebookLM RAG Second Opinion badge, and **Post-Build Vendor Partner Portal BOM Cross-Verification** button.
 6. **Artifacts & Quality Audit**: Multi-sheet XLSX download, catalog JSON viewer, QuickSpecs PDF opener, master registry viewer, 7-check audit certificate.
-7. **System Telemetry**: Real-time KPI metrics (`GET /api/telemetry`), average confidence score, total learned deltas, run history ledger.
+7. **System Telemetry**: Real-time KPI metrics (`GET /api/telemetry`), average confidence score, total learned deltas, run history ledger, and **Gemini Notebook RAG Consultation & Double-Proofing Ledger**.
 8. **Live CDP Scraper & Trace Ledger**: Handshake over port 9222, task mutex lock, and **Side-by-Side Trace Ledger** for replaying historical `run_id` logs.
 
 ---
@@ -250,14 +255,21 @@ http://localhost:5173
 ## 🧪 Test Suite & Observability Commands
 
 ```bash
-# 1. Comprehensive End-to-End Scenarios & Workload DNA Test (19/19)
+# 1. Post-Build Vendor Partner Portal BOM Cross-Verification Suite (3/3)
+node tests/test_vendor_bom_verifier.js
+
+# 2. Gemini Notebook Query Utilities & Async Job Engine Suite (7/7)
+node scripts/test_notebook_query_utils.js
+
+# 3. Comprehensive End-to-End Scenarios & Workload DNA Test (19/19)
 node tests/test_end_to_end_scenarios.js
 
-# 2. 5-Level Dependency Conflict Graph & Rules Engine Test (14/14)
+# 4. 5-Level Dependency Conflict Graph & Rules Engine Test (14/14)
 node tests/test_conflict_graph.js
 
-# 3. Offline Pipeline Regression Test (8/8)
-npm run test:offline
+# 5. Full Portfolio Certification Audit (6/6 Product Lines 100% Certified)
+npm test
+```
 
 # 4. Modular 6-Aspect Physical Math & Feedback Test (34/34)
 npm run test:aspects

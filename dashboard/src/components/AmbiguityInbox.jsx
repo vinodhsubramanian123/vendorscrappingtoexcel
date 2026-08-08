@@ -8,6 +8,8 @@ export default function AmbiguityInbox({ evalResults, chassisContext }) {
   
   // Resolution form state
   const [ruleUpdate, setRuleUpdate] = useState('');
+  const [humanReasoning, setHumanReasoning] = useState('');
+  const [scopeTaxonomy, setScopeTaxonomy] = useState('CHASSIS_SPECIFIC');
   const [affectedSku, setAffectedSku] = useState('');
   const [requiredDependencySku, setRequiredDependencySku] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -31,7 +33,7 @@ export default function AmbiguityInbox({ evalResults, chassisContext }) {
       const res = await fetch('/api/ask-notebook', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt })
+        body: JSON.stringify({ prompt, chassis: chassisContext })
       });
       const data = await res.json();
       setNotebookResponse(data.answer || 'No response received.');
@@ -43,6 +45,7 @@ export default function AmbiguityInbox({ evalResults, chassisContext }) {
       if (foundSkus.length > 1) setRequiredDependencySku(foundSkus[1]);
       
       setRuleUpdate(data.answer);
+      setHumanReasoning(`Validated via NotebookLM QuickSpecs grounding for ${chassisContext}`);
 
     } catch (err) {
       setNotebookResponse(`Error querying NotebookLM: ${err.message}`);
@@ -58,6 +61,8 @@ export default function AmbiguityInbox({ evalResults, chassisContext }) {
     try {
       const payload = {
         ruleUpdate,
+        humanReasoning,
+        scopeTaxonomy,
         chassis: chassisContext,
         affectedSku,
         requiredDependencySku
@@ -133,36 +138,60 @@ export default function AmbiguityInbox({ evalResults, chassisContext }) {
             
             <form onSubmit={handleResolve} className="space-y-3">
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Rule Update / Technical Rationale</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Rule Update / Technical Rule</label>
                 <textarea 
                   required
                   value={ruleUpdate}
                   onChange={e => setRuleUpdate(e.target.value)}
                   className="w-full text-sm border-slate-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   rows="2"
-                  placeholder="e.g. Mixing DDR4 and DDR5 is prohibited on this chassis..."
+                  placeholder="e.g. Storage Controller MR416i-p requires P76453-B21 Box 1/2 Cable Kit..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Human Engineer Reasoning & Context</label>
+                <input 
+                  type="text"
+                  value={humanReasoning}
+                  onChange={e => setHumanReasoning(e.target.value)}
+                  className="w-full text-sm border-slate-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  placeholder="Explain why this fix is necessary (e.g. Controller backplane SAS expander routing requirement)..."
                 />
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Affected SKU (Optional)</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Scope Taxonomy</label>
+                  <select 
+                    value={scopeTaxonomy}
+                    onChange={e => setScopeTaxonomy(e.target.value)}
+                    className="w-full text-sm border-slate-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  >
+                    <option value="CHASSIS_SPECIFIC">Chassis Specific (e.g. DL380 Gen12 SFF)</option>
+                    <option value="FAMILY_GEN">Family & Gen (e.g. ProLiant Gen12)</option>
+                    <option value="SOLUTION_TYPE">Solution Type (e.g. Storage / Multi-Node)</option>
+                    <option value="UNIVERSAL_VENDOR">Universal Vendor (All HPE)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Affected SKU</label>
                   <input 
                     type="text"
                     value={affectedSku}
                     onChange={e => setAffectedSku(e.target.value)}
                     className="w-full text-sm border-slate-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                    placeholder="P12345-B21"
+                    placeholder="P47777-B21"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Required Dependency (Optional)</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Required Dependency SKU</label>
                   <input 
                     type="text"
                     value={requiredDependencySku}
                     onChange={e => setRequiredDependencySku(e.target.value)}
                     className="w-full text-sm border-slate-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                    placeholder="P98765-B21"
+                    placeholder="P76453-B21"
                   />
                 </div>
               </div>

@@ -80,18 +80,42 @@ function recordEvaluationTelemetry(evalResults, boqFile = '', durationMs = 0) {
 }
 
 /**
- * Record KnowledgeDelta feedback metric in telemetry.
- * @param {object} delta 
+ * Record a Gemini Notebook consultation in telemetry.
+ * @param {object} consultation { query, answer, citations, agreementScore, nextActionExecuted, chassis }
  */
-function recordFeedbackTelemetry(delta) {
+function recordNotebookConsultationTelemetry(consultation) {
+  const telemetryDir = path.dirname(TELEMETRY_FILE);
+  if (!fs.existsSync(telemetryDir)) {
+    fs.mkdirSync(telemetryDir, { recursive: true });
+  }
+
   const data = loadTelemetry();
-  data.totalDeltasLearned += 1;
+  if (!data.notebookConsultations) data.notebookConsultations = [];
+
+  const entry = {
+    id: `NLM-${Date.now()}`,
+    timestamp: new Date().toISOString(),
+    query: consultation.query || '',
+    answer: consultation.answer || '',
+    citations: consultation.citations || [],
+    agreementScore: consultation.agreementScore || (consultation.answer ? 0.95 : 0.5),
+    nextActionExecuted: consultation.nextActionExecuted || 'DEPENDENCY_VALIDATED',
+    chassis: consultation.chassis || 'HPE ProLiant DL380 Gen12 SFF'
+  };
+
+  data.notebookConsultations.unshift(entry);
+  if (data.notebookConsultations.length > 50) data.notebookConsultations.pop();
+
+  data.totalNlmQueries = (data.totalNlmQueries || 0) + 1;
   data.lastUpdated = new Date().toISOString();
+
   fs.writeFileSync(TELEMETRY_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  return entry;
 }
 
 module.exports = {
   loadTelemetry,
   recordEvaluationTelemetry,
-  recordFeedbackTelemetry
+  recordFeedbackTelemetry,
+  recordNotebookConsultationTelemetry
 };
