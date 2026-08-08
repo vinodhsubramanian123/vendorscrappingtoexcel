@@ -61,12 +61,12 @@ graph TD
 - **Workload DNA Extraction**: Infers `VDI_AI_GRAPHICS`, `DATABASE_IN_MEMORY`, `STORAGE_HIGH_IOPS`, or `VIRTUALIZATION_DENSE` profile.
 - **Top 5 Resolution Matrix**: **Rank 1 strictly matches customer workload intent** (neither over- nor under-provisioned).
 
-### Phase 3: Grounded Gemini Notebook RAG Validation & Second Opinion
+### Phase 3: Gemini Notebook RAG Payload Generation (Decoupled Architecture)
 - **Module**: [`scripts/eval_boq.js`](file:///Users/macbookaira1466/Downloads/booktoSkill/scripts/eval_boq.js)
 - **Functions**: `formatNotebookQueryPayload(items, evalResults)`
-- **Dynamic Routing**: Queries Gemini NotebookLM dynamically using the detected chassis variant to lookup the specific Notebook ID via `scripts/config/notebooks.json`. It guarantees cross-pollination of constraints does not occur across multi-vendor quotes.
-- **RAG Second Opinion**: Attaches `ragSecondOpinion` certification to synthesized solution tiers and renders a visual Sparkles badge on Rank 1 solution cards.
-- If `nlm` CLI is unreachable or times out (30s), it gracefully falls back and outputs a transparent ungrounded validation notice.
+- **Dynamic Routing**: Dynamically derives the target Notebook ID via `scripts/config/notebooks.json` to prevent cross-pollination of vendor constraints.
+- **Asynchronous Execution**: `eval_boq.js` does **not** block or execute the query directly. It embeds the `notebookPayload` in the output JSON. The frontend (`App.jsx`) intercepts this and fires a non-blocking background request to `/api/notebook-query-async`.
+- **RAG Second Opinion**: The `ResolutionMatrix` UI renders a "Pending Verification" badge, which smoothly updates with the real RAG certification once the background polling completes.
 
 ### Phase 4: Budget Optimization & Golden Rule Assurance
 - **Module**: [`scripts/lib/budget_optimizer.js`](file:///Users/macbookaira1466/Downloads/booktoSkill/scripts/lib/budget_optimizer.js)

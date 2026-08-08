@@ -136,7 +136,9 @@ The structure returned by `evaluatePhysicalMath` in `scripts/lib/boq_evaluator.j
   "confidence": {
     "score": 0.95,
     "deductions": ["-0.05 (1 rules required physical swaps)"]
-  }
+  },
+  "notebookPayload": "Validate the following physical dependencies...",
+  "ragAnswer": "NotebookLM RAG Output..."
 }
 ```
 
