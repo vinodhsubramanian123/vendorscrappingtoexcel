@@ -2,7 +2,7 @@
 
 **Target BOQ File**: `tests/fixtures/test_boq_dl380_gen12.csv`  
 **Target Gemini Notebook**: `Dl 380 Spec Gen 12` (`1d190853-4e9c-48df-aa70-eae66c6f2c1f`)  
-**Evaluation Date**: 2026-08-07T07:08:30.869Z  
+**Evaluation Date**: 2026-08-08T05:26:04.329Z  
 **Quantitative Confidence Score**: `0.2 / 1.00` (🚨 HITL Review Required)  
 
 ---
@@ -40,11 +40,11 @@
 | 4 | CLIC Rule 81392308: 8SFF Front Cage / No Drive FIO Requirement | `873763-B21` | 1 | 873763-B21 FIO HPE 8SFF Front Remove SPEC Perf FIO (or 8SFF Front Cage Kit P75741-B21) |
 | 5 | Controller Cache Protection Rule | `P01366-B21` | 1 | HPE 96W Smart Storage Battery |
 
-### 🕸️ 2.5 Cross-Aspect Dependency & 5-Level Rule Audit Log
-
+## 1. Workload Fingerprint & Intent Analysis  
 - **Detected Chassis Variant**: `DL380 Gen12 SFF`  
-- **Whole-Solution Buildability**: `✅ PASSED`  
-- **Rules Loaded Source**: `/Users/macbookaira1466/Downloads/booktoSkill/outputs/ProLiant/Gen12/DL380_Gen12_SFF/DL380_Gen12_SFF_Catalog_Rules.json` (Dual Safety Net)  
+- **Primary Workload DNA**: `In-Memory Database & Analytics (High Memory Footprint: 768GB RAM, 12GB/Core)`  
+- **Chassis Auto-Detection**: Match Type `EXPLICIT_CLI` (Confidence: 100%)  
+- **Rules Loaded Source**: `outputs/ProLiant/Gen12/DL380_Gen12_SFF/DL380_Gen12_SFF_Catalog_Rules.json` (Dual Safety Net)  
 
 | Hierarchy Level | Evaluated Rule Text | Status | Technical Audit Details |
 |---|---|---|---|
@@ -78,11 +78,11 @@
 
 | Rank | Solution Tier Name | Score | Est. Cost (USD) | Workload Match | SKU Mods | Technical Tradeoff Rationale |
 |---|---|---|---|---|---|---|
-| **Rank 1** | Rank 1: Customer Workload Intent Preserved (Optimal Match) | `0.98` | $10,500 | In-Memory Database & Analytics (High Memory Footprint: 768GB RAM, 12GB/Core) | 5 | Selected as Rank 1 because it directly preserves the customer's In-Memory Database & Analytics (High Memory Footprint: 768GB RAM, 12GB/Core) intent without over- or under-provisioning. Injects only mandatory physical thermal/power fixes. |
-| **Rank 2** | Rank 2: Standardized CTO Baseline & Maximum Stability | `0.91` | $11,700 | CTO Factory Default Standardized Configuration | 6 | Standardizes baseline options with factory default cooling and power accessories. High stability with standard warranty coverage. |
-| **Rank 3** | Rank 3: High-IOPS & Storage Performance Optimized | `0.85` | $14,000 | Optimized for READ_INTENSIVE NONE Performance | 7 | Upgrades storage controller cache and drive cages for enhanced transactional read/write throughput. |
-| **Rank 4** | Rank 4: Maximum Density & Future Scalability Expansion | `0.79` | $19,000 | Max Headroom (Full PCIe Riser & 1DPC Memory Expansion) | 8 | Populates secondary/tertiary risers and high-performance fan kits to support future GPU and 2nd CPU expansions. |
-| **Rank 5** | Rank 5: Budget & CapEx Minimized Buildable Tier | `0.72` | $10,500 | Strict Minimum CapEx (100% Buildable Baseline) | 5 | Strict baseline buildable tier eliminating all optional add-ons to minimize total CapEx expenditure. |
+| **Rank 1** | Rank 1: Customer Workload Intent Preserved (Optimal Match) | `0.9` | $10,500 | In-Memory Database & Analytics (High Memory Footprint: 768GB RAM, 12GB/Core) | 5 | Selected as Rank 1 because it directly preserves the customer's In-Memory Database & Analytics (High Memory Footprint: 768GB RAM, 12GB/Core) intent without over- or under-provisioning. Injects only mandatory physical thermal/power fixes. |
+| **Rank 2** | Rank 2: Standardized CTO Baseline & Maximum Stability | `0.83` | $11,700 | CTO Factory Default Standardized Configuration | 6 | Standardizes baseline options with factory default cooling and power accessories. High stability with standard warranty coverage. |
+| **Rank 3** | Rank 3: High-IOPS & Storage Performance Optimized | `0.77` | $14,000 | Optimized for READ_INTENSIVE NONE Performance | 7 | Upgrades storage controller cache and drive cages for enhanced transactional read/write throughput. |
+| **Rank 4** | Rank 4: Maximum Density & Future Scalability Expansion | `0.71` | $19,000 | Max Headroom (Full PCIe Riser & 1DPC Memory Expansion) | 8 | Populates secondary/tertiary risers and high-performance fan kits to support future GPU and 2nd CPU expansions. |
+| **Rank 5** | Rank 5: Budget & CapEx Minimized Buildable Tier | `0.64` | $10,500 | Strict Minimum CapEx (100% Buildable Baseline) | 5 | Strict baseline buildable tier eliminating all optional add-ons to minimize total CapEx expenditure. |
 
 ---
 
@@ -93,23 +93,10 @@
 - **Mandatory Buildable Cost**: `$31,384 USD` (Includes all direct SKU fixes)
 ---
 
-## 🤖 4. Pre-Flight Physical Validation (RAG Unavailable)
+## 🤖 4. Grounded Gemini Notebook RAG Solution Validation
 
-### Pre-Flight Physical Validation Matrix (RAG Query Unavailable)
+NotebookLM RAG Query Notice: Command failed: nlm notebook query 1d190853-4e9c-48df-aa70-eae66c6f2c1f Validate whole-solution physical buildability, mandatory cable kits, thermal rules, and QuickSpecs requirements for DL380 Gen12 SFF. CONSOLIDATED BILL OF MATERIALS (100% PARTS INCLUDED): 1x P73282-B21 (HPE ProLiant Compute DL380 Gen12 SFF NC Configure-to-order Server); 2x P74573-B21 (Intel Xeon 6730P 2.5GHz 32-core 250W Processor for HPE); 12x P69728-B21 (HPE 64GB (1x64GB) Dual Rank x4 DDR5-6400 CAS-52-52-52 EC8 Registered Smart Memory Kit); 1x P47777-B21 (HPE MR416i-p Gen11 SPG x16 Lanes 8GB Cache PCI SPG Controller); 2x P17023-B21 (HPE 1600W Flex Slot -48VDC Hot Plug Power Supply Kit). PHYSICAL PRE-CHECKS IDENTIFIED MISSING DEPENDENCIES: 1x P48820-B21 — HPE ProLiant DL380 Gen12 High Performance Fan Kit; 1x 873763-B21 — HPE ProLiant Compute DL380 No Drive Configuration FIO Kit; 1x P36877-B21 — HPE 1600W -48VDC Power Cable Lug Kit; 1x 873763-B21 — 873763-B21 FIO HPE 8SFF Front Remove SPEC Perf FIO (or 8SFF Front Cage Kit P75741-B21); 1x P01366-B21 — HPE 96W Smart Storage Battery. CURRENT CONFIGURATION VALIDATION WARNINGS: Thermal Math Failed: 250W processor exceeds 240W limit without High-Performance Fan Kit.; Power Math Failed: -48VDC Power Supply requires DC Power Cable Lug Kit.. Please evaluate if all listed SKUs, quantities, and injected accessories form a 100% buildable solution without any breaking physical, thermal, or power envelope conflicts. --json
 
-> ⚠️ **Notice**: Gemini Notebook RAG synthesis was skipped or unavailable (requires `nlm` CLI installed and authenticated). Below is the ungrounded pre-flight physical math validation.
-
-#### Physical Validation Summary
-- **Errors Identified**: 2 critical physical violation(s)
-- **Warnings Identified**: 3 physical warning(s)
-- **Quantitative Confidence Score**: 0.2 / 1.00
-
-#### Physical Validation Actions:
-- ❌ Violation: High TDP Processor configured (250W >= 240W threshold) without High-Performance Fan Kit.
-- ❌ Violation: -48VDC Power Supply configured without matching DC Power Cable Lug Kit.
-- ⚠️ Advisory: Drive-less server configuration detected (0 storage drives). Requires HPE No Drive Configuration FIO Kit to clear layout block.
-- ⚠️ Advisory: Storage controller configured without Smart Storage Battery to protect write cache.
-- ⚠️ Advisory: Memory count (12 DIMMs across 2 CPUs) is not populated symmetrically across 8 memory channels per CPU socket.
 
 ---
 

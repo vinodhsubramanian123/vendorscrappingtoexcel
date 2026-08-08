@@ -39,6 +39,24 @@ function verifyAll() {
   console.log('🚀 UNIVERSAL PORTFOLIO AUDIT & PIPELINE VERIFICATION SUITE');
   console.log('================================================================\n');
 
+  // --- Phase 0: Module Load & Export Smoke Test ---
+  console.log('--- Phase 0: System Module Load & Export Smoke Test ---');
+  const libDir = path.join(__dirname, 'lib');
+  if (fs.existsSync(libDir)) {
+    const libFiles = fs.readdirSync(libDir).filter(f => f.endsWith('.js'));
+    libFiles.forEach(file => {
+      const modPath = path.join(libDir, file);
+      try {
+        require(modPath);
+        console.log(`  ✅ Module loaded cleanly: scripts/lib/${file}`);
+      } catch (err) {
+        console.error(`  ❌ MODULE LOAD CRASH in scripts/lib/${file}:`, err.message);
+        throw new Error(`Module load smoke test failed for scripts/lib/${file}: ${err.message}`);
+      }
+    });
+  }
+  console.log('  🎉 All pipeline library modules verified clean.\n');
+
   const xlsxFiles = findXlsxFiles(OUTPUTS_ROOT);
   console.log(`Found ${xlsxFiles.length} scraped Excel workbook(s) in outputs/.\n`);
 

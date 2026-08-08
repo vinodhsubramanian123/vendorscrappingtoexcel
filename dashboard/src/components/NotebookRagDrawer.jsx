@@ -1,8 +1,14 @@
 import React from 'react';
-import { BookOpen, X, Sparkles, ExternalLink, ShieldCheck } from 'lucide-react';
+import { BookOpen, X, Sparkles, ExternalLink, ShieldCheck, AlertTriangle } from 'lucide-react';
 
 export default function NotebookRagDrawer({ isOpen, onClose, ragData, isQuerying }) {
   if (!isOpen) return null;
+
+  const isFallback = ragData && (
+    ragData.source === 'FALLBACK' ||
+    ragData.source === 'LOCAL_FALLBACK' ||
+    (ragData.answer && ragData.answer.toLowerCase().includes('fallback'))
+  );
 
   return (
     <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white shadow-2xl border-l border-slate-200 p-6 overflow-y-auto transition-all">
@@ -33,10 +39,22 @@ export default function NotebookRagDrawer({ isOpen, onClose, ragData, isQuerying
           </div>
 
           <div>
-            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2 flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5 text-emerald-600" /> RAG Answer & Spec Rationale:
-            </h4>
-            <div className="text-xs text-slate-700 space-y-2 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1">
+                {isFallback ? (
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                )}
+                {isFallback ? 'Fallback Answer (Local Rules):' : 'RAG Answer & Spec Rationale:'}
+              </h4>
+              {isFallback && (
+                <span className="badge badge-amber text-[10px]">Unverified Local Fallback</span>
+              )}
+            </div>
+            <div className={`text-xs space-y-2 leading-relaxed p-4 rounded-xl border ${
+              isFallback ? 'bg-amber-50/50 border-amber-200 text-amber-900' : 'bg-slate-50 border-slate-100 text-slate-700'
+            }`}>
               {ragData.answer}
             </div>
           </div>

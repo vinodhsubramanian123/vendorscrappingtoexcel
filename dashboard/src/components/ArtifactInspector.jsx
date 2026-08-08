@@ -58,10 +58,22 @@ export default function ArtifactInspector({ currentCatalog, onAuditCatalog }) {
   const tsvSkusPath = folderPath ? `${folderPath}/intermittent_scraps/${prefix}_Catalog_SKUs.tsv` : null;
   const tsvRulesPath = folderPath ? `${folderPath}/intermittent_scraps/${prefix}_Catalog_Rules.tsv` : null;
 
+  const [verifyAllStatus, setVerifyAllStatus] = useState(null);
+
   const handleVerifyAll = async () => {
+    setVerifyAllStatus('LAUNCHING');
     try {
-      await fetch('/api/verify-all', { method: 'POST' });
-    } catch {}
+      const res = await fetch('/api/verify-all', { method: 'POST' });
+      if (res.ok) {
+        setVerifyAllStatus('STARTED');
+        setTimeout(() => setVerifyAllStatus(null), 4000);
+      } else {
+        const data = await res.json();
+        setVerifyAllStatus(`ERROR: ${data.error || 'Failed to start verification'}`);
+      }
+    } catch (err) {
+      setVerifyAllStatus(`ERROR: ${err.message}`);
+    }
   };
 
   return (
@@ -76,6 +88,12 @@ export default function ArtifactInspector({ currentCatalog, onAuditCatalog }) {
           <p className="text-xs text-slate-500 mt-0.5">
             Full transparency into raw JSON extractions, TSVs, catalog diffs, and 7-check audit certificates.
           </p>
+          {verifyAllStatus && (
+            <p className={`text-xs font-semibold mt-1 flex items-center gap-1.5 ${verifyAllStatus.startsWith('ERROR') ? 'text-rose-600' : 'text-purple-600'}`}>
+              <ShieldCheck className="w-3.5 h-3.5" />
+              {verifyAllStatus === 'STARTED' ? 'Portfolio verification suite launched! Watch the Scraper SSE Terminal for live logs.' : verifyAllStatus}
+            </p>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -88,11 +106,12 @@ export default function ArtifactInspector({ currentCatalog, onAuditCatalog }) {
           </button>
           <button
             onClick={handleVerifyAll}
+            disabled={verifyAllStatus === 'LAUNCHING'}
             className="btn-secondary text-xs"
             title="Run 81-Assertion Verification Suite across all product lines"
           >
             <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
-            Run Portfolio Verification Suite
+            {verifyAllStatus === 'LAUNCHING' ? 'Starting Suite...' : 'Run Portfolio Verification Suite'}
           </button>
           <button
             onClick={handleRunAudit}
@@ -105,19 +124,19 @@ export default function ArtifactInspector({ currentCatalog, onAuditCatalog }) {
         </div>
       </div>
 
-      {/* Audit Checklist Card — Dynamically bound to auditResult (Fix B3) */}
+      {/* Audit Checklist Card — Strict Fail-Closed Check */}
       {auditResult && (
-        <div className={`glass-card p-6 border-l-4 ${auditResult.passed !== false ? 'border-l-emerald-500' : 'border-l-rose-500'}`}>
+        <div className={`glass-card p-6 border-l-4 ${auditResult.passed ? 'border-l-emerald-500' : 'border-l-rose-500'}`}>
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-              {auditResult.passed !== false
+              {auditResult.passed
                 ? <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                 : <AlertCircle className="w-4 h-4 text-rose-600" />
               }
               Data Quality Audit Certificate Result
             </h3>
-            <span className={`badge ${auditResult.passed !== false ? 'badge-emerald' : 'badge-amber'}`}>
-              {auditResult.passed !== false ? '100% AUDIT PASS' : 'AUDIT AUDIT ISSUES DETECTED'}
+            <span className={`badge ${auditResult.passed ? 'badge-emerald' : 'badge-amber'}`}>
+              {auditResult.passed ? '100% AUDIT PASS' : 'AUDIT ISSUES DETECTED'}
             </span>
           </div>
 
@@ -126,8 +145,8 @@ export default function ArtifactInspector({ currentCatalog, onAuditCatalog }) {
               {Object.entries(auditResult.checks).map(([checkName, checkVal]) => (
                 <div key={checkName} className="p-2.5 bg-slate-50 rounded-lg border border-slate-100">
                   <span className="text-slate-400 font-semibold block text-[10px] uppercase truncate">{checkName}</span>
-                  <span className={`font-bold ${checkVal?.passed !== false ? 'text-emerald-600' : 'text-rose-600'}`}>
-                    {checkVal?.passed !== false ? 'PASS' : 'FAIL'}
+                  <span className={`font-bold ${checkVal?.passed ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {checkVal?.passed ? 'PASS' : 'FAIL'}
                   </span>
                   {checkVal?.detail && <p className="text-[10px] text-slate-500 mt-0.5 truncate">{checkVal.detail}</p>}
                 </div>

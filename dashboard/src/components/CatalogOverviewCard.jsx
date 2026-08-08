@@ -25,6 +25,37 @@ export default function CatalogOverviewCard({ catalog, catalogData, onNavigate }
   const uniqueSkus = metadata.totalUniqueSKUs || catalog.totalSKUs || totalSkus;
   const scrapeDate = metadata.scrapeDate || catalog.scrapeDate || 'Latest Scrape';
 
+  // FB-1: Extract Chassis Variant & Portfolio Price Matrix
+  const baseVariants = [];
+  catalogData.entries?.forEach(entry => {
+    const parentLower = (entry.parentCategory || '').toLowerCase();
+    const subLower = (entry.subCategory || '').toLowerCase();
+    
+    // Look for Base Configuration, Server, Compute Module, System, or Chassis
+    if (parentLower.includes('server') || parentLower.includes('base') || parentLower.includes('compute module') || parentLower.includes('system') || subLower.includes('base')) {
+      entry.skus?.forEach(sku => {
+        const priceStr = sku['Unit Price (USD)'] || '0';
+        const priceNum = parseFloat(priceStr.replace(/,/g, ''));
+        // Filter out cheap accessories that might be grouped under 'base', focus on main chassis
+        if (priceNum > 500 && !baseVariants.find(v => v.sku === sku['Product #'])) {
+          // Additional filter to ensure it's a server/chassis by looking at description
+          const desc = (sku.Description || '').toLowerCase();
+          if (desc.includes('server') || desc.includes('chassis') || desc.includes('node') || desc.includes('system') || desc.includes('module')) {
+            baseVariants.push({
+              sku: sku['Product #'],
+              desc: sku.Description,
+              price: priceStr
+            });
+          }
+        }
+      });
+    }
+  });
+
+  // Sort by price ascending and take top 4
+  baseVariants.sort((a, b) => parseFloat(a.price.replace(/,/g, '')) - parseFloat(b.price.replace(/,/g, '')));
+  const displayVariants = baseVariants.slice(0, 4);
+
   return (
     <div className="glass-card p-6 space-y-4">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-3 gap-2">
@@ -113,6 +144,31 @@ export default function CatalogOverviewCard({ catalog, catalogData, onNavigate }
           </button>
         </div>
       </div>
+
+      {/* FB-1: Chassis Variant & Portfolio Price Matrix */}
+      {displayVariants.length > 0 && (
+        <div className="pt-2">
+          <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <Server className="w-4 h-4 text-blue-600" /> Chassis Variant &amp; Portfolio Price Matrix
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            {displayVariants.map((variant, idx) => (
+              <div key={idx} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                <div>
+                  <p className="text-[10px] font-bold text-blue-600 mb-0.5">{variant.sku}</p>
+                  <p className="text-[11px] font-semibold text-slate-700 line-clamp-3 mb-2" title={variant.desc}>
+                    {variant.desc}
+                  </p>
+                </div>
+                <div className="pt-2 border-t border-slate-100 flex justify-between items-center mt-auto">
+                  <span className="text-[10px] text-slate-500 font-semibold uppercase">Base Price</span>
+                  <span className="text-sm font-bold text-emerald-700">${variant.price}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

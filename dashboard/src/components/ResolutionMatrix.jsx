@@ -2,14 +2,16 @@ import React, { useState } from 'react';
 import { Award, Check, MessageSquare, Download, AlertTriangle, X, Loader, Sparkles, ShieldCheck } from 'lucide-react';
 import VendorBomVerificationModal from './VendorBomVerificationModal';
 
-export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback, selectedChassis }) {
+export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback, selectedChassis, onTriggerDemoBoq }) {
   const [exportingRank, setExportingRank] = useState(null);
   const [exportedFiles, setExportedFiles] = useState({});
+  const [exportError, setExportError] = useState(null);
   const [rejectionModal, setRejectionModal] = useState(null);
   const [vendorVerificationModal, setVendorVerificationModal] = useState(null);
   const [rejectionText, setRejectionText] = useState('');
   const [isSubmittingRejection, setIsSubmittingRejection] = useState(false);
   const [rejectionConfirmed, setRejectionConfirmed] = useState(null);
+  const [rejectionError, setRejectionError] = useState(null);
 
   const rankedFromEval = evalResults?.conflictGraph?.rankedSolutions;
 
@@ -32,7 +34,7 @@ export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback, se
           capex: sol.estimatedCostUsd ? `$${sol.estimatedCostUsd.toLocaleString()}` : 'Pricing N/A',
           badgeClass: sol.rank === 1 ? 'badge-emerald' : sol.rank <= 3 ? 'badge-blue' : 'badge-amber',
           rationale: sol.reasoning,
-          ragSecondOpinion: sol.ragSecondOpinion,
+          ragSecondOpinion: sol.rank === 1 && evalResults.ragAnswer ? evalResults.ragAnswer : sol.ragSecondOpinion,
           swaps: detailedSwaps
         };
       })
@@ -40,12 +42,14 @@ export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback, se
 
   const handleExport = async (tier) => {
     setExportingRank(tier.rank);
+    setExportError(null);
     try {
       const res = await fetch('/api/export-boq', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ evalResults, chassisId: selectedChassis, rankTier: tier.rank })
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}: Export request failed`);
       const data = await res.json();
       if (data.downloadPath) {
         setExportedFiles(prev => ({ ...prev, [tier.rank]: data }));
@@ -53,9 +57,12 @@ export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback, se
         a.href = data.downloadPath;
         a.download = data.filename;
         a.click();
+      } else {
+        throw new Error(data.error || 'Server did not return a valid download path');
       }
     } catch (err) {
       console.error('Export failed:', err);
+      setExportError(`Export failed for Rank ${tier.rank}: ${err.message}`);
     }
     setExportingRank(null);
   };
@@ -63,6 +70,7 @@ export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback, se
   const handleRejectionSubmit = async () => {
     if (!rejectionText.trim()) return;
     setIsSubmittingRejection(true);
+    setRejectionError(null);
     try {
       const res = await fetch('/api/simulate-error', {
         method: 'POST',
@@ -70,20 +78,34 @@ export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback, se
         body: JSON.stringify({ errorMessage: rejectionText, chassis: selectedChassis })
       });
       const data = await res.json();
-      setRejectionConfirmed(data.delta?.id || 'LOGGED');
+      if (res.ok && data.delta) {
+        setRejectionConfirmed(data.delta?.id || 'LOGGED');
+        setTimeout(() => {
+          setRejectionModal(null);
+          setRejectionText('');
+          setRejectionConfirmed(null);
+        }, 2500);
+      } else {
+        setRejectionError(data.error || 'Failed to record rejection delta');
+      }
     } catch (err) {
       console.error('Rejection submit failed:', err);
+      setRejectionError(err.message || 'Network error submitting rejection');
     }
     setIsSubmittingRejection(false);
-    setTimeout(() => {
-      setRejectionModal(null);
-      setRejectionText('');
-      setRejectionConfirmed(null);
-    }, 2500);
   };
 
   return (
     <div className="space-y-6 animate-fade-in-up delay-300">
+      {exportError && (
+        <div className="bg-rose-50 border-l-4 border-l-rose-500 p-4 rounded-xl text-xs text-rose-700 font-semibold flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-rose-600" />
+            <span>{exportError}</span>
+          </div>
+          <button onClick={() => setExportError(null)} className="text-rose-400 hover:text-rose-600">Close</button>
+        </div>
+      )}
       <div className="glass-card p-6">
         <div className="border-b border-slate-100 pb-3 mb-4 flex justify-between items-start">
           <div>
@@ -133,44 +155,63 @@ export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback, se
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {tiers.length === 0 ? (
-            <div className="col-span-full text-center py-12 text-slate-400">
+            <div className="col-span-full p-8 text-center text-slate-500 bg-slate-50/50 rounded-xl border border-slate-100 flex flex-col items-center justify-center">
               <Award className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-              <p className="text-sm font-semibold text-slate-600">No Resolution Tiers Available</p>
-              <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
-                Evaluate a BOQ quote in the BOQ Evaluator tab to generate 5-tier ranked buildable candidates.
+              <p className="font-semibold text-slate-600 mb-2">No Synthesis Available</p>
+              <p className="text-xs text-slate-400 mb-4 max-w-md mx-auto">
+                Run a BOQ Evaluation with conflicting rules to view the 5-Tier Strategic Resolution Matrix.
               </p>
-              <button
-                onClick={() => {
-                  const boqTabBtn = document.querySelector('button[data-tab="boq"]') || document.querySelectorAll('nav button')[2];
-                  if (boqTabBtn) boqTabBtn.click();
-                }}
-                className="mt-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all inline-flex items-center gap-2"
-              >
-                <Sparkles className="w-4 h-4" />
-                Go to BOQ Evaluator &amp; Test Sample Quote
-              </button>
-            </div>
-          ) : tiers.map(tier => (
-            <div
-              key={tier.rank}
-              className={`rounded-2xl p-5 border transition-all glass-card ${
-                tier.rank === 1 ? 'border-emerald-300 ring-2 ring-emerald-500/20 bg-emerald-50/10' : 'border-slate-200'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <span className={`badge ${tier.badgeClass}`}>{tier.subtitle}</span>
-                <span className="text-xs font-bold text-slate-500">Match: {tier.intentMatch}</span>
-              </div>
-
-              <h3 className="font-bold text-slate-900 text-sm mb-1">{tier.title}</h3>
-              <p className="text-xs text-slate-500 mb-2">{tier.rationale}</p>
-
-              {tier.ragSecondOpinion && (
-                <div className="bg-emerald-50/80 border border-emerald-200 rounded-lg p-2 mb-3 text-[11px] font-semibold text-emerald-800 flex items-center gap-1.5 shadow-sm">
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>{tier.ragSecondOpinion}</span>
-                </div>
+              {onTriggerDemoBoq && (
+                <button
+                  onClick={() => onTriggerDemoBoq({
+                    rawText: "1x P73282-B21\n1x P48820-B21\n2x P49610-B21\n1x P76449-B21\n4x P40502-B21\n1x P52019-B21",
+                    chassisDir: selectedChassis
+                  })}
+                  className="mt-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition-all inline-flex items-center gap-2"
+                >
+                  <Sparkles className="w-4 h-4" /> Load Sample Demo BOQ & Run 5-Tier Synthesis
+                </button>
               )}
+            </div>
+          ) : tiers.map(tier => {
+            const isRagFallback = tier.ragSecondOpinion && (
+              tier.ragSecondOpinion.toLowerCase().includes('fallback') ||
+              tier.ragSecondOpinion.toLowerCase().includes('unverified')
+            );
+
+            return (
+              <div
+                key={tier.rank}
+                className={`rounded-2xl p-5 border transition-all glass-card ${
+                  tier.rank === 1 ? 'border-emerald-300 ring-2 ring-emerald-500/20 bg-emerald-50/10' : 'border-slate-200'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span className={`badge ${tier.badgeClass}`}>{tier.subtitle}</span>
+                  <span className="text-xs font-bold text-slate-500">Match: {tier.intentMatch}</span>
+                </div>
+
+                <h3 className="font-bold text-slate-900 text-sm mb-1">{tier.title}</h3>
+                <p className="text-xs text-slate-500 mb-2">{tier.rationale}</p>
+
+                {tier.ragSecondOpinion && (
+                  <div className={`border rounded-lg p-2 mb-3 text-[11px] font-semibold flex items-center gap-1.5 shadow-sm ${
+                    tier.ragSecondOpinion.includes('Pending')
+                      ? 'bg-slate-50 border-slate-200 text-slate-600 animate-pulse'
+                      : isRagFallback
+                      ? 'bg-amber-50 border-amber-200 text-amber-900'
+                      : 'bg-emerald-50/80 border-emerald-200 text-emerald-800'
+                  }`}>
+                    {tier.ragSecondOpinion.includes('Pending') ? (
+                      <Loader className="w-3.5 h-3.5 text-slate-400 shrink-0 animate-spin" />
+                    ) : isRagFallback ? (
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    ) : (
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    )}
+                    <span>{tier.ragSecondOpinion}</span>
+                  </div>
+                )}
 
               <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 mb-4">
                 <div className="flex justify-between items-center text-xs">
@@ -241,7 +282,8 @@ export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback, se
                 Log Portal Feedback
               </button>
             </div>
-          ))}
+          );
+        })}
         </div>
       </div>
 
@@ -254,7 +296,7 @@ export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback, se
                 <AlertTriangle className="w-5 h-5 text-amber-600" />
                 Report Portal Rejection — Rank {rejectionModal.rank}
               </h3>
-              <button onClick={() => { setRejectionModal(null); setRejectionText(''); setRejectionConfirmed(null); }}>
+              <button onClick={() => { setRejectionModal(null); setRejectionText(''); setRejectionConfirmed(null); setRejectionError(null); }}>
                 <X className="w-5 h-5 text-slate-400 hover:text-slate-700" />
               </button>
             </div>
@@ -268,6 +310,11 @@ export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback, se
               </div>
             ) : (
               <>
+                {rejectionError && (
+                  <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 mb-3 text-xs text-rose-700 font-medium">
+                    {rejectionError}
+                  </div>
+                )}
                 <p className="text-xs text-slate-600 mb-4">
                   Describe the HPE portal rejection. This is logged as a <strong>KnowledgeDelta</strong> scoped to chassis{' '}
                   <span className="font-bold text-blue-600">{selectedChassis || 'Unknown'}</span>, permanently improving the evaluation engine.
@@ -279,7 +326,7 @@ export default function ResolutionMatrix({ evalResults, onOpenPortalFeedback, se
                   className="w-full border border-slate-200 rounded-xl p-3 text-xs text-slate-800 resize-none h-28 focus:outline-none focus:ring-2 focus:ring-amber-400"
                 />
                 <div className="flex justify-end gap-2 mt-4">
-                  <button onClick={() => { setRejectionModal(null); setRejectionText(''); }} className="btn-secondary text-xs">
+                  <button onClick={() => { setRejectionModal(null); setRejectionText(''); setRejectionError(null); }} className="btn-secondary text-xs">
                     Cancel
                   </button>
                   <button

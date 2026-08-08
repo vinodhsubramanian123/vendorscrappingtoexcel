@@ -85,7 +85,22 @@ function sanitizeNotebookQuery(rawQuery, context = {}) {
     .trim();
 
   if (clean.length === 0) {
-    return 'What are the hardware configuration rules and QuickSpecs specifications for this server model?';
+    clean = 'What are the hardware configuration rules and QuickSpecs specifications for this model?';
+  }
+
+  // Prepend explicit product scope, family, generation, and chassis context
+  const { parseProductMeta } = require('./product_meta');
+  const chassisName = context.chassis || 'HPE ProLiant DL380 Gen12 SFF';
+  const meta = parseProductMeta(chassisName);
+  
+  let scope = 'Server';
+  if (['Alletra', 'Nimble', 'StoreOnce', 'MSA', 'SimpliVity'].includes(meta.family)) scope = 'Storage System';
+  else if (meta.family === 'Synergy') scope = 'Interconnect & Frame Module';
+  else if (meta.family === 'StoreEver') scope = 'Tape Library System';
+  else if (meta.family === 'Cray') scope = 'Supercomputing System';
+
+  if (!clean.toLowerCase().includes(chassisName.toLowerCase())) {
+    clean = `[Product Scope: ${scope} | Family: ${meta.family} | Gen: ${meta.gen} | Chassis: ${chassisName}] ${clean}`;
   }
 
   return clean;

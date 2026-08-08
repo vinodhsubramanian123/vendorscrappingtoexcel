@@ -209,7 +209,7 @@ function synthesize5TierRankedSolutions(items = [], evalResults = {}, graphResul
         costDeltaUsd: `+$${fixCost.toLocaleString()} (Mandatory Buildability)`,
         capacityExpansion: 'Optimal (Zero over/under-provisioning)'
       },
-      ragSecondOpinion: '✅ NotebookLM RAG Certified: QuickSpecs verified zero thermal/power envelope violations.',
+      ragSecondOpinion: '⏳ Pending QuickSpecs Verification...',
       reasoning: `Selected as Rank 1 because it directly preserves the customer's ${dna.workloadDescription} intent without over- or under-provisioning. Injects only mandatory physical thermal/power fixes.`
     },
     {

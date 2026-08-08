@@ -27,14 +27,14 @@ http://localhost:5173
 
 | Tab | Component | Description |
 |-----|-----------|-------------|
-| **Executive Dashboard** | [`CatalogOverviewCard`](file:///Users/macbookaira1466/Downloads/booktoSkill/dashboard/src/components/CatalogOverviewCard.jsx), [`TaskHistoryCard`](file:///Users/macbookaira1466/Downloads/booktoSkill/dashboard/src/components/TaskHistoryCard.jsx) | Selected chassis metadata, scrape date, historical diff breakdown (`+Added`, `-Removed`, `Price Delta`), interactive task history timeline |
-| **Master Excel Catalog** | [`CatalogExplorer`](file:///Users/macbookaira1466/Downloads/booktoSkill/dashboard/src/components/CatalogExplorer.jsx) | Client-side NLP FlexSearch, 3-tier category filters, color-coded status badges, real-time price trend modal |
-| **BOQ Evaluator & DNA** | [`BoqUploader`](file:///Users/macbookaira1466/Downloads/booktoSkill/dashboard/src/components/BoqUploader.jsx), [`WorkloadDnaCard`](file:///Users/macbookaira1466/Downloads/booktoSkill/dashboard/src/components/WorkloadDnaCard.jsx) | Drag-and-drop BOQ upload (.xlsx, .csv, .json, .txt), Workload DNA profiler, live SSE stdout terminal |
-| **6-Aspect Math & CLIC** | [`ConflictGraphInspector`](file:///Users/macbookaira1466/Downloads/booktoSkill/dashboard/src/components/ConflictGraphInspector.jsx) | Physical pre-flight verification checklist + CLIC error inspector |
-| **5-Tier Resolution Matrix** | [`ResolutionMatrix`](file:///Users/macbookaira1466/Downloads/booktoSkill/dashboard/src/components/ResolutionMatrix.jsx) | Ranked buildable solutions, intent match %, per-SKU technical swap rationale, NotebookLM RAG Second Opinion badge |
-| **Artifacts & Quality Audit** | [`ArtifactInspector`](file:///Users/macbookaira1466/Downloads/booktoSkill/dashboard/src/components/ArtifactInspector.jsx) | Multi-sheet XLSX download, catalog JSON viewer, QuickSpecs PDF opener, master registry viewer, 7-check audit certificate |
-| **System Telemetry** | [`TelemetryCard`](file:///Users/macbookaira1466/Downloads/booktoSkill/dashboard/src/components/TelemetryCard.jsx) | Real-time KPI metrics (`GET /api/telemetry`), average confidence score, total learned deltas, run history ledger |
-| **Live CDP Scraper** | [`ScraperTriggerCard`](file:///Users/macbookaira1466/Downloads/booktoSkill/dashboard/src/components/ScraperTriggerCard.jsx) | Handshake over port 9222, task mutex lock with cancel button, live SSE terminal streaming |
+| **Executive Dashboard** | [`CatalogOverviewCard`](src/components/CatalogOverviewCard.jsx), [`TaskHistoryCard`](src/components/TaskHistoryCard.jsx) | Selected chassis metadata, scrape date, historical diff breakdown (`+Added`, `-Removed`, `Price Delta`), interactive task history timeline |
+| **Master Excel Catalog** | [`CatalogExplorer`](src/components/CatalogExplorer.jsx) | Client-side NLP FlexSearch, 3-tier category filters, color-coded status badges, real-time price trend modal |
+| **BOQ Evaluator & DNA** | [`BoqUploader`](src/components/BoqUploader.jsx), [`WorkloadDnaCard`](src/components/WorkloadDnaCard.jsx) | Drag-and-drop BOQ upload (.xlsx, .csv, .json, .txt), Workload DNA profiler, live SSE stdout terminal |
+| **6-Aspect Math & CLIC** | [`ConflictGraphInspector`](src/components/ConflictGraphInspector.jsx) | Physical pre-flight verification checklist + CLIC error inspector |
+| **5-Tier Resolution Matrix** | [`ResolutionMatrix`](src/components/ResolutionMatrix.jsx) | Ranked buildable solutions, intent match %, per-SKU technical swap rationale, NotebookLM RAG Second Opinion badge |
+| **Artifacts & Quality Audit** | [`ArtifactInspector`](src/components/ArtifactInspector.jsx) | Multi-sheet XLSX download, catalog JSON viewer, QuickSpecs PDF opener, master registry viewer, 7-check audit certificate |
+| **System Telemetry** | [`TelemetryCard`](src/components/TelemetryCard.jsx) | Real-time KPI metrics (`GET /api/telemetry`), average confidence score, total learned deltas, run history ledger |
+| **Live CDP Scraper** | [`ScraperTriggerCard`](src/components/ScraperTriggerCard.jsx) | Handshake over port 9222, task mutex lock with cancel button, live SSE terminal streaming |
 
 ---
 

@@ -524,3 +524,21 @@ graph TD
 
 52. **Adaptive DOM Expansion Check (`assertExpansionThreshold`)**:
     - Scraper guardrails in `cdp.js` MUST evaluate scroll height expansion using relative delta thresholds (`Math.min(15000, initialHeight * 1.5)`), avoiding false expansion warnings on compact UI wizards.
+
+---
+
+## Agent Lifecycle & Integration Rules (Learnings from NotebookLM & Asynchronous Execution)
+
+53. **Asynchronous NotebookLM Polling Protocol**:
+    - **Never block the UI** or jump to conclusions when querying NotebookLM. NotebookLM acts as the crux of our evaluation but can be slow.
+    - Always use the asynchronous polling strategy: initiate the job via `POST /api/notebook-query-async`, return a `jobId` with HTTP 202, and have the client poll `GET /api/notebook-query-status/:jobId`.
+    - **Wait in the right way**: The system MUST wait for NotebookLM to stream its status before judging the final response or assuming a failure. Timeouts must be generous to account for RAG processing.
+
+54. **NotebookLM MCP Usage & Syntax Guardrails**:
+    - Do not pass un-sanitized code snippets (e.g., `const fs`, `require`) to NotebookLM, as it can confuse the natural language processor. Always use `sanitizeNotebookQuery` to pre-process payload data into text.
+    - Validate the syntax of any response coming from the MCP server. NotebookLM might return Markdown wrapped JSON; ensure `server.cjs` unwraps the JSON cleanly without crashing.
+
+55. **Double-Checking & 5-Tier Safety Nets**:
+    - NotebookLM provides a "Second Opinion" and ranks options, but it is not infallible.
+    - Always validate NotebookLM responses locally using the **Vendor Agnostic BOM Engine** (the multi-aspect constraint graph and local math engine).
+    - If NotebookLM's confidence is low or unverified, flag it with the `FALLBACK` / Amber alert and rely on the local `master_knowledge_registry.json` rules. The system learns and perfectly improves over time by injecting these deltas back into the local engine.

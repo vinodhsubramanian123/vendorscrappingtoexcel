@@ -36,6 +36,13 @@ export default function UserFeedbackDrawer({ isOpen, onClose }) {
     } catch {}
   };
 
+  const handleMarkAllCompleted = async () => {
+    try {
+      await fetch('/api/feedback-mark-completed', { method: 'POST' });
+      fetchQueue();
+    } catch {}
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -93,7 +100,17 @@ export default function UserFeedbackDrawer({ isOpen, onClose }) {
 
       {/* Queue Items */}
       <div>
-        <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-3">Pending Tasks Queue:</h4>
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Pending Tasks Queue:</h4>
+          {queueItems.length > 0 && (
+            <button
+              onClick={handleMarkAllCompleted}
+              className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-md hover:bg-emerald-100 font-bold flex items-center gap-1 transition-colors"
+            >
+              <CheckCircle2 className="w-3 h-3" /> Resolve All
+            </button>
+          )}
+        </div>
         <div className="space-y-2">
           {queueItems.length === 0 ? (
             <p className="text-xs text-slate-400 italic">No feedback items in queue.</p>

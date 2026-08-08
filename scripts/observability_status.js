@@ -162,10 +162,14 @@ async function main() {
   });
 
   console.log('\n================================================================');
+  const isHealthy = catalogs.length > 0 && telemetryData !== null;
+  const isCdpConnected = cdpState && cdpState.ok;
   if (catalogs.length === 0) {
     console.log('⚠️ NO DATA: 0 product catalogs found. Pipeline evaluation not applicable.');
+  } else if (!isHealthy) {
+    console.log('⚠️ OBSERVABILITY WARNING: Catalog portfolio present, but telemetry log is uninitialized or degraded.');
   } else {
-    console.log('🎉 OBSERVABILITY DASHBOARD COMPLETE — PIPELINE 100% HEALTHY');
+    console.log(`🎉 OBSERVABILITY DASHBOARD COMPLETE — PIPELINE ${isCdpConnected ? '100% HEALTHY (CDP ACTIVE)' : 'READY (OFFLINE / BACKEND READY)'}`);
   }
   console.log('================================================================\n');
 }

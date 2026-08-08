@@ -69,7 +69,20 @@ function classifyOptionType(skuStr) {
   if (str.endsWith('CTO')) return 'CTO';
   if (str.endsWith('BTO')) return 'BTO';
   if (str.endsWith('FIO')) return 'FIO';
+  if (isServiceSku(str)) return 'Service';
   return 'Standard';
+}
+
+/**
+ * Identify if SKU is a Service or Support SKU
+ * @param {string} skuStr 
+ * @returns {boolean}
+ */
+function isServiceSku(skuStr) {
+  if (!skuStr) return false;
+  const clean = cleanBaseSKU(skuStr).trim();
+  // Service SKUs typically start with H, U, R, S and don't have hyphens (e.g., HA114A1, H7J34A3, U4391E)
+  return /^[HURS][A-Z0-9]{4,10}$/i.test(clean);
 }
 
 module.exports = {
@@ -77,5 +90,6 @@ module.exports = {
   HPE_SKU_EXTRACT_REGEX,
   isValidHpeSKU,
   cleanBaseSKU,
-  classifyOptionType
+  classifyOptionType,
+  isServiceSku
 };

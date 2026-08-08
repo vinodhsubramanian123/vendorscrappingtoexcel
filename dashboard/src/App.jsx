@@ -131,6 +131,59 @@ export default function App() {
           setLogStream(prev => [...prev.slice(-200), payload]);
         } else if (payload.type === 'LOG') {
           setLogStream(prev => [...prev.slice(-200), payload]);
+        } else if (payload.type === 'EVAL_RESULT') {
+          // The async BOQ evaluation completed successfully!
+          setIsTaskRunning(false);
+          setActiveProgress(null);
+          
+          if (payload.data) {
+            setEvalResults(payload.data);
+            setActiveTab('overview'); // Flip to 5-Tier Matrix
+            
+            // Decoupled RAG: Dispatch parallel RAG query now that matrix is rendered
+            if (payload.data.notebookPayload) {
+              fetch('/api/notebook-query-async', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: payload.data.notebookPayload, chassis: selectedChassis })
+              })
+              .then(res => res.json())
+              .then(jobInfo => {
+                if (jobInfo.status === 'COMPLETED') {
+                  setEvalResults(prev => ({...prev, ragAnswer: jobInfo.result.answer}));
+                } else if (jobInfo.jobId) {
+                  // Poll for matrix RAG result
+                  let polls = 0;
+                  const maxPolls = 35; // 70 seconds max
+                  const matrixPoll = setInterval(async () => {
+                    polls++;
+                    if (polls > maxPolls) {
+                      clearInterval(matrixPoll);
+                      setEvalResults(prev => ({...prev, ragAnswer: '⚠️ NotebookLM Query Timeout: RAG verification took too long.'}));
+                      return;
+                    }
+                    try {
+                      const stRes = await fetch(`/api/notebook-query-status/${jobInfo.jobId}`);
+                      const stData = await stRes.json();
+                      if (stData.status === 'COMPLETED') {
+                        clearInterval(matrixPoll);
+                        setEvalResults(prev => ({...prev, ragAnswer: stData.result.answer}));
+                      } else if (stData.status === 'FAILED') {
+                        clearInterval(matrixPoll);
+                        setEvalResults(prev => ({...prev, ragAnswer: `⚠️ NotebookLM Query Failed: ${stData.error}`}));
+                      }
+                    } catch (e) {
+                      console.error('Matrix RAG poll error:', e);
+                    }
+                  }, 2000);
+                }
+              })
+              .catch(err => console.error('Failed to dispatch background RAG query:', err));
+            }
+            
+          } else if (payload.error) {
+            setEvalResults({ status: 'ERROR', error: payload.error.error || 'Evaluation failed' });
+          }
         }
       } catch (err) {
         console.error('SSE Error:', err);
@@ -145,18 +198,56 @@ export default function App() {
     if (query.toLowerCase().includes('notebook') || query.toLowerCase().includes('rag') || query.length > 25) {
       setIsRagOpen(true);
       setIsQueryingRag(true);
+      setRagData({ query, answer: 'Querying Gemini NotebookLM... This may take up to 30-60 seconds to consult the QuickSpecs.', citations: [], source: 'PENDING' });
       try {
-        const res = await fetch('/api/notebook-query', {
+        const initRes = await fetch('/api/notebook-query-async', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ query, chassis: selectedChassis })
         });
-        const data = await res.json();
-        setRagData(data);
+        const jobInfo = await initRes.json();
+        
+        if (jobInfo.status === 'COMPLETED') {
+          // Instant fallback was returned
+          setRagData(jobInfo.result);
+          setIsQueryingRag(false);
+          return;
+        }
+
+        const jobId = jobInfo.jobId;
+        let pollCount = 0;
+        const maxPolls = 35; // 70 seconds limit
+        
+        const pollInterval = setInterval(async () => {
+          pollCount++;
+          if (pollCount > maxPolls) {
+            clearInterval(pollInterval);
+            setRagData({ query, answer: '⚠️ NotebookLM Query Timeout: No response received after 70 seconds.', citations: [], source: 'ERROR' });
+            setIsQueryingRag(false);
+            return;
+          }
+          try {
+            const statusRes = await fetch(`/api/notebook-query-status/${jobId}`);
+            const statusData = await statusRes.json();
+            
+            if (statusData.status === 'COMPLETED') {
+              clearInterval(pollInterval);
+              setRagData(statusData.result);
+              setIsQueryingRag(false);
+            } else if (statusData.status === 'FAILED') {
+              clearInterval(pollInterval);
+              setRagData({ query, answer: `NotebookLM Query Failed: ${statusData.error}`, citations: [], source: 'ERROR' });
+              setIsQueryingRag(false);
+            }
+          } catch (pollErr) {
+            console.error('Polling error:', pollErr);
+          }
+        }, 2000); // Poll every 2 seconds
+        
       } catch {
-        setRagData({ query, answer: 'RAG Query Failed.', citations: [] });
+        setRagData({ query, answer: 'Failed to initiate RAG Query.', citations: [], source: 'ERROR' });
+        setIsQueryingRag(false);
       }
-      setIsQueryingRag(false);
     } else {
       setActiveTab('catalog');
     }
@@ -227,9 +318,23 @@ export default function App() {
     }
   };
 
-  // Handler: Evaluate BOQ
+  // Handler: Auto-Navigate to OCA
+  const handleTriggerNavigate = async () => {
+    setLogStream([]);
+    setActiveTab('scraper');
+    setEvalResults(null);
+    try {
+      await fetch('/api/navigate-oca', { method: 'POST' });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Handler: Evaluate BOQ (Now Async SSE Driven)
   const handleEvaluateBoq = async (boqInput) => {
     setLogStream([]);
+    setActiveTab('scraper'); // Flip to terminal view while waiting
+    setEvalResults(null);
     try {
       const currentCat = catalogs.find(c => c.id === selectedChassis);
       const res = await fetch('/api/eval-boq', {
@@ -237,12 +342,15 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...boqInput, chassisDir: currentCat?.chassisDir || currentCat?.id })
       });
+      
       const data = await res.json();
-      setEvalResults(data);
-      setActiveTab('overview');
-      return data;
+      if (!res.ok) {
+        setEvalResults({ status: 'ERROR', error: data.error });
+      }
+      // If ok (202), we don't return data immediately. The SSE stream will broadcast EVAL_RESULT.
     } catch (err) {
       console.error(err);
+      setEvalResults({ status: 'ERROR', error: err.message });
     }
   };
 
@@ -354,6 +462,7 @@ export default function App() {
             evalResults={evalResults}
             onOpenPortalFeedback={setSelectedCardForFeedback}
             selectedChassis={selectedChassis}
+            onTriggerDemoBoq={handleEvaluateBoq}
           />
         )}
 
@@ -380,6 +489,7 @@ export default function App() {
             onTriggerDownloadPdf={handleTriggerDownloadPdf}
             onTriggerSyncKnowledge={handleTriggerSyncKnowledge}
             onTriggerKillTask={handleTriggerKillTask}
+            onTriggerNavigate={handleTriggerNavigate}
           />
         )}
 

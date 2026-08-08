@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Play, RefreshCw, Terminal, Download, Server, Sparkles, Loader, Square, ShieldAlert, CheckCircle, Navigation, KeyRound } from 'lucide-react';
 
-export default function ScraperTriggerCard({ logStream, isTaskRunning, onTriggerScrape, onTriggerRebuild, onTriggerDownloadPdf, onTriggerSyncKnowledge, onTriggerKillTask }) {
+export default function ScraperTriggerCard({ logStream, isTaskRunning, onTriggerScrape, onTriggerRebuild, onTriggerDownloadPdf, onTriggerSyncKnowledge, onTriggerKillTask, onTriggerNavigate }) {
   const [scrapeMode, setScrapeMode] = useState('solution');
   const [cdpState, setCdpState] = useState({ status: 'CHECKING', message: 'Probing browser...' });
+  const [logFilter, setLogFilter] = useState('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     // Poll CDP state every 3 seconds if no task is running
@@ -35,17 +37,17 @@ export default function ScraperTriggerCard({ logStream, isTaskRunning, onTrigger
     }
   });
 
-  let progressPercent = 0;
+  let progressPercent = null;
   let progressStage = 'IDLE';
 
   if (latestProgressLog) {
     try {
       const p = JSON.parse(latestProgressLog.text);
-      progressPercent = p.percent || 0;
+      progressPercent = typeof p.percent === 'number' ? p.percent : null;
       progressStage = p.stage || 'PROCESSING';
     } catch {}
   } else if (isTaskRunning) {
-    progressPercent = 45;
+    progressPercent = null;
     progressStage = 'IN_PROGRESS';
   }
 
@@ -100,7 +102,7 @@ export default function ScraperTriggerCard({ logStream, isTaskRunning, onTrigger
                
               <span>
                 <strong>Browser State:</strong> {
-                  cdpState.status === 'READY' ? `Ready on ${cdpState.title.substring(0,40)}...`
+                  cdpState.status === 'READY' ? `Ready on ${(cdpState.title || 'OCA Portal Page').substring(0, 40)}...`
                   : cdpState.status === 'AUTHENTICATING' ? 'Waiting for HPE Partner Login...'
                   : cdpState.status === 'NAVIGATING' ? 'Navigate to an OCA Solution or Chassis page...'
                   : cdpState.status === 'DISCONNECTED' ? 'CDP Disconnected (Port 9222 closed)'
@@ -122,13 +124,17 @@ export default function ScraperTriggerCard({ logStream, isTaskRunning, onTrigger
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6 space-y-2">
             <div className="flex justify-between items-center text-xs font-semibold text-slate-700">
               <span>Pipeline Workflow Progress: <span className="text-blue-600">{progressStage}</span></span>
-              <span>{progressPercent}%</span>
+              <span>{progressPercent !== null ? `${progressPercent}%` : 'Processing...'}</span>
             </div>
             <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-              <div
-                className="bg-blue-600 h-full transition-all duration-300 rounded-full"
-                style={{ width: `${Math.max(progressPercent, 10)}%` }}
-              ></div>
+              {progressPercent !== null ? (
+                <div
+                  className="bg-blue-600 h-full transition-all duration-300 rounded-full"
+                  style={{ width: `${Math.max(progressPercent, 10)}%` }}
+                ></div>
+              ) : (
+                <div className="bg-blue-600 h-full w-full animate-pulse rounded-full opacity-75"></div>
+              )}
             </div>
           </div>
         )}
@@ -171,12 +177,23 @@ export default function ScraperTriggerCard({ logStream, isTaskRunning, onTrigger
             <button
               onClick={() => onTriggerScrape(scrapeMode)}
               disabled={isTaskRunning || !canScrape}
-              className={`w-full justify-center text-xs ${canScrape ? 'btn-primary' : 'bg-slate-200 text-slate-400 font-semibold py-2 px-4 rounded-lg cursor-not-allowed'}`}
+              className={`w-full justify-center text-xs mb-2 ${canScrape ? 'btn-primary' : 'bg-slate-200 text-slate-400 font-semibold py-2 px-4 rounded-lg cursor-not-allowed'}`}
               title={canScrape ? "Start Scraping" : "Navigate browser to OCA to unlock"}
             >
               {isTaskRunning ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
               {canScrape ? 'Start Scrape' : 'Waiting for Browser...'}
             </button>
+            
+            {/* FB-5: Auto-Navigate Button */}
+            {!canScrape && cdpState.status !== 'DISCONNECTED' && (
+              <button
+                onClick={onTriggerNavigate}
+                disabled={isTaskRunning}
+                className="w-full justify-center text-xs btn-secondary"
+              >
+                <Navigation className="w-3.5 h-3.5 text-blue-600" /> Auto-Navigate to OCA
+              </button>
+            )}
           </div>
 
           {/* Offline Rebuild Action */}
@@ -237,25 +254,77 @@ export default function ScraperTriggerCard({ logStream, isTaskRunning, onTrigger
 
       {/* Real-Time SSE Log Terminal */}
       <div className="glass-card p-6">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
-          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-            <Terminal className="w-4 h-4 text-slate-600" /> Real-Time Terminal Output Stream (SSE)
-          </h3>
-          <span className="mono text-[11px] text-slate-400">Streamed via /api/stream-logs</span>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-3 mb-3 gap-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <Terminal className="w-4 h-4 text-slate-600" /> Real-Time Terminal Output Stream (SSE)
+            </h3>
+            <span className="mono text-[11px] text-slate-400">Streamed via /api/stream-logs</span>
+          </div>
+          
+          {/* FB-4: Interactive Logger Controls */}
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              placeholder="Search logs..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="px-2 py-1 border border-slate-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 w-32"
+            />
+            <select
+              value={logFilter}
+              onChange={(e) => setLogFilter(e.target.value)}
+              className="px-2 py-1 border border-slate-200 rounded text-xs bg-white text-slate-700 focus:outline-none"
+            >
+              <option value="ALL">All Logs</option>
+              <option value="ERROR">Errors/Fails</option>
+              <option value="INFO">Info</option>
+              <option value="PASS">Pass/Success</option>
+            </select>
+            <button
+              onClick={() => {
+                const blob = new Blob([logStream.map(l => `[${l.timestamp}] ${l.text}`).join('\n')], { type: 'text/plain' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `pipeline_logs_${Date.now()}.txt`;
+                a.click();
+              }}
+              className="btn-secondary text-[10px] px-2 py-1 h-auto min-h-0"
+              title="Export logs to file"
+            >
+              <Download className="w-3 h-3" /> Export
+            </button>
+          </div>
         </div>
 
         <div className="terminal-view">
           {logStream.length === 0 ? (
             <p className="text-slate-500 italic">Terminal ready. Trigger an action above to view live logs...</p>
           ) : (
-            logStream.map((log, i) => {
-              const isPass = log.text?.includes('PASS') || log.text?.includes('SUCCESS') || log.text?.includes('✅');
-              const isErr = log.text?.includes('FAIL') || log.text?.includes('ERROR') || log.text?.includes('❌');
-              const isInfo = log.text?.includes('NAV') || log.text?.includes('STEP') || log.text?.includes('⚡');
+            logStream
+              .filter(log => {
+                const text = log.text || '';
+                if (searchQuery && !text.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+                
+                const isPass = log.level === 'pass' || log.level === 'success' || /\b(PASS|SUCCESS)\b/.test(text) || text.includes('✅');
+                const isErr = log.level === 'error' || log.stream === 'stderr' || /\b(FAIL|ERROR|FAILED)\b/.test(text) || text.includes('❌');
+                const isInfo = log.level === 'info' || /\b(NAV|STEP|BUILD|AUDIT)\b/.test(text) || text.includes('⚡') || text.includes('⏳');
+                
+                if (logFilter === 'ERROR' && !isErr) return false;
+                if (logFilter === 'PASS' && !isPass) return false;
+                if (logFilter === 'INFO' && isErr) return false; // Exclude errors from info
+                
+                return true;
+              })
+              .map((log, i) => {
+              const text = log.text || '';
+              const isPass = log.level === 'pass' || log.level === 'success' || /\b(PASS|SUCCESS)\b/.test(text) || text.includes('✅');
+              const isErr = log.level === 'error' || log.stream === 'stderr' || /\b(FAIL|ERROR|FAILED)\b/.test(text) || text.includes('❌');
+              const isInfo = log.level === 'info' || /\b(NAV|STEP|BUILD|AUDIT)\b/.test(text) || text.includes('⚡') || text.includes('⏳');
 
               return (
                 <div key={i} className={`terminal-line ${isPass ? 'pass' : isErr ? 'error' : isInfo ? 'info' : ''}`}>
-                  {log.text}
+                  {text}
                 </div>
               );
             })

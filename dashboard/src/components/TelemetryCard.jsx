@@ -1,28 +1,60 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, ShieldCheck, Cpu, Clock, RefreshCw, BarChart2, AlertTriangle, CheckCircle2, Sparkles, Server } from 'lucide-react';
+import { Activity, ShieldCheck, Cpu, Clock, RefreshCw, BarChart2, AlertTriangle, CheckCircle2, Sparkles, Server, X } from 'lucide-react';
 
 export default function TelemetryCard() {
   const [telemetry, setTelemetry] = useState(null);
   const [nlmMetrics, setNlmMetrics] = useState({ totalQueries: 0, citationMatches: 0 });
   const [nlmHealth, setNlmHealth] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState(null);
+  const [isViolationsModalOpen, setIsViolationsModalOpen] = useState(false);
+
+  // Playground States
+  const [ragQuery, setRagQuery] = useState('');
+  const [ragResult, setRagResult] = useState(null);
+  const [isQuerying, setIsQuerying] = useState(false);
+
+  const handleRagQuery = async () => {
+    if (!ragQuery.trim()) return;
+    setIsQuerying(true);
+    setRagResult(null);
+    try {
+      const res = await fetch('/api/notebook-query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: ragQuery, chassisId: 'general-playground' })
+      });
+      const data = await res.json();
+      setRagResult(data);
+    } catch (err) {
+      setRagResult({ error: err.message });
+    }
+    setIsQuerying(false);
+  };
 
   const fetchTelemetry = async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const res = await fetch('/api/telemetry');
+      if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to fetch telemetry`);
       const data = await res.json();
       setTelemetry(data);
       
       const nlmRes = await fetch('/api/notebooklm-consultations');
-      const nlmData = await nlmRes.json();
-      setNlmMetrics(nlmData);
+      if (nlmRes.ok) {
+        const nlmData = await nlmRes.json();
+        setNlmMetrics(nlmData);
+      }
 
       const healthRes = await fetch('/api/test-notebooklm');
-      const healthData = await healthRes.json();
-      setNlmHealth(healthData);
+      if (healthRes.ok) {
+        const healthData = await healthRes.json();
+        setNlmHealth(healthData);
+      }
     } catch (err) {
       console.error('Failed to fetch telemetry:', err);
+      setFetchError(err.message || 'Error connecting to telemetry bridge');
     }
     setLoading(false);
   };
@@ -31,10 +63,23 @@ export default function TelemetryCard() {
     fetchTelemetry();
   }, []);
 
+  if (fetchError && !telemetry) {
+    return (
+      <div className="glass-card p-6 text-center text-rose-600 border-l-4 border-l-rose-500 space-y-3">
+        <AlertTriangle className="w-8 h-8 text-rose-500 mx-auto" />
+        <p className="text-sm font-bold">Telemetry Bridge Error</p>
+        <p className="text-xs text-slate-500">{fetchError}</p>
+        <button onClick={fetchTelemetry} className="btn-primary text-xs mx-auto inline-flex items-center gap-1.5">
+          <RefreshCw className="w-3.5 h-3.5" /> Retry Fetching Telemetry
+        </button>
+      </div>
+    );
+  }
+
   if (!telemetry) {
     return (
       <div className="glass-card p-6 text-center text-slate-400">
-        <Activity className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+        <Activity className="w-8 h-8 text-slate-300 mx-auto mb-2 animate-pulse" />
         <p className="text-xs font-semibold text-slate-600">Loading Telemetry &amp; Observability Metrics...</p>
       </div>
     );
@@ -74,7 +119,7 @@ export default function TelemetryCard() {
             </div>
             <div>
               <p className="text-[11px] text-slate-400 font-semibold uppercase">Total BOQ Evaluations</p>
-              <p className="text-xl font-bold text-slate-900">{telemetry.evaluationsCount || 0}</p>
+              <p className="text-xl font-bold text-slate-900">{telemetry.evaluationsCount > 0 ? telemetry.evaluationsCount : '—'}</p>
             </div>
           </div>
 
@@ -84,40 +129,47 @@ export default function TelemetryCard() {
             </div>
             <div>
               <p className="text-[11px] text-slate-400 font-semibold uppercase">Avg Confidence Score</p>
-              <p className="text-xl font-bold text-slate-900">
-                {telemetry.avgConfidenceScore ? `${Math.round(telemetry.avgConfidenceScore * 100)}%` : '100%'}
+              <p className="text-xl font-bold text-slate-900 flex items-baseline gap-1">
+                {telemetry.evaluationsCount > 0 ? (telemetry.avgConfidenceScore * 100).toFixed(0) + '%' : '—'}
               </p>
-            </div>
-          </div>
-
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center font-bold">
-              <Cpu className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[11px] text-slate-400 font-semibold uppercase">Learned Knowledge Deltas</p>
-              <p className="text-xl font-bold text-slate-900">{telemetry.totalDeltasLearned || 0}</p>
             </div>
           </div>
 
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center font-bold">
-              <Clock className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[11px] text-slate-400 font-semibold uppercase">Last Pipeline Update</p>
-              <p className="text-xs font-bold text-slate-900 truncate">
-                {telemetry.lastUpdated ? new Date(telemetry.lastUpdated).toLocaleTimeString() : 'N/A'}
-              </p>
-            </div>
-          </div>
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold">
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[11px] text-slate-400 font-semibold uppercase">NLM Consultations</p>
-              <p className="text-xl font-bold text-slate-900">{nlmMetrics.totalQueries || 0}</p>
+              <p className="text-[11px] text-slate-400 font-semibold uppercase">Learned Rules (Deltas)</p>
+              <p className="text-xl font-bold text-slate-900">{telemetry.totalDeltasLearned > 0 ? telemetry.totalDeltasLearned : '—'}</p>
+            </div>
+          </div>
+
+          <div
+            className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center gap-3 cursor-pointer hover:bg-red-50 hover:border-red-100 transition-colors"
+            onClick={() => setIsViolationsModalOpen(true)}
+            title="Click to view detailed violations"
+          >
+            <div className="w-10 h-10 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center font-bold">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[11px] text-slate-400 font-semibold uppercase">Failed Evaluations</p>
+              <p className="text-xl font-bold text-slate-900">
+                {history.filter(h => h.criticalViolationsCount > 0).length > 0 ? history.filter(h => h.criticalViolationsCount > 0).length : '—'}
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[11px] text-slate-400 font-semibold uppercase">Avg Duration</p>
+              <p className="text-xl font-bold text-slate-900">
+                {history.length > 0 ? (history.reduce((acc, curr) => acc + (curr.durationMs || 0), 0) / history.length / 1000).toFixed(1) + 's' : '—'}
+              </p>
             </div>
           </div>
         </div>
@@ -142,6 +194,56 @@ export default function TelemetryCard() {
             </div>
           </div>
         )}
+
+        {/* FB-3: Gemini NotebookLM RAG Playground */}
+        <div className="mb-6 p-4 rounded-xl border border-blue-200 bg-blue-50/30">
+          <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-blue-600" /> Gemini NotebookLM RAG Playground
+          </h3>
+          <div className="flex gap-2 mb-3">
+            <input
+              type="text"
+              value={ragQuery}
+              onChange={(e) => setRagQuery(e.target.value)}
+              placeholder="Ask NotebookLM a general question about the catalog..."
+              className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onKeyDown={(e) => { if (e.key === 'Enter') handleRagQuery(); }}
+            />
+            <button
+              onClick={handleRagQuery}
+              disabled={isQuerying || !ragQuery.trim()}
+              className="btn-primary text-xs shrink-0 disabled:opacity-50"
+            >
+              {isQuerying ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+              {isQuerying ? 'Querying...' : 'Run Search'}
+            </button>
+          </div>
+          {ragResult && (
+            <div className="bg-white border border-slate-200 p-4 rounded-xl text-xs text-slate-700 max-h-64 overflow-y-auto">
+              {ragResult.error ? (
+                <div className="text-rose-600 font-semibold">{ragResult.error}</div>
+              ) : (
+                <>
+                  <div className="font-semibold text-slate-900 mb-2 border-b border-slate-100 pb-2 flex justify-between items-center">
+                    <span>RAG Answer</span>
+                    {ragResult.source && <span className="badge badge-amber">Source: {ragResult.source}</span>}
+                  </div>
+                  <div className="leading-relaxed space-y-2 whitespace-pre-wrap">{ragResult.answer}</div>
+                  {ragResult.citations && ragResult.citations.length > 0 && (
+                    <div className="mt-4 pt-3 border-t border-slate-100">
+                      <p className="font-bold text-slate-900 mb-2">Citations:</p>
+                      <ul className="list-disc pl-4 space-y-1 text-slate-500">
+                        {ragResult.citations.map((c, i) => (
+                          <li key={i}>{c.source || 'QuickSpecs'} — {c.snippet}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* History Table */}
         <div>
@@ -251,6 +353,57 @@ export default function TelemetryCard() {
           </div>
         </div>
       </div>
+
+      {/* FB-7: Violations Modal */}
+      {isViolationsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[80vh]">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-500" /> Evaluation Violations Ledger
+              </h2>
+              <button onClick={() => setIsViolationsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto">
+              {history.filter(h => h.criticalViolationsCount > 0).length === 0 ? (
+                <div className="text-center py-8 text-slate-500 text-sm">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
+                  No failed evaluations found in history.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {history.filter(h => h.criticalViolationsCount > 0).map((h, i) => (
+                    <div key={i} className="border border-rose-100 rounded-lg p-3 bg-rose-50/30">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-xs font-bold text-slate-800">{new Date(h.startTime).toLocaleString()}</span>
+                        <span className="badge badge-rose">Confidence: {(h.confidence * 100).toFixed(0)}%</span>
+                      </div>
+                      <div className="text-[11px] text-slate-600 mb-2 font-mono">
+                        Run ID: {h.runId} <br/>
+                        File: {h.logs?.find(l => l.text?.includes('File:'))?.text?.replace('File: ', '') || 'Unknown'}
+                      </div>
+                      <div className="space-y-1">
+                        {h.logs?.filter(l => l.stream === 'stderr' || l.text?.includes('FAIL') || l.text?.includes('Error')).map((l, j) => (
+                          <div key={j} className="text-xs text-rose-700 bg-white p-2 rounded border border-rose-100">
+                            {l.text}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+              <button onClick={() => setIsViolationsModalOpen(false)} className="btn-secondary text-xs">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

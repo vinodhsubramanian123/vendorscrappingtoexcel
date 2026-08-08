@@ -454,6 +454,57 @@ function evaluatePhysicalMath(items, catalogData = null, targetDir = '') {
     mathDeductions.push(reason);
   }
 
+  const aspectChecks = [
+    {
+      id: 1,
+      name: 'Thermal & Compute Math',
+      iconType: 'Cpu',
+      defaultRule: 'CPU TDP thermal envelope vs cooling kit population rules',
+      status: compute.maxCpuTdpWatts >= HIGH_TDP_THRESHOLD_WATTS && !compute.hasHighPerfFans ? 'FAIL' : 'PASS',
+      detail: compute.maxCpuTdpWatts >= HIGH_TDP_THRESHOLD_WATTS && !compute.hasHighPerfFans ? `Thermal Math Failed: ${compute.maxCpuTdpWatts}W processor exceeds ${HIGH_TDP_THRESHOLD_WATTS}W limit without High-Performance Fan Kit.` : `Verified ${compute.cpuCount} CPUs within TDP envelope.`
+    },
+    {
+      id: 2,
+      name: 'Memory & Channel Balance',
+      iconType: 'Memory',
+      defaultRule: 'Memory interleaving, channel balance & population rules',
+      status: (memory.memoryCount > 0 && !memory.isBalancedChannel) ? 'FAIL' : 'PASS',
+      detail: (memory.memoryCount > 0 && !memory.isBalancedChannel) ? `Memory Math Failed: ${memory.memoryCount} DIMMs across ${compute.cpuCount || 2} CPUs is not balanced.` : `Verified ${memory.memoryCount} DIMMs in balanced configuration.`
+    },
+    {
+      id: 3,
+      name: 'Storage & Controller Cabling',
+      iconType: 'HardDrive',
+      defaultRule: 'Storage controller, drive cage & cable kit compatibility checks',
+      status: (storage.driveCount === 0 && !storage.hasNoDriveKit && !hasDriveCageKit) || (storage.hasStorageController && !storage.hasSmartBattery) ? 'FAIL' : 'PASS',
+      detail: storage.driveCount === 0 && !storage.hasNoDriveKit && !hasDriveCageKit ? 'Storage Math Failed: 0 drives requires No Drive Configuration FIO Kit.' : storage.hasStorageController && !storage.hasSmartBattery ? 'Storage Math Failed: Storage controller requires Smart Storage Battery.' : `Verified ${storage.driveCount} drives and controller configuration.`
+    },
+    {
+      id: 4,
+      name: 'PCIe Riser & Slot Alignment',
+      iconType: 'Zap',
+      defaultRule: 'Riser lane allocation, slot population & TDP compliance',
+      status: (pcie.requiredPcieCards > pcie.totalSlotsAvailable) || ((pcie.secondaryRiserCount > 0 || pcie.tertiaryRiserCount > 0) && compute.cpuCount < 2) ? 'FAIL' : 'PASS',
+      detail: pcie.requiredPcieCards > pcie.totalSlotsAvailable ? `PCIe Math Failed: ${pcie.requiredPcieCards} required cards exceeds ${pcie.totalSlotsAvailable} slots.` : (pcie.secondaryRiserCount > 0 || pcie.tertiaryRiserCount > 0) && compute.cpuCount < 2 ? 'Compute/PCIe Math Failed: Secondary/Tertiary Risers require 2nd CPU socket.' : `Verified ${pcie.requiredPcieCards} PCIe cards fit within ${pcie.totalSlotsAvailable} slots.`
+    },
+    {
+      id: 5,
+      name: 'Power & Redundancy Math',
+      iconType: 'Power',
+      defaultRule: 'Power supply redundancy rating & auxiliary kit requirements',
+      status: power.hasDcPowerSupply && !power.hasDcLugKit ? 'FAIL' : 'PASS',
+      detail: power.hasDcPowerSupply && !power.hasDcLugKit ? 'Power Math Failed: -48VDC Power Supply requires DC Power Cable Lug Kit.' : 'Verified power supply and infrastructure dependencies.'
+    },
+    {
+      id: 6,
+      name: 'Vendor Support Taxonomy',
+      iconType: 'Award',
+      defaultRule: 'Hardware SKU validation against mandatory support SLA tiers',
+      status: support.hasSupportService ? 'PASS' : 'FAIL',
+      detail: support.hasSupportService ? 'Verified mandatory support services included.' : 'Support Taxonomy Failed: Missing required support service SLA.'
+    }
+  ];
+
   const evalSummary = {
     cpuCount: compute.cpuCount,
     maxCpuTdpWatts: compute.maxCpuTdpWatts,
@@ -476,7 +527,8 @@ function evaluatePhysicalMath(items, catalogData = null, targetDir = '') {
     errors,
     warnings,
     mathDeductions,
-    missingDependencies
+    missingDependencies,
+    aspectChecks
   };
 
   // Step 7: Run 5-Level Dependency Conflict Graph Validation
@@ -511,28 +563,37 @@ function formatNotebookQueryPayload(items, evalResults) {
   const graph = evalResults.conflictGraph || {};
   const chassis = graph.chassisInfo || { model: 'HPE ProLiant DL380 Gen12 SFF', formFactor: 'SFF' };
 
-  // Format 100% of BOQ hardware items into clean natural language text
-  const itemSummaries = items.map(it => {
-    const qtyStr = it.quantity > 1 ? `${it.quantity}x ` : '1x ';
-    const descStr = it.description ? ` (${it.description})` : '';
-    return `${qtyStr}${it.sku}${descStr}`;
-  }).filter(Boolean);
+  let prompt = `Validate the following physical dependencies and constraints against the QuickSpecs for ${chassis.model}.\n\n`;
 
-  const partsListStr = itemSummaries.length > 0 ? itemSummaries.join('; ') : 'standard server components';
+  const hasMissingDeps = evalResults.missingDependencies && evalResults.missingDependencies.length > 0;
+  const hasErrors = evalResults.errors && evalResults.errors.length > 0;
+  const rankedSolutions = graph.rankedSolutions || [];
 
-  let prompt = `Validate whole-solution physical buildability, mandatory cable kits, thermal rules, and QuickSpecs requirements for ${chassis.model}.\n\n`;
-  prompt += `CONSOLIDATED BILL OF MATERIALS (100% PARTS INCLUDED):\n${partsListStr}.\n\n`;
-
-  if (evalResults.missingDependencies && evalResults.missingDependencies.length > 0) {
-    const deps = evalResults.missingDependencies.map(d => `${d.quantity || 1}x ${d.sku} — ${d.description || 'required cable/accessory'}`).join('; ');
-    prompt += `PHYSICAL PRE-CHECKS IDENTIFIED MISSING DEPENDENCIES:\n${deps}.\n\n`;
+  if (hasMissingDeps || hasErrors) {
+    prompt += `The Local Rule Engine detected the following potential conflicts/missing items in the baseline configuration:\n`;
+    if (hasMissingDeps) {
+      const deps = evalResults.missingDependencies.map(d => `${d.quantity || 1}x ${d.sku} — ${d.description || 'required cable/accessory'}`).join('; ');
+      prompt += `- Missing Dependencies: ${deps}\n`;
+    }
+    if (hasErrors) {
+      prompt += `- Violations: ${evalResults.errors.join('; ')}\n`;
+    }
+    
+    prompt += `\nTo resolve these, the engine generated the following Tier 1 solution: \n`;
+    if (rankedSolutions.length > 0) {
+      const r1 = rankedSolutions[0];
+      prompt += `Proposed Fixes: ${r1.tradeoffMetrics?.skuModifications || 'Standard'}. Reason: ${r1.reasoning}\n`;
+    }
+    
+    prompt += `\nPlease act as a hardware engineering expert. Consult the QuickSpecs to verify if these conflicts are accurate AND if the proposed Tier 1 solution fully resolves the thermal, power, and physical constraints without introducing new violations. Return your answer as a concise technical rationale.`;
+  } else {
+    // If no conflicts detected locally, do a lightweight sanity check of the primary components
+    const primaryItems = items.filter(it => it.quantity > 0 && ['Processor', 'Memory', 'Storage Devices'].includes(it.category)).slice(0, 10);
+    const itemSummaries = primaryItems.map(it => `${it.quantity > 1 ? it.quantity + 'x ' : '1x '}${it.sku}`).join('; ');
+    prompt += `Core configuration: ${itemSummaries || 'standard base chassis'}.\n`;
+    prompt += `The Local Rule Engine detected NO physical conflicts. Please do a quick sanity check to ensure no hidden thermal, power, or mixing rules are violated by this core configuration. Return a concise technical rationale confirming buildability.`;
   }
 
-  if (evalResults.errors && evalResults.errors.length > 0) {
-    prompt += `CURRENT CONFIGURATION VALIDATION WARNINGS:\n${evalResults.errors.join('; ')}.\n\n`;
-  }
-
-  prompt += `Please evaluate if all listed SKUs, quantities, and injected accessories form a 100% buildable solution without any breaking physical, thermal, or power envelope conflicts.`;
   return prompt;
 }
 

@@ -207,6 +207,12 @@ Examples:
     }
 
     console.log(`\n  📊 Quantitative Confidence Score: ${evalResults.confidence.score} / 1.00`);
+    
+    // Send the generated payload so UI can trigger async notebook query
+    evalResults.notebookPayload = queryPayload;
+    
+    console.log(JSON.stringify(evalResults, null, 2));
+
     console.log(`  ${evalResults.confidence.summary}`);
 
     if (evalResults.errors.length > 0) {
@@ -219,43 +225,16 @@ Examples:
     }
   }
 
-  // Helper to check if nlm CLI is installed and available in PATH
-  function checkNlmAvailable() {
-    try {
-      const envPath = process.platform === 'win32' ? '' : `export PATH="$HOME/.local/bin:$PATH"; `;
-      execSync(`${envPath} nlm --version`, { stdio: 'ignore', timeout: 5000 });
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  // Step 3: Format Payload & Query Gemini Notebook
-  emitProgress(8, 10, 'Grounded Gemini Notebook Validation', 'in_progress', `Querying Gemini Notebook RAG with conflict context.`);
+  // Step 3: Decoupled RAG - Formatting payload for UI async dispatch
+  emitProgress(8, 10, 'Grounded Gemini Notebook Validation', 'in_progress', `Generating RAG payload for asynchronous dispatch.`);
   const queryPayload = formatNotebookQueryPayload(items, evalResults);
-  const isNlmAvailable = checkNlmAvailable();
+  // UI will fetch the actual NotebookLM RAG result non-blockingly via /api/notebook-query-async
 
-  let ragAnswer = '';
-  if (isNlmAvailable) {
-    if (!JSON_MODE) console.log(`\n🤖 Phase 3: Querying Gemini Notebook RAG (${notebookId})...`);
-    try {
-      const res = await executeNotebookQuery(notebookId, queryPayload, {
-        context: { chassis: path.basename(chassisDir) }
-      });
-      ragAnswer = res.answer || '';
-    } catch (err) {
-      if (!JSON_MODE) console.warn(`  ⚠️ Notebook RAG query execution error: ${err.message}`);
-    }
-  } else {
-    if (!JSON_MODE) console.log(`\n⚠️ Phase 3: 'nlm' CLI not detected in PATH. Skipping Gemini Notebook RAG query.`);
-  }
+  let ragAnswer = `### Pre-Flight Physical Validation Matrix (RAG Dispatched Asynchronously)
 
-  if (!ragAnswer || ragAnswer.includes('ETIMEDOUT')) {
-    ragAnswer = `### Pre-Flight Physical Validation Matrix (RAG Query Unavailable)
+> ℹ️ **Notice**: Gemini Notebook RAG synthesis is now executed non-blockingly by the dashboard UI. Please check the dashboard for the real-time verified RAG Second Opinion.
 
-> ⚠️ **Notice**: Gemini Notebook RAG synthesis was skipped or unavailable (requires \`nlm\` CLI installed and authenticated). Below is the ungrounded pre-flight physical math validation.
-
-#### Physical Validation Summary
+#### Physical Validation Summary (Local Rules Engine)
 - **Errors Identified**: ${evalResults.errors.length} critical physical violation(s)
 - **Warnings Identified**: ${evalResults.warnings.length} physical warning(s)
 - **Quantitative Confidence Score**: ${evalResults.confidence.score} / 1.00
@@ -263,7 +242,6 @@ Examples:
 #### Physical Validation Actions:
 ${evalResults.errors.length === 0 ? '- ✅ No critical physical violations detected in input BOQ.' : evalResults.errors.map(e => `- ❌ Violation: ${e}`).join('\n')}
 ${evalResults.warnings.length === 0 ? '' : evalResults.warnings.map(w => `- ⚠️ Advisory: ${w}`).join('\n')}`;
-  }
 
   // Step 4: Budget Optimization Analysis (Golden Rule Assurance)
   let targetBudgetUsd = 0;
@@ -374,10 +352,7 @@ ${evalResults.warnings.length === 0 ? '' : evalResults.warnings.map(w => `- ⚠�
   }
 
   reportContent += `---\n\n`;
-  const ragSectionTitle = ragAnswer.includes('RAG Query Unavailable')
-    ? '## 🤖 4. Pre-Flight Physical Validation (RAG Unavailable)'
-    : '## 🤖 4. Grounded Gemini Notebook RAG Solution Validation';
-  reportContent += `${ragSectionTitle}\n\n`;
+  reportContent += `## 🤖 4. Gemini Notebook RAG Status\n\n`;
   reportContent += `${ragAnswer}\n\n`;
   reportContent += `---\n\n`;
   reportContent += `*Report generated automatically by HPE BOQ Evaluation Engine.*  \n`;
@@ -436,6 +411,7 @@ ${evalResults.warnings.length === 0 ? '' : evalResults.warnings.map(w => `- ⚠�
         },
         budgetOptimization: budgetOpt,
         ragAnswer: ragAnswer || null,
+        notebookPayload: queryPayload,
         durationMs: Date.now() - startTime
       }
     };

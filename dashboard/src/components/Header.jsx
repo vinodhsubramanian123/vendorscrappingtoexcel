@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Cpu, Search, Sparkles, Server, RefreshCw, MessageSquare, Settings } from 'lucide-react';
 import CdpHealthBadge from './CdpHealthBadge';
+import NotebookLmHealthBadge from './NotebookLmHealthBadge';
 
 export default function Header({ 
   catalogs, 
@@ -97,6 +98,7 @@ export default function Header({
             </span>
           )}
 
+          <NotebookLmHealthBadge />
           <CdpHealthBadge />
           
           <button

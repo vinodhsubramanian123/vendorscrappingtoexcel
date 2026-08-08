@@ -13,7 +13,7 @@ export default function CdpHealthBadge() {
       const data = await res.json();
       setStatus(data);
     } catch {
-      setStatus({ online: false, activeSession: false, target: null });
+      setStatus({ status: 'DISCONNECTED' });
     }
   };
 
@@ -41,16 +41,16 @@ export default function CdpHealthBadge() {
       <button
         onClick={handleOpenObservability}
         className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
-          status.activeSession
+          status.status === 'READY'
             ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-            : status.online
+            : ['NAVIGATING', 'AUTHENTICATING'].includes(status.status)
             ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
             : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
         }`}
       >
-        <Radio className={`w-3 h-3 ${status.activeSession ? 'animate-pulse text-emerald-600' : ''}`} />
+        <Radio className={`w-3 h-3 ${status.status === 'READY' ? 'animate-pulse text-emerald-600' : ''}`} />
         <span>
-          {status.activeSession ? 'CDP 9222 Active' : status.online ? 'CDP Ready (No OCA Tab)' : 'CDP Offline'}
+          {status.status === 'READY' ? 'CDP 9222 Active' : status.status === 'AUTHENTICATING' ? 'CDP Ready (Authenticating)' : status.status === 'NAVIGATING' ? 'DOM Ready (No OCA Tab)' : 'CDP Offline'}
         </span>
       </button>
 
@@ -93,11 +93,11 @@ export default function CdpHealthBadge() {
                       <span className="font-bold text-slate-800">{totalSkus} SKUs</span>
                     </div>
                     <div className="bg-slate-50 p-2 rounded">
-                      <span className="text-slate-400 block text-[9px] uppercase font-bold">Certified Lines</span>
+                      <span className="text-slate-400 block text-[9px] uppercase font-bold">Scraped Catalogs</span>
                       <span className="font-bold text-emerald-600">{catalogCount} Catalogs</span>
                     </div>
                     <div className="bg-slate-50 p-2 rounded">
-                      <span className="text-slate-400 block text-[9px] uppercase font-bold">Learned Rules</span>
+                      <span className="text-slate-400 block text-[9px] uppercase font-bold">Learned Rules (Deltas)</span>
                       <span className="font-bold text-purple-600">{deltasCount} Deltas</span>
                     </div>
                     <div className="bg-slate-50 p-2 rounded">
@@ -107,7 +107,9 @@ export default function CdpHealthBadge() {
                   </div>
                   <div className="flex justify-between border-t border-slate-100 pt-2 text-[10px]">
                     <span>Page Ready State:</span>
-                    <span className="font-semibold text-emerald-600">{obs.cdp?.ok ? 'CDP Connected' : 'DOM Ready'}</span>
+                    <span className={`font-semibold ${obs.cdp?.ok ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      {obs.cdp?.ok ? 'CDP Connected' : 'DOM Ready (No CDP)'}
+                    </span>
                   </div>
                 </div>
               );

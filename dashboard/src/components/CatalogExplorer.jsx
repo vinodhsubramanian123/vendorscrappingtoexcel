@@ -67,19 +67,23 @@ export default function CatalogExplorer({ catalogData, chassisName }) {
 
   const types = ['ALL', 'CTO', 'BTO', 'FIO', 'Service'];
 
-  // Filter SKUs
-  let displayedSkus = searchResults !== null ? searchResults : allSkus;
-  if (activeCategory !== 'ALL') {
-    displayedSkus = displayedSkus.filter(s => s.parentCategory === activeCategory);
-  }
-  if (activeSubCategory !== 'ALL') {
-    displayedSkus = displayedSkus.filter(s => s.subCategory === activeSubCategory);
-  }
-  if (activeType !== 'ALL') {
-    displayedSkus = displayedSkus.filter(s => s.optionType === activeType);
-  }
+  const [viewMode, setViewMode] = useState('table'); // 'table', 'analytics', 'services'
 
-  const [viewMode, setViewMode] = useState('table'); // 'table' or 'analytics'
+  let displayedSkus = searchResults !== null ? searchResults : allSkus;
+  
+  if (viewMode === 'services') {
+    displayedSkus = displayedSkus.filter(s => s.optionType === 'Service');
+  } else {
+    if (activeCategory !== 'ALL') {
+      displayedSkus = displayedSkus.filter(s => s.parentCategory === activeCategory);
+    }
+    if (activeSubCategory !== 'ALL') {
+      displayedSkus = displayedSkus.filter(s => s.subCategory === activeSubCategory);
+    }
+    if (activeType !== 'ALL') {
+      displayedSkus = displayedSkus.filter(s => s.optionType === activeType);
+    }
+  }
 
   // Derive chassisDir from catalogData.metadata if available or chassisName
   const chassisDir = catalogData?.metadata?.chassisDir || (chassisName ? chassisName.replace(/ /g, '_') : '');
@@ -148,9 +152,17 @@ export default function CatalogExplorer({ catalogData, chassisName }) {
             >
               Price Variance & History
             </button>
+            <button
+              onClick={() => setViewMode('services')}
+              className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                viewMode === 'services' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Services & Support
+            </button>
           </div>
 
-          {viewMode === 'table' && (
+          {(viewMode === 'table' || viewMode === 'services') && (
             <>
               {/* Instant Search input */}
               <div className="relative flex-1 md:w-48">

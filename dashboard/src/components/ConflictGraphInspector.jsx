@@ -7,26 +7,28 @@ export default function ConflictGraphInspector({ evalResults, chassisName }) {
   // Extract dynamic physical checks from evalResults if available
   const rawAspects = evalResults?.physicalChecks || evalResults?.aspectChecks;
 
-  const aspectIcons = [Cpu, Memory, HardDrive, Zap, Power, Award];
+  const aspectIcons = { Cpu, Memory, HardDrive, Zap, Power, Award };
 
   // Dynamic 6-aspect definitions — reads from eval payload when available (Fix G7)
   const defaultAspects = [
-    { id: 1, name: 'Thermal & Compute Math', icon: Cpu, defaultRule: 'CPU TDP thermal envelope vs cooling kit population rules' },
-    { id: 2, name: 'Memory & Channel Balance', icon: Memory, defaultRule: 'Memory interleaving, channel balance & population rules' },
-    { id: 3, name: 'Storage & Controller Cabling', icon: HardDrive, defaultRule: 'Storage controller, drive cage & cable kit compatibility checks' },
-    { id: 4, name: 'PCIe Riser & Slot Alignment', icon: Zap, defaultRule: 'Riser lane allocation, slot population & TDP compliance' },
-    { id: 5, name: 'Power & Redundancy Math', icon: Power, defaultRule: 'Power supply redundancy rating & auxiliary kit requirements' },
-    { id: 6, name: 'Vendor Support Taxonomy', icon: Award, defaultRule: 'Hardware SKU validation against mandatory support SLA tiers' }
+    { id: 1, name: 'Thermal & Compute Math', iconType: 'Cpu', defaultRule: 'CPU TDP thermal envelope vs cooling kit population rules' },
+    { id: 2, name: 'Memory & Channel Balance', iconType: 'Memory', defaultRule: 'Memory interleaving, channel balance & population rules' },
+    { id: 3, name: 'Storage & Controller Cabling', iconType: 'HardDrive', defaultRule: 'Storage controller, drive cage & cable kit compatibility checks' },
+    { id: 4, name: 'PCIe Riser & Slot Alignment', iconType: 'Zap', defaultRule: 'Riser lane allocation, slot population & TDP compliance' },
+    { id: 5, name: 'Power & Redundancy Math', iconType: 'Power', defaultRule: 'Power supply redundancy rating & auxiliary kit requirements' },
+    { id: 6, name: 'Vendor Support Taxonomy', iconType: 'Award', defaultRule: 'Hardware SKU validation against mandatory support SLA tiers' }
   ];
 
-  const aspects = defaultAspects.map((def, idx) => {
-    const isEvaluated = !!evalResults;
-    let passed = true;
-    let detail = def.defaultRule;
-    let status = !isEvaluated ? 'PENDING' : 'PASS';
+  const dataSource = rawAspects && rawAspects.length > 0 ? rawAspects : defaultAspects;
 
-    // If we have mathDeductions from the backend, map them to the UI aspects
-    if (isEvaluated && evalResults.mathDeductions) {
+  const aspects = dataSource.map((def, idx) => {
+    const isEvaluated = !!evalResults;
+    let passed = def.status === 'PASS';
+    let detail = def.detail || def.defaultRule;
+    let status = def.status || (!isEvaluated ? 'PENDING' : 'PASS');
+
+    // If using default aspects (no backend payload), try to fallback to mathDeductions mapping
+    if (isEvaluated && !rawAspects && evalResults.mathDeductions) {
       const keyword = def.name.split(' ')[0]; // e.g., "Thermal", "Memory", "Storage", "PCIe", "Power", "Vendor"
       const matchedDeduction = evalResults.mathDeductions.find(d => 
         d.includes(keyword) || 
@@ -44,9 +46,11 @@ export default function ConflictGraphInspector({ evalResults, chassisName }) {
 
     return {
       ...def,
+      id: def.id || (idx + 1),
       name: def.name,
       status,
-      detail
+      detail,
+      iconType: def.iconType || 'ShieldCheck'
     };
   });
 
@@ -60,7 +64,7 @@ export default function ConflictGraphInspector({ evalResults, chassisName }) {
           <div>
             <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-emerald-600" />
-              6-Aspect Physical Math Verification
+              Dynamic Multi-Aspect Constraint Engine
             </h2>
             <p className="text-xs text-slate-500">
               Automated pre-flight physical rules audit for <span className="font-semibold text-slate-800">{chassisName || 'Selected Solution'}</span>
@@ -85,7 +89,7 @@ export default function ConflictGraphInspector({ evalResults, chassisName }) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {aspects.map(asp => {
-            const Icon = asp.icon;
+            const Icon = aspectIcons[asp.iconType] || ShieldCheck;
             const isPass = asp.status === 'PASS';
             const isPending = asp.status === 'PENDING';
 

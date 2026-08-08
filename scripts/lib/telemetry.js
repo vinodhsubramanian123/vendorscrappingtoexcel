@@ -30,7 +30,7 @@ function loadTelemetry() {
     evaluationsCount: 0,
     totalDeltasLearned: 0,
     totalRulesEvaluated: 0,
-    avgConfidenceScore: 1.0,
+    avgConfidenceScore: 0,
     history: []
   };
 }
@@ -73,6 +73,47 @@ function recordEvaluationTelemetry(evalResults, boqFile = '', durationMs = 0) {
   // Recalculate average confidence score
   const totalScore = data.history.reduce((acc, curr) => acc + curr.confidenceScore, 0);
   data.avgConfidenceScore = parseFloat((totalScore / data.history.length).toFixed(2));
+  data.lastUpdated = new Date().toISOString();
+
+  fs.writeFileSync(TELEMETRY_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  return entry;
+}
+
+/**
+ * Record a learned portal feedback delta in telemetry.
+ * @param {object} delta 
+ */
+function recordFeedbackTelemetry(delta) {
+  const telemetryDir = path.dirname(TELEMETRY_FILE);
+  if (!fs.existsSync(telemetryDir)) {
+    fs.mkdirSync(telemetryDir, { recursive: true });
+  }
+
+  const data = loadTelemetry();
+  if (!data.learnedDeltas) data.learnedDeltas = [];
+
+  const entry = {
+    id: delta.deltaId || `DELTA-${Date.now()}`,
+    timestamp: delta.timestamp || new Date().toISOString(),
+    chassis: delta.chassis || 'DL380_Gen12_SFF',
+    errorType: delta.errorType || 'PERMANENT_PHYSICAL_DEPENDENCY',
+    affectedSku: delta.affectedSku || '',
+    requiredSku: delta.requiredDependencySku || null,
+    ruleUpdate: delta.ruleUpdate || ''
+  };
+
+  data.learnedDeltas.unshift(entry);
+  if (data.learnedDeltas.length > 50) data.learnedDeltas.pop();
+
+  data.totalDeltasLearned = (data.totalDeltasLearned || 0) + 1;
+  
+  // Human intervention implies 0% confidence in the engine's previous state
+  if (data.history && data.history.length > 0) {
+    data.history[0].confidenceScore = 0.0;
+    const totalScore = data.history.reduce((acc, curr) => acc + curr.confidenceScore, 0);
+    data.avgConfidenceScore = parseFloat((totalScore / data.history.length).toFixed(2));
+  }
+  
   data.lastUpdated = new Date().toISOString();
 
   fs.writeFileSync(TELEMETRY_FILE, JSON.stringify(data, null, 2), 'utf-8');
