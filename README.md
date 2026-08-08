@@ -11,6 +11,26 @@ Generates multi-sheet Excel workbooks, structured JSON companions, TSV intermedi
 
 ---
 
+## 🏛️ Goals, Architecture, Tech Stack & Coding Approach
+
+### 🎯 Primary Goals
+1. **Zero-Hardcoding Agnosticism**: The pipeline must dynamically adapt to *any* product family (ProLiant, Synergy, Alletra, Cray) without code changes, deriving constraints purely from DOM taxonomy.
+2. **SSO/MFA Security Bypass**: Avoid headless bots getting blocked by using Chrome DevTools Protocol (CDP) to piggyback on the user's authenticated session.
+3. **Closed-Loop Intelligence**: Create a self-healing 6-stage lifecycle where physical math pre-checks, NotebookLM RAG verification, and human-in-the-loop portal trials feed rejected rules back into the local engine (`catalog_deltas.json`).
+
+### 🏗️ Architecture Design & Approach
+This project operates on a **Dual-Node Architecture**:
+- **Core Engine (Scripts)**: A collection of purely functional, stateless Node.js scripts (`scripts/`). They use regex for SKU identification, DOM walking for table classification, and deterministic math graphs for BOQ (Bill of Materials) evaluation.
+- **Control Center (Dashboard)**: A modern React UI that spawns these backend Node.js scripts as `child_process` instances. It uses Server-Sent Events (SSE) to stream live terminal outputs to the user, creating a transparent, real-time observability ledger.
+
+### 💻 Tech Stack
+- **Backend Pipeline**: Pure `Node.js` (≥ v18), `ws` (WebSockets for CDP port 9222 connection), `xlsx` / `xlsx-js-style` (Excel generation).
+- **Frontend Dashboard**: `React 18`, `Vite`, `TailwindCSS` (Glassmorphism aesthetics).
+- **Backend Bridge API**: `Express.js` (Task Mutex locking, child process spawning, async NotebookLM RAG polling).
+- **AI Integration**: Gemini NotebookLM MCP Server (Asynchronous RAG polling architecture).
+
+---
+
 ## ⚡ Quick Start & Cross-Platform Prerequisites
 
 ### 1. Prerequisites
